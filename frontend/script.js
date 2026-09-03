@@ -525,8 +525,11 @@ function clearDirectory(shouldFocus = true) {
     updateSettings();
     if (shouldFocus) {
         input.focus();
+    } else {
+        input.blur();
     }
 }
+window.clearDirectory = clearDirectory;
 
 /* ---- Settings: output save location ---- */
 function selectSaveLocation() {

@@ -343,6 +343,10 @@ func (a *App) playAudio(path string) {
 	a.execJS(fmt.Sprintf(`if (typeof playAudio === 'function') playAudio(%s);`, string(pJSON)))
 }
 
+func (a *App) clearSourceDirectory() {
+	a.execJS(`if (typeof clearDirectory === 'function') clearDirectory(false);`)
+}
+
 // AppReady is called when the frontend DOM and Wails runtime are ready.
 func (a *App) AppReady() {
 	a.execJS(fmt.Sprintf(`if (typeof applyAppVersion === 'function') applyAppVersion('%s');`, constants.Version))
@@ -830,6 +834,7 @@ func (a *App) Start(params map[string]interface{}) {
 					a.playAudio("success.wav")
 				}
 				a.showSuccess(getMsg("idle_done", lang))
+				a.clearSourceDirectory()
 			}
 		} else {
 			// Batch mode
@@ -938,6 +943,7 @@ func (a *App) Start(params map[string]interface{}) {
 				a.playAudio("success.wav")
 			}
 			a.showSuccess(getMsg("idle_done", lang))
+			a.clearSourceDirectory()
 		}
 
 		a.setButtonState("idle")
