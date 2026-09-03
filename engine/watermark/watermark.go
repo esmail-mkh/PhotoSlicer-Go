@@ -168,8 +168,12 @@ func DefaultWatermarkPlacements(canvasW, canvasH, count int, wmSize image.Point,
 	return placements
 }
 
-// ComputeWatermarkPlacements computes optimal non-overlapping placements.
+// ComputeWatermarkPlacements computes optimal non-overlapping placements using Content-Aware Panel Detection.
 func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int, edge string, widthPercent int, margin int) ([]Placement, *image.RGBA) {
+	if count <= 0 {
+		count = 1
+	}
+
 	b := img.Bounds()
 	canvasW := b.Dx()
 	canvasH := b.Dy()
@@ -182,20 +186,61 @@ func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int
 	wmW := wm.Bounds().Dx()
 	wmH := wm.Bounds().Dy()
 
-	points := DefaultWatermarkPlacements(canvasW, canvasH, count, image.Pt(wmW, wmH), edge, margin)
+	// Extract grayscale and saturation for content-aware analysis
+	gray, sat, w, h := ExtractGrayAndSaturation(img)
 
-	var result []Placement
-	for i, pt := range points {
-		result = append(result, Placement{
+	// Whole-image connected bubble mask (built once, shared across all segments)
+	bubbleMask, maskW, maskH := BuildBubbleMask(gray, sat, w, h)
+
+	// Whole-image gutters (built once, shared across all segments)
+	gutters := FindGutters(gray, sat, w, h)
+
+	segmentHeight := float64(canvasH) / float64(count)
+	var placements []Placement
+
+	for i := 0; i < count; i++ {
+		segStart := int(float64(i) * segmentHeight)
+		segEnd := int(float64(i+1) * segmentHeight)
+
+		if segEnd-segStart < wmH {
+			continue
+		}
+
+		xPos, yPos, _ := FindBestWatermarkPosition(
+			gray, sat, w, h, wmW, wmH, segStart, segEnd, edge, margin,
+			bubbleMask, maskW, maskH, gutters,
+		)
+
+		// Clamp yPos inside segment
+		if yPos < segStart {
+			yPos = segStart
+		}
+		if yPos > segEnd-wmH {
+			yPos = segEnd - wmH
+		}
+
+		placements = append(placements, Placement{
 			Image: wm,
-			X:     pt.X,
-			Y:     pt.Y,
+			X:     xPos,
+			Y:     yPos,
 			Name:  "Watermark",
 		})
-		_ = i
 	}
 
-	return result, wm
+	// Fallback to deterministic placements if none were found
+	if len(placements) == 0 {
+		fallbackPoints := DefaultWatermarkPlacements(canvasW, canvasH, count, image.Pt(wmW, wmH), edge, margin)
+		for _, pt := range fallbackPoints {
+			placements = append(placements, Placement{
+				Image: wm,
+				X:     pt.X,
+				Y:     pt.Y,
+				Name:  "Watermark",
+			})
+		}
+	}
+
+	return placements, wm
 }
 
 // ApplyWatermark composites watermark onto an image.

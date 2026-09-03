@@ -263,10 +263,16 @@ func RunRealEsrganAI(
 	archive.RegisterTempDir(outDir)
 
 	if modelName == "" {
-		modelName = "realesrgan-x4plus-anime"
+		modelName = "realesr-animevideov3-x2"
 	}
 
-	cmd := exec.Command(exePath, "-i", inputFolder, "-o", outDir, "-n", modelName)
+	modelsDir := filepath.Join(filepath.Dir(exePath), "models")
+	args := []string{"-i", inputFolder, "-o", outDir, "-n", modelName, "-s", "2", "-t", "400", "-f", "jpg"}
+	if fi, err := os.Stat(modelsDir); err == nil && fi.IsDir() {
+		args = append(args, "-m", modelsDir)
+	}
+
+	cmd := exec.Command(exePath, args...)
 	cmd.Dir = filepath.Dir(exePath)
 
 	if err := cmd.Start(); err != nil {

@@ -134,18 +134,53 @@ func TestWatermarkPlacements(t *testing.T) {
 	})
 
 	t.Run("ApplyWatermarkCompositesPixels", func(t *testing.T) {
+		placements, _ := ComputeWatermarkPlacements(canvas, wmPath, 1, "left", 0, 0)
+		if len(placements) == 0 {
+			t.Fatal("Expected at least one placement")
+		}
+
 		result := ApplyWatermark(canvas, wmPath, 1, "left", 0, 0)
 		if result == nil {
 			t.Fatal("Expected valid composite image, got nil")
 		}
 
-		// Pixel at (10, 480) shouldn't be pure white anymore if watermark is placed there
-		// Default Y centers vertically in 1000px: y = (1000 - 50)/2 = 475
-		c := result.At(10, 480)
+		// Verify watermark was blended at placement coordinates
+		c := result.At(placements[0].X+10, placements[0].Y+10)
 		_, g, b, _ := c.RGBA()
 		// Pure white is 65535, 65535, 65535. Watermark is semi-transparent red, so green & blue will be lower.
 		if g == 65535 && b == 65535 {
-			t.Errorf("Expected watermark blended at (10, 480), but pixel is white: G=%d B=%d", g, b)
+			t.Errorf("Expected watermark blended at (%d, %d), but pixel is white: G=%d B=%d",
+				placements[0].X+10, placements[0].Y+10, g, b)
+		}
+	})
+
+	t.Run("AvoidsSpeechBubble", func(t *testing.T) {
+		// Create canvas with artwork (mid-tone gray)
+		comicCanvas := image.NewRGBA(image.Rect(0, 0, 800, 1000))
+		draw.Draw(comicCanvas, comicCanvas.Bounds(), image.NewUniform(color.RGBA{R: 140, G: 140, B: 140, A: 255}), image.Point{}, draw.Src)
+
+		// Draw a speech bubble at the left (x: 0..250, y: 10..150)
+		// White interior
+		bubbleRect := image.Rect(0, 10, 250, 150)
+		draw.Draw(comicCanvas, bubbleRect, image.White, image.Point{}, draw.Src)
+		// Scatter text pixels inside bubble (dark dots)
+		for by := 30; by < 130; by += 8 {
+			for bx := 20; bx < 220; bx += 4 {
+				comicCanvas.SetRGBA(bx, by, color.RGBA{R: 20, G: 20, B: 20, A: 255})
+			}
+		}
+
+		// Watermark is 200x50 on left edge. Without avoidance, it would sit in y: 10..150.
+		// With smart detection, it must dodge the speech bubble!
+		placements, _ := ComputeWatermarkPlacements(comicCanvas, wmPath, 1, "left", 0, 0)
+		if len(placements) == 0 {
+			t.Fatal("Expected placement, got none")
+		}
+
+		wmY := placements[0].Y
+		// Watermark must not overlap the speech bubble interior (y: 10..150)
+		if wmY >= 10 && wmY < 150 {
+			t.Errorf("Watermark was placed inside speech bubble at Y=%d, expected avoidance!", wmY)
 		}
 	})
 }

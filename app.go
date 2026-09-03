@@ -569,6 +569,8 @@ func (a *App) Start(params map[string]interface{}) {
 			return
 		}
 
+		originalInputPath := dirAddress
+
 		// Handle direct ZIP/CBZ/PDF input file
 		fi, err := os.Stat(dirAddress)
 		if err != nil {
@@ -579,8 +581,9 @@ func (a *App) Start(params map[string]interface{}) {
 			return
 		}
 
+		originalIsFile := !fi.IsDir()
 		var archiveTempDir string
-		if !fi.IsDir() {
+		if originalIsFile {
 			extLower := strings.ToLower(filepath.Ext(dirAddress))
 			if extLower == ".zip" || extLower == ".cbz" {
 				tempRoot, _ := os.MkdirTemp("", "photoslicer_extract_")
@@ -600,7 +603,15 @@ func (a *App) Start(params map[string]interface{}) {
 		if saveLocation != "" {
 			outputBase = saveLocation
 		}
-		_ = os.MkdirAll(outputBase, 0755)
+
+		saveNextSrc, _ := params["save_next_to_source"].(bool)
+		outputSuffix, _ := params["output_suffix"].(string)
+		outputSuffix = strings.TrimSpace(outputSuffix)
+		if outputSuffix == "" {
+			outputSuffix = " [Stitched]"
+		} else if !strings.HasPrefix(outputSuffix, " ") {
+			outputSuffix = " " + outputSuffix
+		}
 
 		// Watermark check
 		wmEnabled, _ := params["watermark_enabled"].(bool)
@@ -660,6 +671,26 @@ func (a *App) Start(params map[string]interface{}) {
 		directImages, _ := sorting.GetAllImagesDirectory(dirAddress)
 		isSingleMode := len(directImages) > 0
 
+		stitchedSaveName := filepath.Base(dirAddress)
+		if saveNextSrc {
+			absSrc, err := filepath.Abs(originalInputPath)
+			if err == nil {
+				sourceParent := filepath.Dir(absSrc)
+				sourceName := filepath.Base(absSrc)
+				if originalIsFile {
+					sourceName = strings.TrimSuffix(sourceName, filepath.Ext(sourceName))
+				}
+				stitchedName := fmt.Sprintf("%s%s", sourceName, outputSuffix)
+				if isSingleMode {
+					outputBase = sourceParent
+					stitchedSaveName = stitchedName
+				} else {
+					outputBase = filepath.Join(sourceParent, stitchedName)
+				}
+			}
+		}
+		_ = os.MkdirAll(outputBase, 0755)
+
 		currentDate := time.Now().Format("2006-01-02")
 
 		if isSingleMode {
@@ -712,7 +743,7 @@ func (a *App) Start(params map[string]interface{}) {
 				IsCustomWidth:         isCustomWidth,
 				SaveFormat:            saveFormat,
 				SaveQuality:           saveQualityVal,
-				SaveDirectory:         filepath.Base(dirAddress),
+				SaveDirectory:         stitchedSaveName,
 				HeightLimit:           heightLimitVal,
 				CurrentDate:           currentDate,
 				IsZip:                 isZip,
@@ -793,9 +824,17 @@ func (a *App) Start(params map[string]interface{}) {
 				if isEnhance {
 					a.updateStep("process")
 					if enhanceEngine == "fast" {
-						enhancedDir, _ := enhancer.RunFastEnhancement(fld, threadCount, nil)
-						if enhancedDir != "" {
+						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, nil)
+						if err == nil && enhancedDir != "" {
 							processFolder = enhancedDir
+						}
+					} else {
+						exePath := enhancer.FindRealEsrganExecutable(".")
+						if exePath != "" {
+							enhancedDir, err := enhancer.RunRealEsrganAI(exePath, fld, "", nil)
+							if err == nil && enhancedDir != "" {
+								processFolder = enhancedDir
+							}
 						}
 					}
 				}

@@ -292,6 +292,10 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 		counter++
 		savePath = fmt.Sprintf("%s (%d)", originalSavePath, counter)
 	}
+	// PSD format cannot be embedded in PDF; fallback to JPG if PDF is requested
+	if opts.IsPdf && strings.ToUpper(opts.SaveFormat) == "PSD" {
+		opts.SaveFormat = "JPG"
+	}
 
 	if opts.IsNoStitch {
 		err := ProcessBatchNoStitch(images, savePath, opts)
