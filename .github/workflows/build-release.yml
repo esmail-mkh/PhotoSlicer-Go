@@ -12,10 +12,10 @@ on:
         required: true
         default: true
       version_tag:
-        description: 'Release Tag Version (e.g. v5.2)'
+        description: 'Release Tag Version (leave blank to auto-detect from wails.json)'
         type: string
         required: false
-        default: 'v5.2'
+        default: ''
 
 permissions:
   contents: write
@@ -73,7 +73,10 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($tag) -or $tag.StartsWith("refs/")) {
             $tag = "${{ inputs.version_tag }}"
           }
-          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "v5.2" }
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $wailsJson = Get-Content "wails.json" -Raw | ConvertFrom-Json
+            $tag = "v" + $wailsJson.info.productVersion
+          }
 
           $zipName = "PhotoSlicer-$tag-Windows.zip"
           New-Item -ItemType Directory -Path "dist_pkg" -Force
@@ -88,7 +91,9 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
-          if [ -z "$TAG" ]; then TAG="v5.2"; fi
+          if [ -z "$TAG" ]; then
+            TAG="v$(jq -r '.info.productVersion' wails.json)"
+          fi
 
           ZIP_NAME="PhotoSlicer-$TAG-Linux.zip"
           mkdir -p dist_pkg
@@ -106,7 +111,9 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
-          if [ -z "$TAG" ]; then TAG="v5.2"; fi
+          if [ -z "$TAG" ]; then
+            TAG="v$(jq -r '.info.productVersion' wails.json)"
+          fi
 
           ZIP_NAME="PhotoSlicer-$TAG-macOS.zip"
           mkdir -p dist_pkg
@@ -143,7 +150,9 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
-          if [ -z "$TAG" ]; then TAG="v5.2"; fi
+          if [ -z "$TAG" ]; then
+            TAG="v$(jq -r '.info.productVersion' wails.json)"
+          fi
           CLEAN_VER="${TAG#v}"
           CLEAN_VER="${CLEAN_VER#V}"
           echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV

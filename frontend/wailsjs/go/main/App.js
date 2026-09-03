@@ -18,6 +18,10 @@ export function FolderName(arg1) {
   return window['go']['main']['App']['FolderName'](arg1);
 }
 
+export function GetAppVersion() {
+  return window['go']['main']['App']['GetAppVersion']();
+}
+
 export function GetClipboardText() {
   return window['go']['main']['App']['GetClipboardText']();
 }

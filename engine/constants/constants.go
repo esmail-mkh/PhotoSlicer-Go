@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	Version           = "5.2"
+	Version           = "5.3"
 	WebPMaxDimension  = 16383
 	JpegMaxDimension  = 65500
 	DefaultWidth      = 800

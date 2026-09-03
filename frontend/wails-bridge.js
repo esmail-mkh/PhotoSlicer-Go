@@ -49,7 +49,8 @@
         close_window: () => window.go?.main?.App?.CloseWindow(),
         get_clipboard_text: () => window.go?.main?.App?.GetClipboardText(),
         isDirectory: (path) => window.go?.main?.App?.IsDirectory(path),
-        folderName: (path) => window.go?.main?.App?.FolderName(path)
+        folderName: (path) => window.go?.main?.App?.FolderName(path),
+        get_app_version: () => window.go?.main?.App?.GetAppVersion()
     };
 
     window.pywebview = { api: api };

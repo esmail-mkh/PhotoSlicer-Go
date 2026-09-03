@@ -2444,7 +2444,25 @@ function handleResize() {
     }
 }
 
+function applyAppVersion(version) {
+    const v = version || window.__APP_VERSION__;
+    if (!v) return;
+    document.querySelectorAll('.version-badge, .about-version-badge').forEach(el => {
+        el.textContent = 'v' + v;
+    });
+    const statVal = document.querySelector('.about-stat-value');
+    if (statVal) {
+        statVal.textContent = v;
+    }
+}
+window.applyAppVersion = applyAppVersion;
+
 window.addEventListener('DOMContentLoaded', function() {
+    if (window.__APP_VERSION__) {
+        applyAppVersion(window.__APP_VERSION__);
+    } else if (window.pywebview?.api?.get_app_version) {
+        window.pywebview.api.get_app_version().then(applyAppVersion).catch(() => {});
+    }
     handleResize();
     positionTabIndicator();
 });
@@ -2471,6 +2489,9 @@ function openResultFolder() {
 }
 
 window.addEventListener('pywebviewready', function() {
+    if (window.pywebview?.api?.get_app_version) {
+        window.pywebview.api.get_app_version().then(applyAppVersion).catch(() => {});
+    }
     pywebview.api.app_ready();
 });
 

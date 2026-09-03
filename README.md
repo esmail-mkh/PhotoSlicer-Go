@@ -1,6 +1,6 @@
 [🇮🇷 **Read in Persian (فارسی)**](README-fa.md)
 
-# 📸 PhotoSlicer v5.2
+# 📸 PhotoSlicer
 ### The Ultimate Manhwa & Webtoon Processing Tool (Go + Wails v2)
 
 [![Version](https://img.shields.io/github/v/release/esmail-mkh/PhotoSlicer-Go?label=Version&color=blue)](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest)
@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="left">
-  <img src="assets/app-v5.1-fa-image.jpg" alt="PhotoSlicer v5.2 Interface" width="420">
+  <img src="assets/app-v5.1-fa-image.jpg" alt="PhotoSlicer Interface" width="420">
 </p>
 
 **PhotoSlicer** is a blazing-fast, aesthetically stunning, cross-platform desktop application designed specifically for **Webtoon, Manhwa, and Manga translators, scanlation teams, and editors**. Completely rewritten in **Go** and **Wails v2**, it delivers pure native performance with an ultra-lightweight memory footprint and zero external runtime dependencies (no Python or heavy runtimes required).
@@ -118,9 +118,9 @@ Download the latest release archive from [Releases](https://github.com/esmail-mk
 
 | Operating System | Package Name | Executable Inside |
 |:---|:---|:---|
-| 🪟 **Windows (x64)** | `PhotoSlicer-v5.2-Windows.zip` | `PhotoSlicer.exe` |
-| 🐧 **Linux (x64)** | `PhotoSlicer-v5.2-Linux.zip` | `./PhotoSlicer` |
-| 🍎 **macOS (x64/ARM)** | `PhotoSlicer-v5.2-macOS.zip` | `PhotoSlicer.app` |
+| 🪟 **Windows (x64)** | `PhotoSlicer-v<Version>-Windows.zip` | `PhotoSlicer.exe` |
+| 🐧 **Linux (x64)** | `PhotoSlicer-v<Version>-Linux.zip` | `./PhotoSlicer` |
+| 🍎 **macOS (x64/ARM)** | `PhotoSlicer-v<Version>-macOS.zip` | `PhotoSlicer.app` |
 
 > ℹ️ Each package comes bundled with the `up-model/` directory containing AI models.
 

@@ -9,6 +9,8 @@ export function ExportPresets(arg1:string,arg2:string):Promise<string>;
 
 export function FolderName(arg1:string):Promise<string>;
 
+export function GetAppVersion():Promise<string>;
+
 export function GetClipboardText():Promise<string>;
 
 export function ImportPresets():Promise<string>;

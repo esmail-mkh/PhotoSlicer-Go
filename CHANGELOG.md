@@ -1,8 +1,21 @@
-[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۲-بازنویسی-کامل-با-go-و-wails-v2) | [🇬🇧 **English**](#-photoslicer-v52-complete-rewrite-in-go--wails-v2)
+[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۳-ارتقای-واترمارک-هوشمند-و-بهبود-پایداری) | [🇬🇧 **English**](#-photoslicer-v53-content-aware-watermarking--stability)
 
 ---
 
 <div dir="rtl">
+
+# 🚀 فوتو اسلایسر نسخه ۵.۳: ارتقای واترمارک هوشمند و بهبود پایداری
+
+**نسخه ۵.۳ منتشر شد!** این نسخه با ارتقای سیستم واترمارک هوشمند محتوا-محور، جلوگیری از تداخل با حباب‌های گفتگو، حفظ دقیق ابعاد اصلی تصاویر، و بهبود ذخیره‌سازی تنظیمات و پایداری عملکرد ارائه شده است.
+
+### 🌟 تغییرات جدید (نسخه ۵.۳)
+
+* **🧠 سیستم واترمارک هوشمند و محتوا-محور:** الگوریتم پیشرفته تشخیص کادرهای طراحی و جلوگیری دقیق از تداخل واترمارک با حباب‌های گفتگو.
+* **📐 حفظ ابعاد اصلی تصویر در واترمارک:** رفع مشکل کوچک‌شدن ناخواسته تصویر و تثبیت رزولوشن دقیق هنگام درج واترمارک.
+* **💾 پایداری تنظیمات و رفع مواردی از انکودینگ:** ذخیره‌سازی پایدار انتخاب موتور بهبود کیفیت (Fast Clean / Real-ESRGAN)، حفظ گزینه‌های پریست‌ها و رفع مشکل کاراکترهای ناسازگار (Mojibake).
+* **⚡ بهینه‌سازی رابط کاربری و رفع خطاهای اسکریپت:** رفع باگ‌های جزئی در فایل‌های فرانت‌اند و بهبود روانی عملکرد برنامه.
+
+---
 
 # 🚀 فوتو اسلایسر نسخه ۵.۲: بازنویسی کامل با Go و Wails v2
 
@@ -119,6 +132,19 @@
 فایل **ZIP** آخرین نسخه را از صفحه [Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest) دانلود کنید، اکسترکت کنید و `PhotoSlicer.exe` را اجرا کنید. لذت ببرید!
 
 </div>
+
+---
+
+# 🚀 PhotoSlicer v5.3: Content-Aware Watermarking & Stability
+
+**Version 5.3 is here!** This release brings advanced content-aware smart watermarking with speech bubble detection, strict preservation of original image dimensions, enhanced settings persistence, and overall stability polish.
+
+### 🌟 What's New (v5.3)
+
+* **🧠 Content-Aware Smart Watermarking:** Advanced panel edge detection and intelligent speech bubble avoidance for pristine watermark placement.
+* **📐 Native Image Dimension Preservation:** Fixed unexpected image downscaling during watermarking, guaranteeing exact source resolution retention.
+* **💾 Robust Settings & Presets Persistence:** Reliable persistence of enhancement engine selection (Fast Clean / Real-ESRGAN), full preservation of preset options, and resolution of text encoding/mojibake issues.
+* **⚡ Frontend Polish & Bug Fixes:** Eliminated minor script syntax issues and enhanced UI stability.
 
 ---
 

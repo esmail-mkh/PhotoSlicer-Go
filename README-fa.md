@@ -2,7 +2,7 @@
 
 [🇬🇧 **Read in English**](README.md)
 
-# 📸 فوتو اسلایسر نسخه ۵.۲ (Go + Wails v2)
+# 📸 فوتو اسلایسر (Go + Wails v2)
 ### قدرتمندترین ابزار پردازش و برش مانهوا، وبتون و مانگا
 
 [![Version](https://img.shields.io/github/v/release/esmail-mkh/PhotoSlicer-Go?label=Version&color=blue)](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest)
@@ -14,7 +14,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="center">
-  <img src="assets/app-v5.1-fa-image.jpg" alt="رابط کاربری فوتو اسلایسر v5.2" width="420">
+  <img src="assets/app-v5.1-fa-image.jpg" alt="رابط کاربری فوتو اسلایسر" width="420">
 </p>
 
 **فوتو اسلایسر (PhotoSlicer)** یک نرم‌افزار فوق‌سریع، سبک، زیبا و چندسکویی است که به‌صورت اختصاصی برای **مترجمین، ادیتورها، کلینرها و تیم‌های ترجمه مانهوا، وبتون و مانگا** طراحی شده است. این نسخه با بازنویسی کامل به زبان **Go** و فریم‌ورک **Wails v2**، سرعت و کارایی فوق‌العاده بالایی ارائه داده و بدون نیاز به هیچ پیش‌نیازی (بدون پایتون و به‌صورت کاملاً مستقل) با مصرف بهینه حافظه اجرا می‌شود.
@@ -119,9 +119,9 @@
 
 | سیستم عامل | نام پکیج دانلودی | فایل اجرایی داخل پکیج |
 |:---|:---|:---|
-| 🪟 **ویندوز (Windows x64)** | `PhotoSlicer-v5.2-Windows.zip` | `PhotoSlicer.exe` |
-| 🐧 **لینوکس (Linux x64)** | `PhotoSlicer-v5.2-Linux.zip` | `./PhotoSlicer` |
-| 🍎 **مک (macOS x64/ARM)** | `PhotoSlicer-v5.2-macOS.zip` | `PhotoSlicer.app` |
+| 🪟 **ویندوز (Windows x64)** | `PhotoSlicer-v<Version>-Windows.zip` | `PhotoSlicer.exe` |
+| 🐧 **لینوکس (Linux x64)** | `PhotoSlicer-v<Version>-Linux.zip` | `./PhotoSlicer` |
+| 🍎 **مک (macOS x64/ARM)** | `PhotoSlicer-v<Version>-macOS.zip` | `PhotoSlicer.app` |
 
 > ℹ️ تمامی پکیج‌ها به همراه پوشه `up-model/` حاوی مدل‌های ارتقای کیفیت عرضه می‌شوند.
 

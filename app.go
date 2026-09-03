@@ -148,6 +148,7 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	wailsRuntime.WindowExecJS(ctx, fmt.Sprintf("window.__APP_VERSION__ = '%s'; if (typeof applyAppVersion === 'function') applyAppVersion('%s');", constants.Version, constants.Version))
 	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		if len(paths) > 0 {
 			pathsJSON, err := json.Marshal(paths)
@@ -156,6 +157,11 @@ func (a *App) startup(ctx context.Context) {
 			}
 		}
 	})
+}
+
+// GetAppVersion returns the current application version string.
+func (a *App) GetAppVersion() string {
+	return constants.Version
 }
 
 func (a *App) defaultSettings() map[string]interface{} {
@@ -339,6 +345,7 @@ func (a *App) playAudio(path string) {
 
 // AppReady is called when the frontend DOM and Wails runtime are ready.
 func (a *App) AppReady() {
+	a.execJS(fmt.Sprintf(`if (typeof applyAppVersion === 'function') applyAppVersion('%s');`, constants.Version))
 	settings := a.loadSettings()
 	lang, _ := settings["language"].(string)
 	if lang == "" {
