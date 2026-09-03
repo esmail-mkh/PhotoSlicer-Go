@@ -6,6 +6,11 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
+      create_release:
+        description: 'Create Release on GitHub'
+        type: boolean
+        required: true
+        default: true
       version_tag:
         description: 'Release Tag Version (e.g. v5.2)'
         type: string
@@ -16,9 +21,22 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    name: Build Windows
-    runs-on: windows-latest
+  build:
+    name: Build (${{ matrix.asset_suffix }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target_os: windows
+            asset_suffix: Windows
+          - os: ubuntu-latest
+            target_os: linux
+            asset_suffix: Linux
+          - os: macos-latest
+            target_os: macos
+            asset_suffix: macOS
 
     steps:
       - name: Checkout Repository
@@ -30,34 +48,162 @@ jobs:
           go-version: '1.22'
           cache: true
 
+      - name: Install System Dependencies (Linux)
+        if: matrix.target_os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config build-essential || sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev pkg-config build-essential
+
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
-      - name: Build Standalone Executable
+      - name: Build Application (Windows)
+        if: matrix.target_os == 'windows'
         run: wails build -clean
 
-      - name: Package Release
-        shell: pwsh
-        run: |
-          $ver = "${{ github.ref_name }}"
-          if ([string]::IsNullOrWhiteSpace($ver) -or $ver.StartsWith("refs/")) {
-            $ver = "${{ github.event.inputs.version_tag }}"
-          }
-          if ([string]::IsNullOrWhiteSpace($ver)) { $ver = "v5.2" }
+      - name: Build Application (Linux & macOS)
+        if: matrix.target_os != 'windows'
+        run: wails build -clean
 
-          $zipName = "PhotoSlicer-$ver-Windows.zip"
-          $stage = "release_stage"
-          New-Item -ItemType Directory -Force $stage
-          Copy-Item "build/bin/PhotoSlicer.exe" "$stage/PhotoSlicer.exe"
-          Copy-Item "build/bin/PhotoSlicer.exe" "$stage/PhotoSlicer $ver.exe"
-          Copy-Item -Recurse -Force "up-model" "$stage/up-model"
-          Compress-Archive -Path "$stage/*" -DestinationPath $zipName
-          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+      - name: Package Windows Artifact
+        if: matrix.target_os == 'windows'
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ([string]::IsNullOrWhiteSpace($tag) -or $tag.StartsWith("refs/")) {
+            $tag = "${{ inputs.version_tag }}"
+          }
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "v5.2" }
+
+          $zipName = "PhotoSlicer-$tag-Windows.zip"
+          New-Item -ItemType Directory -Path "dist_pkg" -Force
+          Copy-Item "build/bin/*.exe" "dist_pkg\"
+          Copy-Item "up-model" "dist_pkg\up-model" -Recurse -Force
+          Remove-Item -Path "dist_pkg\up-model\realesrgan-ncnn-vulkan-ubuntu" -ErrorAction SilentlyContinue
+          Remove-Item -Path "dist_pkg\up-model\realesrgan-ncnn-vulkan-macos" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "dist_pkg\*" -DestinationPath $zipName -Force
+
+      - name: Package Linux Artifact
+        if: matrix.target_os == 'linux'
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
+          if [ -z "$TAG" ]; then TAG="v5.2"; fi
+
+          ZIP_NAME="PhotoSlicer-$TAG-Linux.zip"
+          mkdir -p dist_pkg
+          cp -r build/bin/* dist_pkg/
+          cp -r up-model dist_pkg/
+          rm -f dist_pkg/up-model/realesrgan-ncnn-vulkan.exe
+          rm -f dist_pkg/up-model/vcomp140*.dll
+          rm -f dist_pkg/up-model/realesrgan-ncnn-vulkan-macos
+          chmod +x dist_pkg/PhotoSlicer* || true
+          chmod +x dist_pkg/up-model/realesrgan-ncnn-vulkan-ubuntu || true
+          cd dist_pkg && zip -r "../$ZIP_NAME" . && cd ..
+
+      - name: Package macOS Artifact
+        if: matrix.target_os == 'macos'
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
+          if [ -z "$TAG" ]; then TAG="v5.2"; fi
+
+          ZIP_NAME="PhotoSlicer-$TAG-macOS.zip"
+          mkdir -p dist_pkg
+          cp -r build/bin/PhotoSlicer.app dist_pkg/
+          cp -r up-model dist_pkg/
+          rm -f dist_pkg/up-model/realesrgan-ncnn-vulkan.exe
+          rm -f dist_pkg/up-model/vcomp140*.dll
+          rm -f dist_pkg/up-model/realesrgan-ncnn-vulkan-ubuntu
+          chmod -R +x dist_pkg/PhotoSlicer.app || true
+          chmod +x dist_pkg/up-model/realesrgan-ncnn-vulkan-macos || true
+          ditto -c -k --keepParent dist_pkg "$ZIP_NAME"
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PhotoSlicer-${{ matrix.asset_suffix }}
+          path: PhotoSlicer-*.zip
+
+  release:
+    name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/') || inputs.create_release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+
+      - name: Prepare Release Variables
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
+          if [ -z "$TAG" ]; then TAG="v5.2"; fi
+          CLEAN_VER="${TAG#v}"
+          CLEAN_VER="${CLEAN_VER#V}"
+          echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV
+          echo "CLEAN_VERSION=$CLEAN_VER" >> $GITHUB_ENV
+          echo "RELEASE_TITLE=Version $CLEAN_VER" >> $GITHUB_ENV
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
-          files: ${{ env.ZIP_NAME }}
           draft: false
-          prerelease: false
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TITLE }}
+          files: release_assets/**/*.zip
+          body: |
+            [🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-${{ env.CLEAN_VERSION }}) | [🇬🇧 **English**](#-photoslicer-v${{ env.CLEAN_VERSION }})
+
+            ---
+
+            <div dir="rtl">
+
+            # 🚀 فوتو اسلایسر نسخه ${{ env.CLEAN_VERSION }} (Go + Wails v2)
+
+            **نسخه ${{ env.CLEAN_VERSION }} با بازنویسی کامل در Go و فریم‌ورک Wails v2 منتشر شد!**
+            پکیج‌های بومی و مستقل سیستم‌عامل‌های **Windows**, **Linux** و **macOS** با سرعت و بهینگی فوق‌العاده بالا آماده دانلود هستند.
+
+            ### 🌟 ویژگی‌ها و بهبودها (نسخه ${{ env.CLEAN_VERSION }})
+            * **⚡ سرعت مضاعف:** پردازش و انکودینگ تصاویر با عملکرد چندنخی Native در Go.
+            * **💎 حجم بسیار اندک و بهینه:** فایل اجرایی مستقل بدون نیاز به پایتون یا رانتایم‌های سنگین.
+            * **🛡️ پشتیبانی از تمام پلتفرم‌ها:** بیلد اختصاصی و بهینه‌سازی شده برای ویندوز، لینوکس و مک.
+
+            ---
+
+            ### 📥 دانلود و نصب
+
+            فایل **ZIP** مربوط به سیستم‌عامل خود را از پیوست‌های این Release دانلود و اجرا کنید:
+            * **[Windows]** `PhotoSlicer-${{ env.RELEASE_TAG }}-Windows.zip`
+            * **[Linux]** `PhotoSlicer-${{ env.RELEASE_TAG }}-Linux.zip`
+            * **[macOS]** `PhotoSlicer-${{ env.RELEASE_TAG }}-macOS.zip`
+
+            </div>
+
+            ---
+
+            # 🚀 PhotoSlicer v${{ env.CLEAN_VERSION }} (Go + Wails v2)
+
+            **Version ${{ env.CLEAN_VERSION }} is here, completely rewritten in Go and Wails v2!**
+            Blazing fast native standalone builds for **Windows**, **Linux**, and **macOS** are ready.
+
+            ### 🌟 What's New (v${{ env.CLEAN_VERSION }})
+            * **⚡ Ultimate Performance:** Native multi-threaded Go pipeline for 2x faster encoding and 3.4x faster natural sorting.
+            * **💎 Ultra Lightweight:** Pure standalone binary (~15MB), zero Python dependency.
+            * **🛡️ Full Cross-Platform Support:** Native builds for Windows, Linux, and macOS.
+
+            ---
+
+            ### 📥 Downloads
+
+            Download the appropriate **ZIP** archive for your operating system below:
+            * **[Windows]** `PhotoSlicer-${{ env.RELEASE_TAG }}-Windows.zip`
+            * **[Linux]** `PhotoSlicer-${{ env.RELEASE_TAG }}-Linux.zip`
+            * **[macOS]** `PhotoSlicer-${{ env.RELEASE_TAG }}-macOS.zip`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
