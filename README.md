@@ -1,19 +1,23 @@
 [🇮🇷 **Read in Persian (فارسی)**](README-fa.md)
 
 # 📸 PhotoSlicer v5.2
-### The Ultimate Manhwa & Webtoon Processing Tool
+### The Ultimate Manhwa & Webtoon Processing Tool (Go + Wails v2)
 
-[![Version](https://img.shields.io/github/v/release/esmail-mkh/PhotoSlicer?label=Version&color=blue)](https://github.com/esmail-mkh/PhotoSlicer/releases/latest)
-[![Download](https://img.shields.io/github/downloads/esmail-mkh/PhotoSlicer/total?label=Downloads&color=success)](https://github.com/esmail-mkh/PhotoSlicer/releases/latest)
-[![Stars](https://img.shields.io/github/stars/esmail-mkh/PhotoSlicer?style=flat&label=Stars&color=tomato)](https://github.com/esmail-mkh/PhotoSlicer)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational?color=blue)](<#-installation>)
+[![Version](https://img.shields.io/github/v/release/esmail-mkh/PhotoSlicer-Go?label=Version&color=blue)](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest)
+[![Download](https://img.shields.io/github/downloads/esmail-mkh/PhotoSlicer-Go/total?label=Downloads&color=success)](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest)
+[![Stars](https://img.shields.io/github/stars/esmail-mkh/PhotoSlicer-Go?style=flat&label=Stars&color=tomato)](https://github.com/esmail-mkh/PhotoSlicer-Go)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational?color=blue)](<#-installation--downloads>)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Wails](https://img.shields.io/badge/Wails-v2-red)](https://wails.io/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="left">
-  <img src="assets/app-v5.1-fa-image.jpg" alt="PhotoSlicer v5.2 Interface" width="400">
+  <img src="assets/app-v5.1-fa-image.jpg" alt="PhotoSlicer v5.2 Interface" width="420">
 </p>
 
-**PhotoSlicer** is a blazing-fast, aesthetically stunning, and feature-rich application designed specifically for **Webtoon, Manhwa, and Manga translators/editors**. It automates the tedious process of stitching images together, resizing them, improving quality via AI, intelligently slicing them back into web-friendly chunks without cutting through dialogue bubbles, and adding **smart watermarks** with content-aware bubble avoidance.
+**PhotoSlicer** is a blazing-fast, aesthetically stunning, cross-platform desktop application designed specifically for **Webtoon, Manhwa, and Manga translators, scanlation teams, and editors**. Completely rewritten in **Go** and **Wails v2**, it delivers pure native performance with an ultra-lightweight memory footprint and zero external runtime dependencies (no Python or heavy runtimes required).
+
+It automates the entire webtoon production workflow: seamless vertical stitching, high-fidelity bicubic resizing, smart content-aware slicing without cutting through speech bubbles or artwork, flexible watermarking, dual-engine image enhancement, and multi-format exports.
 
 ---
 
@@ -25,11 +29,11 @@
 * [🎨 Stunning UI & UX](#-stunning-ui--ux)
 * [🛠️ Power User Tools](#-power-user-tools)
 * [⚡ Quick Start](#-quick-start)
-* [📥 Installation](#-installation)
+* [📥 Installation & Downloads](#-installation--downloads)
 * [🎮 How to Use](#-how-to-use)
 * [📸 Watermarking Guide](#-watermarking-guide)
-* [🎨 Presets](#-presets)
-* [🖼️ Themes](#-themes)
+* [🎨 Presets System](#-presets-system)
+* [🖼️ Themes & Customization](#-themes--customization)
 * [🧩 Tech Stack](#-tech-stack)
 * [☕ Support Me](#-support-me)
 * [🤝 Contributing](#-contributing)
@@ -40,228 +44,232 @@
 
 ### 🚀 Core Capabilities
 
-* **Smart Stitching:** Seamlessly merges multiple image files into long strips.
-* **Content-Aware Slicing:** Uses an intelligent algorithm (`Comparison Detector`) to find safe cutting points (whitespaces/gaps), ensuring text bubbles and artwork are never split in half.
-* **AI Enhancement:** Integrated support for **Real-ESRGAN** to upscale and denoise low-quality images before processing.
-* **Format Mastery:** Supports input from **JPG, PNG, WEBP, AVIF,** and even **PSD** files.
-* **Multi-language:** Fully supports **English** and **Farsi (Persian)** interfaces.
+* **Native Go Architecture:** High-speed multi-threaded pipeline using Go goroutines and worker pools for 2x–3x faster processing, encoding, and sorting.
+* **Smart Stitching:** Seamlessly merges fragmented vertical panels into continuous long strips.
+* **Content-Aware Slicing:** Uses an intelligent boundary-detection algorithm (`Comparison Detector`) to identify safe cutting gaps (whitespaces and gutters) so speech bubbles and artwork are **never split in half**.
+* **Dual-Engine Quality Enhancement:**
+  * ⚡ **Fast Clean (CPU):** Instant built-in denoising and smoothing running efficiently across all CPU cores.
+  * 🔥 **Real-ESRGAN (GPU):** State-of-the-art AI upscaler powered by NCNN Vulkan to upscale and clarify low-resolution artwork.
+* **Format Mastery:** Supports input from **JPG, PNG, WEBP, AVIF,** and layered **PSD** files.
 * **Multi-Mode Processing:**
-  * **Single Mode:** Process one chapter/folder instantly.
-  * **Batch Mode:** Point to a root directory and process dozens of chapters automatically.
+  * **Single Mode:** Point to a folder of images to process a single chapter.
+  * **Batch Mode:** Point to a parent directory containing multiple chapter folders; PhotoSlicer processes each chapter sequentially with full progress tracking.
+* **No-Stitch Mode:** Process, resize, enhance, watermark, and slice images individually without stitching them into a vertical strip first.
 
 ### 🖼️ Smart Watermarking System
 
-* **Layout-Aware Placement:** Automatically detects panel borders and gutters to place watermarks intelligently.
-* **Bubble Avoidance:** Uses advanced algorithms to detect speech bubbles and ensure watermarks never overlap with dialogue.
-* **Custom Watermark Support:** Add your own PNG watermark with configurable opacity, size, and positioning.
-* **Progress Tracking:** Dedicated progress step for watermark operations with real-time feedback.
-* **Native PNG Dimensions:** Uses original PNG resolution for crisp, high-quality watermark rendering.
-* **Speed Optimized:** Multi-threaded watermark processing for lightning-fast performance.
+* **Segment-Distributed Placement:** Automatically calculates balanced placements across vertical segments of each slice.
+* **Edge Alignment & Margins:** Align watermarks to the **Left Edge** or **Right Edge** with customizable pixel margin offsets (`0–200 px`).
+* **Multi-Instance Support:** Place between `1` and `10` watermark instances per output slice.
+* **Original PNG Fidelity:** Renders crisp transparent PNG logos scaled proportionally to canvas width with Lanczos filtering.
+* **Editable PSD Layers:** When exporting to PSD, watermarks are preserved as independent, fully editable Photoshop layers.
+* **Dynamic Pipeline Step:** The UI step indicator dynamically shows the **Watermark** phase when active.
 
 ### 🎨 Stunning UI & UX
 
-* **Neon Aurora Design:** A modern, glassmorphism-based interface with animated backgrounds.
-* **6 Color Themes:** Switch between Cyber Blue, Electric Purple, Ruby Red, Sunset Orange, Luxury Gold, and Neo Emerald instantly.
-* **Custom Theme Editor:** Create your own theme with the built-in color picker featuring a color wheel, live preview, saturation slider, and 10×10 color grid.
-* **Adaptive Contrast:** Foreground colors automatically adjust based on theme brightness for optimal readability.
-* **Settings Tab:** Configurable save location, presets management, and advanced options in a dedicated settings panel.
-* **Drag & Drop Support:** Drag and drop folders directly onto the app with an animated drop zone.
-* **Advanced Filename Patterning:** Custom filename templates with a visual guide for organized output.
-* **Interactive Elements:** Animated logos, glassmorphism tabs with sliding pill indicator, smooth transitions, and sound alerts upon completion.
-* **Notification Toggle:** Easily enable or disable sound and visual notifications during processing.
-* **Collapsible Progress Bar:** The workspace progress bar auto-collapses to save space when not needed.
-* **Control Center:** Pause and Resume large batch operations at any time.
+* **Neon Aurora & Glassmorphism:** Modern translucent interface with dynamic background orbs, sleek borders, and subtle glow effects.
+* **6 Built-in Neon Themes:** Switch instantly between **Cyber Blue**, **Electric Purple**, **Ruby Red**, **Sunset Orange**, **Luxury Gold**, and **Neo Emerald**.
+* **Custom Theme Creator:** Built-in modal with a live color wheel, saturation slider, hex input, and a 10×10 curated palette with real-time preview and adaptive text contrast.
+* **Bilingual Support:** Instant live switching between **English (EN)** and **Persian (FA)** without app restart.
+* **Drag & Drop:** Drop folders directly onto the application with an animated glowing drop-zone overlay.
+* **Directory Quick Actions:** Clear path, paste from clipboard, or browse with native dialogs.
+* **Live Progress & Telemetry:** Real-time percentage, detail status, processed files counter (`X/Y`), current file name, elapsed timer, and dynamic ETA calculator.
+* **Collapsible Workspace:** Progress area auto-collapses cleanly to keep the workspace compact.
+* **Interactive Control Center:** **Pause**, **Resume**, or completely **Stop** active jobs at any time.
 
 ### 🛠️ Power User Tools
 
-* **Custom Resizing:** High-quality Bicubic resizing to your target width (e.g., 800px standard).
-* **Export Options:**
-  * Save as **JPG, PNG, WEBP, PSD or CBZ**.
-  * Custom layered **PSD** export with editable watermark layers.
-  * Auto-archive into **ZIP** files.
-  * Generate long-strip **PDFs** for easy reading.
-* **Presets:** Save and load entire configurations (format, quality, width, etc.) for quick reuse.
-* **Performance:** Multi-threaded architecture for lightning-fast resizing, slicing, and watermarking.
+* **Custom Width & Resizing:** High-quality Bicubic resizing to custom widths (default: `800 px`), or toggle off to preserve original widths.
+* **Configurable Slice Limits:** Set maximum slice height (default: `16,000 px`, with automatic WebP 16,383px and JPEG 65,500px safe capping).
+* **Multiple Output Formats:** Export to **JPG**, **PNG**, **WEBP**, or layered **PSD**.
+* **Bundled Packaging:**
+  * 📦 **ZIP Archive:** Automatically archives all chapter slices into a clean `.zip` file.
+  * 📑 **PDF Document:** Generates a unified long-strip PDF document for reading.
+  * 📚 **CBZ Archive:** Produces comic book archives ready for comic reader apps.
+* **Flexible Save Locations:**
+  * Default `./Results` directory next to the executable (or Documents folder).
+  * Custom destination path.
+  * **Save Next to Source:** Places results directly alongside original source folders with a customizable suffix (e.g. `[Stitched]`).
+* **Advanced Output Filename Templates:**
+  * Configure custom naming patterns using tokens: `[number]`, `[folder]`, `[date]`, `[total]`.
+  * Customizable digit zero-padding (`1–6` digits, e.g. `001.jpg`).
+  * Real-time preview of the output filename.
+* **Thread & Performance Control:** Select active worker concurrency (`1–16` CPU threads).
+* **Presets Management:** Save configurations, set default (starred) presets for startup, and export/import presets via JSON.
 
 ---
 
 ## ⚡ Quick Start
 
-**Try it now in 3 commands:**
+### Run Pre-compiled Binary
+No installation or dependencies required:
 
-```bash
-git clone https://github.com/esmail-mkh/PhotoSlicer.git
-cd PhotoSlicer
-pip install -r requirements.txt && python main.py
-```
-
-> 💡 **Prefer a standalone EXE?** Download the latest compiled release from the [Releases page](https://github.com/esmail-mkh/PhotoSlicer/releases/latest) — no Python setup required!
+1. Download the ZIP for your OS from the [Releases Page](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest).
+2. Extract the archive.
+3. Run `PhotoSlicer.exe` (Windows), `./PhotoSlicer` (Linux), or `PhotoSlicer.app` (macOS).
 
 ---
 
-## 📥 Installation & Building from Source
+## 📥 Installation & Downloads
 
-### Option 1: Run from Source (Recommended for developers)
+### Option 1: Pre-compiled Standalone Packages
 
-| Requirement | Minimum Version |
-|:---|---:|
-| **Go** | 1.22+ |
-| **Wails v2** | `v2.9.0+` |
-| **C Compiler** | MinGW-w64 (Windows), GCC (Linux) |
-| **OS** | Windows 10/11, Linux, macOS |
+Download the latest release archive from [Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest):
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/esmail-mkh/PhotoSlicer.git
-   cd PhotoSlicer
-   ```
+| Operating System | Package Name | Executable Inside |
+|:---|:---|:---|
+| 🪟 **Windows (x64)** | `PhotoSlicer-v5.2-Windows.zip` | `PhotoSlicer.exe` |
+| 🐧 **Linux (x64)** | `PhotoSlicer-v5.2-Linux.zip` | `./PhotoSlicer` |
+| 🍎 **macOS (x64/ARM)** | `PhotoSlicer-v5.2-macOS.zip` | `PhotoSlicer.app` |
 
-2. **Install Wails CLI:**
-   ```bash
-   go install github.com/wailsapp/wails/v2/cmd/wails@latest
-   ```
+> ℹ️ Each package comes bundled with the `up-model/` directory containing AI models.
 
-3. **Run in Live Development Mode:**
-   ```bash
-   wails dev
-   ```
+---
 
-4. **Build Production Executable:**
-   ```bash
-   wails build
-   ```
-   *The optimized standalone executable will be compiled to `build/bin/PhotoSlicer.exe` (~15 MB, zero external runtime dependencies).*
+### Option 2: Build from Source
 
-### Option 2: Pre-compiled Executables
+#### Prerequisites
 
-Download the latest standalone release package from the [Releases page](https://github.com/esmail-mkh/PhotoSlicer/releases/latest):
+| Dependency | Minimum Version | Note |
+|:---|:---:|:---|
+| **Go** | `1.22+` | Backend language |
+| **Wails v2** | `v2.9.0+` | Desktop runtime framework |
+| **C Compiler** | MinGW-w64 (Windows), GCC (Linux), Clang (macOS) | Required by CGo |
+| **System Libraries (Linux)** | `libgtk-3-dev`, `libwebkit2gtk-4.0-dev` (or `4.1`) | WebView dependencies |
 
-* **[Windows]** Download `PhotoSlicer-v5.2-Windows.zip`, extract it, and run `PhotoSlicer v5.2.exe`.
-* **[Linux]** Download `PhotoSlicer-v5.2-Linux.zip`, extract it, and run `./PhotoSlicer`.
-* **[macOS]** Download `PhotoSlicer-v5.2-macOS.zip`, extract it, and run `./PhotoSlicer`.
+#### 1. Clone the Repository
+```bash
+git clone https://github.com/esmail-mkh/PhotoSlicer-Go.git
+cd PhotoSlicer-Go
+```
+
+#### 2. Install Wails CLI
+```bash
+go install github.com/wailsapp/wails/v2/cmd/wails@latest
+```
+
+#### 3. Run Live Development Mode
+```bash
+wails dev
+```
+Hot-reloading is enabled for both Go backend and frontend assets.
+
+#### 4. Build Production Executable
+```bash
+wails build
+```
+The optimized standalone binary will be created in `build/bin/` (approx. 15–20 MB, zero external runtime dependencies).
 
 ---
 
 ## 🎮 How to Use
 
-### 1️⃣ Select Source
-Click the folder icon to choose your directory.
+```
+ ┌─────────────────────────────────────────────────────────────┐
+ │ 1. Select Folder ──> 2. Settings ──> 3. Options ──> 4. Go!  │
+ └─────────────────────────────────────────────────────────────┘
+```
 
-* **If the folder contains images:** **Single Mode** is activated.
-* **If the folder contains sub-folders:** **Batch Mode** is activated (processes all sub-folders one by one).
+### 1️⃣ Select Source Directory
+* Click the folder icon, paste a path from clipboard, or drag & drop a directory onto the application.
+* **Single Mode:** If the folder directly contains images, PhotoSlicer processes it as a single chapter.
+* **Batch Mode:** If the folder contains sub-folders, PhotoSlicer automatically identifies them and processes all chapters sequentially.
 
-### 2️⃣ Configure Settings
+### 2️⃣ Configure Core Parameters
 
-| Setting | Description | Default |
-|:---|:---|---:|
-| **Width** | Target width for output images (in pixels) | `800` |
-| **Height Limit** | Maximum height of a single slice (in pixels) | `15000` |
-| **Quality** | JPG/WebP compression quality (1–100) | `95` |
-| **Format** | Output image format | `WEBP` |
+| Setting | Description | Default | Range / Values |
+|:---|:---|:---:|:---:|
+| **Width** | Target output width in pixels (Bicubic resize) | `800 px` | `100 – 10000 px` (or toggle off) |
+| **Height Limit** | Maximum slice height before finding a cut point | `16000 px` | `1000 – 65000 px` |
+| **Quality** | Image compression quality | `100 %` | `1 – 100 %` |
+| **Format** | Output format | `JPG` | `JPG`, `PNG`, `WEBP`, `PSD` |
 
-### 3️⃣ Advanced Options
+### 3️⃣ Additional Processing Options
 
-* **AI Enhance** — Toggle **Real-ESRGAN** upscaling for low-quality source images.
-* **ZIP** — Auto-archive all outputs into a ZIP file.
-* **PDF** — Generate a long-strip PDF for easy reading.
-* **Presets** — Load a saved configuration with one click (see [Presets](#-presets) below).
-* **Watermark** — Enable smart watermarking (see [Watermarking Guide](#-watermarking-guide) below).
+* **AI Enhance:** Check to enable image enhancement. Choose between **Fast Clean (CPU)** or **Real-ESRGAN (GPU)** in the Settings tab.
+* **No Stitch:** Slices and resizes individual images without stitching them into a vertical continuous strip first.
+* **Package Formats:** Optionally wrap the output into a **ZIP Archive**, **PDF Document**, or **CBZ Archive**.
 
-### 4️⃣ Initiate!
-Click the **🚀 ROCKET** button to start processing.
-
-* **Pause/Resume** — Use the control center to pause or resume the operation at any time.
-* **Notifications** — A sound alert plays when the job is complete.
+### 4️⃣ Initiate Processing!
+Click the **🚀 INITIATE** button to start.
+* Monitor progress with the progress bar, file counters, elapsed timer, and ETA.
+* Use **Pause** / **Resume** or click **STOP** to halt processing immediately.
+* Click **Open Folder** when done to inspect your sliced images.
 
 ---
 
 ## 📸 Watermarking Guide
 
-PhotoSlicer v5.2 introduces a powerful **Smart Watermarking System**. To use it:
+PhotoSlicer features a high-performance watermarking system:
 
-1. **Prepare your watermark:** Use a **PNG file with transparency** (e.g., a logo or signature).
-2. **Enable watermarking:** In the settings panel, toggle the **Watermark** option.
-3. **Select your watermark file:** Click the watermark path input to browse and select your PNG file.
-4. **Configure placement:**
-   * **Opacity:** Adjust transparency level.
-   * **Size:** Scale the watermark relative to the panel.
-   * **Position:** Choose placement (center, corners, or auto).
-5. **Let AI handle the rest:** The engine automatically:
-   * Detects panel borders and gutters.
-   * Avoids speech bubbles and dialogue areas.
-   * Places watermarks intelligently without ruining the artwork.
-6. **For PSD output:** Watermarks are saved as **editable layers** in Photoshop, allowing further adjustments.
+1. **Open Settings Tab:** Navigate to the **Watermark Settings** section.
+2. **Enable Watermark:** Toggle **Enable Watermark** on.
+3. **Select PNG:** Choose a transparent **PNG** image (e.g., scanlation group logo).
+4. **Configure Layout:**
+   * **Count Per Page:** Choose how many watermarks to place per output slice (`1` to `10`).
+   * **Placement Edge:** Choose **Left Edge** or **Right Edge**.
+   * **Edge Margin:** Adjust the horizontal distance from the chosen edge (`0` to `200 px`).
+5. **Layered PSD Workflow:** When output format is set to **PSD**, watermarks are saved onto dedicated editable layers for quick retouching in Adobe Photoshop.
 
 ---
 
-## 🎨 Presets
+## 🎨 Presets System
 
-Save time by creating **presets** — reusable configurations that store all your settings:
+Save, load, and share your complete processing configurations:
 
-| Preset Feature | Description |
-|:---|---:|
-| **Save** | Store Width, Height Limit, Quality, Format, and advanced options in a named preset |
-| **Load** | Restore any saved preset with a single click |
-| **Hover Preview** | Hover over a preset name to see a tooltip of its configuration |
-| **Auto-Manage** | Presets persist between app restarts |
-
-To save a preset: Configure your settings → Click **Save Preset** → Give it a name.
+* **Save Preset:** Click the presets dropdown in the header, enter a name, and save your current width, height, quality, format, watermark, and packaging settings.
+* **Load Preset:** Select any saved preset to restore all parameters instantly.
+* **Starred Default:** Star your favorite preset so it is applied automatically every time PhotoSlicer launches.
+* **Export / Import JSON:** Share presets across machines using the native Export/Import buttons in the Presets modal.
 
 ---
 
-## 🖼️ Themes
+## 🖼️ Themes & Customization
 
-Customize your experience with built-in themes — or create your own!
+### Built-in Neon Themes
+* 🔵 **Cyber Blue** — Clean cyber aesthetic (Default)
+* 🟣 **Electric Purple** — Vibrant vaporwave style
+* 🔴 **Ruby Red** — High-contrast crimson
+* 🟠 **Sunset Orange** — Warm amber glow
+* 🟡 **Luxury Gold** — Elegant golden sheen
+* 🟢 **Neo Emerald** — Cyberpunk terminal green
 
-### Default Themes
-
-| Theme | Description |
-|:---:|:---|
-| 🔵 **Blue** | Default Cyberpunk look |
-| 🟣 **Purple** | Vaporwave aesthetic |
-| 🔴 **Ruby** | Aggressive & Bold |
-| 🟠 **Sunset** | Warm & Cozy |
-| 🟡 **Gold** | Premium feel |
-| 🟢 **Emerald** | Matrix vibes |
-
-### Custom Theme Editor
-
-Go to the **Settings** tab → **Theme** section to access the built-in theme editor:
-
-* **Color Wheel** — Pick any hue visually.
-* **Saturation Slider** — Fine-tune color intensity.
-* **10×10 Color Grid** — Quick pick from a curated palette.
-* **Live Preview** — Changes reflect instantly on the interface.
-* **Adaptive Contrast** — Text colors automatically adjust for readability, no matter how bright or dark your custom theme is.
+### Custom Theme Creator
+Navigate to **Settings → Appearance → Custom Color** to design your own palette with the visual color wheel, saturation slider, hex input, and live UI preview with automated contrast adaptation.
 
 ---
 
 ## 🧩 Tech Stack
 
 | Layer | Technology |
-|:---|---:|
-| **Backend & Engine** | Go 1.22+ (Goroutines, libwebp CGo, Pure-Go PDF/PSD/ZIP encoders) |
-| **Desktop Framework** | Wails v2 (High-performance native WebView2 runtime) |
-| **Frontend** | HTML5, CSS3 (Glassmorphism & 6 Neon Themes), Vanilla JavaScript |
-| **AI Engine** | Real-ESRGAN (NCNN Vulkan GPU engine) |
+|:---|:---|
+| **Language & Backend** | **Go 1.22+** (Goroutines, worker pools, native cross-platform runtime) |
+| **Desktop Framework** | **Wails v2** (Native WebView2 on Windows, WebKitGTK on Linux, WebKit on macOS) |
+| **Image Processing** | `github.com/disintegration/imaging`, pure-Go encoders & decoders |
+| **Document & Container Encoders** | Pure-Go PDF, layered PSD, ZIP, and CBZ writers |
+| **AI Upscaling** | **Real-ESRGAN** (NCNN Vulkan GPU) & **Fast Clean** (CPU engine) |
+| **Frontend UI** | Modern HTML5, CSS3 Glassmorphism, Vanilla JavaScript |
 
 ---
 
 ## ☕ Support Me
 
-If you find this tool useful, consider supporting its development!
+If you love PhotoSlicer and want to support its ongoing development:
 
-<a href="https://daramet.com/esmailmkh"><img src="https://panel.daramet.com/static/media/daramet-pizza-donate.8ecef99d74658fec0caf.png" width="300" height="100" /></a>
-<a href="https://coffeebede.com/esmailmkh"><img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg" width="300" height="100" /></a>
+<p align="left">
+  <a href="https://daramet.com/esmailmkh"><img src="https://panel.daramet.com/static/media/daramet-pizza-donate.8ecef99d74658fec0caf.png" width="280" alt="Donate via Daramet" /></a>
+  &nbsp;&nbsp;
+  <a href="https://coffeebede.com/esmailmkh"><img src="https://coffeebede.ir/DashboardTemplateV2/app-assets/images/banner/default-yellow.svg" width="280" alt="Donate via CoffeeBede" /></a>
+</p>
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to:
+Contributions, feature requests, and bug reports are warmly welcomed!
 
-* 🐛 **Report bugs** by opening an [Issue](https://github.com/esmail-mkh/PhotoSlicer/issues)
-* 💡 **Suggest features** via Issues or Discussions
-* 🔧 **Submit a Pull Request** with improvements
+* 🐛 **Report a Bug:** Open an issue on the [Issues](https://github.com/esmail-mkh/PhotoSlicer-Go/issues) page.
+* 💡 **Feature Requests:** Submit ideas via [Discussions](https://github.com/esmail-mkh/PhotoSlicer-Go/discussions).
+* 🔧 **Pull Requests:** Fork the repository, create your branch, and submit a PR.
 
 Created with ❤️ by **E.MKH**.

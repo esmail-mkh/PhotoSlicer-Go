@@ -1,8 +1,26 @@
-[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۱۳-بهبود-عملکرد-بهینه-سازی-و-ارتقای-هوش-مصنوعی) | [🇬🇧 **English**](#-photoslicer-v513-performance-heuristics--core-polish)
+[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۲-بازنویسی-کامل-با-go-و-wails-v2) | [🇬🇧 **English**](#-photoslicer-v52-complete-rewrite-in-go--wails-v2)
 
 ---
 
 <div dir="rtl">
+
+# 🚀 فوتو اسلایسر نسخه ۵.۲: بازنویسی کامل با Go و Wails v2
+
+**نسخه ۵.۲ منتشر شد!** این نسخه یک بازنویسی بنیادین و اساسی از پایتون به زبان **Go 1.22+** و فریم‌ورک دسکتاپ **Wails v2** است که سرعتی خیره‌کننده، مصرف حافظه ناچیز و پکیج‌های اجرایی مستقل برای ویندوز، لینوکس و مک را به ارمغان آورده است.
+
+### 🌟 تغییرات جدید (نسخه ۵.۲)
+
+* **⚡ بازنویسی کامل و بومی به زبان Go:** پیاده‌سازی خط لوله موازی پردازش تصاویر با استفاده از گوروتین‌ها (Goroutines) و مخزن پردازش چندنخی (Worker Pools) با سرعتی ۲ تا ۳ برابر بیشتر در فشرده‌سازی، ریسایز و چسباندن.
+* **💎 اجرای سبک و کاملاً مستقل (Zero Runtime Dependency):** حذف کامل پایتون؛ بدون نیاز به نصب هیچ‌گونه مفسر یا پیش‌نیاز، فایل اجرایی مستقل با حجم حدود ۱۵ تا ۲۰ مگابایت.
+* **🌐 انتشار رسمی چندسکویی (Windows, Linux, macOS):** ساخت خودکار و ریلیز پکیج‌های بومی سیستم‌عامل‌های مختلف از طریق گیت‌هاب اکشنز (GitHub Actions).
+* **⚡ دو موتور ارتقای کیفیت:** اضافه شدن موتور سریع و بهینه **Fast Clean (CPU)** برای نویزگیری بدون نیاز به کارت گرافیک، در کنار موتور قدرتمند هوش مصنوعی **Real-ESRGAN (GPU NCNN Vulkan)**.
+* **💾 سیستم پیشرفته پریست‌ها با خروجی و ورودی JSON:** امکان Export و Import کامل تنظیمات در قالب فایل JSON جهت انتقال آسان بین سیستم‌ها، به همراه قابلیت ستاره‌دار کردن پریست پیش‌فرض برای راه‌اندازی برنامه.
+* **🖼️ بازطراحی سیستم واترمارک:** پنل تنظیمات پیشرفته واترمارک با امکان انتخاب لبه (چپ یا راست)، فاصله حاشیه (Margin)، تعداد تکرار در هر قطعه و ذخیره در لایه‌های مجزا و قابل ویرایش در خروجی PSD.
+* **📊 هماهنگی زنده نشانگر مراحل پردازش:** همگام‌سازی بلادرنگ نشانگرهای مراحل (Ready → Scan → Process → Watermark → Save → Done) و نوار پیشرفت جمع‌شونده همراه با شمارنده فایل‌ها، زمان سپری‌شده و تخمین زمان باقی‌مانده (ETA).
+* **🔄 حالت No Stitch:** قابلیت پردازش، ریسایز، واترمارک و برش مجزای تصاویر بدون چسباندن اولیه آن‌ها به یکدیگر.
+* **📦 انکودرهای بومی آرشیو:** تولید مستقیم و سریع فایل‌های فشرده ZIP، آرشیو کمیک CBZ، سند یکپارچه PDF و فایل‌های لایه‌باز PSD با انکودرهای بومی Go.
+
+---
 
 # 🚀 فوتو اسلایسر نسخه ۵.۱.۳: بهبود عملکرد، بهینه‌سازی و ارتقای هوش مصنوعی
 
@@ -98,9 +116,27 @@
 
 ### 📥 دانلود و نصب
 
-فایل **ZIP** آخرین نسخه را از صفحه [Release](https://github.com/esmail-mkh/PhotoSlicer/releases/latest) دانلود کنید، اکسترکت کنید و `PhotoSlicer.exe` را اجرا کنید. لذت ببرید!
+فایل **ZIP** آخرین نسخه را از صفحه [Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest) دانلود کنید، اکسترکت کنید و `PhotoSlicer.exe` را اجرا کنید. لذت ببرید!
 
 </div>
+
+---
+
+# 🚀 PhotoSlicer v5.2: Complete Rewrite in Go & Wails v2
+
+**Version 5.2 is here!** A ground-up rewrite from Python into **Go 1.22+** and **Wails v2**, bringing 2x–3x faster performance, ultra-lightweight memory footprint, and true cross-platform standalone binaries for Windows, Linux, and macOS without any runtime dependencies.
+
+### 🌟 What's New (v5.2)
+
+* **⚡ Native Go Architecture:** High-speed multi-threaded pipeline powered by Go goroutines and worker pools for 2x–3x faster image processing, resizing, and encoding.
+* **💎 Ultra-Lightweight Standalone Binary:** Completely eliminates Python and external runtime requirements; compact single-binary distribution (~15–20 MB).
+* **🌐 Full Multi-Platform Releases:** Official automated release builds for **Windows (x64)**, **Linux (x64)**, and **macOS (x64/ARM)** via GitHub Actions CI/CD.
+* **⚡ Dual Enhancement Engines:** Introduces the ultra-fast **Fast Clean (CPU)** filter for rapid multi-core denoising alongside **Real-ESRGAN (GPU NCNN Vulkan)** AI upscaling.
+* **💾 Advanced Presets with JSON Import/Export:** Export and import full app configurations as JSON, plus set favorite/starred default presets that load on startup.
+* **🖼️ Revamped Smart Watermark Controls:** Configurable placement edges (left/right), pixel edge margins, repeated instance counts per slice, and editable layer preservation in PSD exports.
+* **📊 Synchronized Pipeline & UI Telemetry:** Real-time step progression (Ready → Scan → Process → Watermark → Save → Done), live ETA, elapsed timer, processed file counters, and current filename display.
+* **🔄 No-Stitch Processing Mode:** Option to process, enhance, slice, and watermark individual chapter images without stitching them into a vertical continuous strip.
+* **📦 Native Archive & Document Encoders:** High-performance pure-Go encoders for ZIP, CBZ, PDF, and layered PSD containers.
 
 ---
 
@@ -198,4 +234,4 @@
 
 ### 📥 Installation
 
-Download the latest **ZIP** file from the [Release page](https://github.com/esmail-mkh/PhotoSlicer/releases/latest), extract it, and run `PhotoSlicer.exe`. Enjoy!
+Download the latest **ZIP** file from the [Releases page](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest), extract it, and run `PhotoSlicer.exe`. Enjoy!
