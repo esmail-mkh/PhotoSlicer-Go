@@ -725,15 +725,22 @@ func AnalyzeRegionDetailed(
 	if edge == "left" {
 		xStart = xMargin
 		xEnd = xMargin + wmW
-		if xEnd > w {
-			xEnd = w
-		}
 	} else {
 		xStart = w - xMargin - wmW
-		if xStart < 0 {
-			xStart = 0
-		}
 		xEnd = w - xMargin
+	}
+
+	if xStart < 0 {
+		xStart = 0
+	}
+	if xStart > w {
+		xStart = w
+	}
+	if xEnd < 0 {
+		xEnd = 0
+	}
+	if xEnd > w {
+		xEnd = w
 	}
 
 	if yEnd <= y || xEnd <= xStart {
@@ -1238,26 +1245,39 @@ func FindBestWatermarkPosition(
 	if edge == "left" {
 		cwX0 = xMargin
 		cwX1 = xMargin + wmW
-		if cwX1 > w {
-			cwX1 = w
-		}
 	} else {
 		cwX0 = w - xMargin - wmW
-		if cwX0 < 0 {
-			cwX0 = 0
-		}
 		cwX1 = w - xMargin
 	}
 
-	colWhite := make([]float64, cwX1-cwX0)
-	for x := cwX0; x < cwX1; x++ {
-		var cnt int
-		for y := 0; y < h; y++ {
-			if gray[y*w+x] > bubbleWhiteThreshold {
-				cnt++
+	if cwX0 < 0 {
+		cwX0 = 0
+	}
+	if cwX0 > w {
+		cwX0 = w
+	}
+	if cwX1 < 0 {
+		cwX1 = 0
+	}
+	if cwX1 > w {
+		cwX1 = w
+	}
+	if cwX1 < cwX0 {
+		cwX1 = cwX0
+	}
+
+	span := cwX1 - cwX0
+	colWhite := make([]float64, span)
+	if span > 0 {
+		for x := cwX0; x < cwX1; x++ {
+			var cnt int
+			for y := 0; y < h; y++ {
+				if gray[y*w+x] > bubbleWhiteThreshold {
+					cnt++
+				}
 			}
+			colWhite[x-cwX0] = float64(cnt) / float64(h)
 		}
-		colWhite[x-cwX0] = float64(cnt) / float64(h)
 	}
 
 	panelEdges := []int{0, h}

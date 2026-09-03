@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	"image/jpeg"
 	_ "image/png"
 	"io"
@@ -92,7 +94,7 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 		imageObjID := 5 + i*3
 
 		// Read and normalize image to JPEG bytes
-		imgData, w, h, err := loadImageAsJpegBytes(imgPath)
+		imgData, w, h, colorSpace, err := loadImageAsJpegBytes(imgPath)
 		if err != nil {
 			return fmt.Errorf("error processing image %s for PDF: %w", imgPath, err)
 		}
@@ -116,8 +118,8 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 
 		// Image XObject
 		offsets = append(offsets, currentOffset)
-		imageHeader := fmt.Sprintf("%d 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
-			imageObjID, w, h, len(imgData))
+		imageHeader := fmt.Sprintf("%d 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace %s /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
+			imageObjID, w, h, colorSpace, len(imgData))
 		if err := writeStr(imageHeader); err != nil {
 			return err
 		}
@@ -147,46 +149,66 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 	return writeStr(trailer)
 }
 
-func loadImageAsJpegBytes(path string) ([]byte, int, int, error) {
+func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 
 	// Fast path for JPEG
 	if ext == ".jpg" || ext == ".jpeg" {
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, 0, 0, err
+			return nil, 0, 0, "", err
 		}
 		defer f.Close()
 
 		cfg, err := jpeg.DecodeConfig(f)
 		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
-			_, _ = f.Seek(0, 0)
-			data, err := io.ReadAll(f)
-			if err == nil {
-				return data, cfg.Width, cfg.Height, nil
+			if cfg.ColorModel == color.GrayModel {
+				_, _ = f.Seek(0, 0)
+				data, err := io.ReadAll(f)
+				if err == nil {
+					return data, cfg.Width, cfg.Height, "/DeviceGray", nil
+				}
+			} else if cfg.ColorModel == color.YCbCrModel || cfg.ColorModel == color.RGBAModel {
+				_, _ = f.Seek(0, 0)
+				data, err := io.ReadAll(f)
+				if err == nil {
+					return data, cfg.Width, cfg.Height, "/DeviceRGB", nil
+				}
 			}
+			// If CMYK or non-standard JPEG, fallback below to decode and normalize to RGB
 		}
 	}
 
-	// Other formats or fallback: decode to image and re-encode to JPEG
+	// Other formats or fallback: decode to image and normalize
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, "", err
 	}
 	defer f.Close()
 
 	img, _, err := image.Decode(f)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, 0, "", err
 	}
 
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
 
-	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 95}); err != nil {
-		return nil, 0, 0, err
+	if gray, ok := img.(*image.Gray); ok {
+		var buf bytes.Buffer
+		if err := jpeg.Encode(&buf, gray, &jpeg.Options{Quality: 95}); err != nil {
+			return nil, 0, 0, "", err
+		}
+		return buf.Bytes(), w, h, "/DeviceGray", nil
 	}
 
-	return buf.Bytes(), w, h, nil
+	rgba := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(rgba, rgba.Bounds(), img, b.Min, draw.Src)
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, rgba, &jpeg.Options{Quality: 95}); err != nil {
+		return nil, 0, 0, "", err
+	}
+
+	return buf.Bytes(), w, h, "/DeviceRGB", nil
 }

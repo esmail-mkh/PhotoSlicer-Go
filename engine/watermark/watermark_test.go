@@ -183,4 +183,47 @@ func TestWatermarkPlacements(t *testing.T) {
 			t.Errorf("Watermark was placed inside speech bubble at Y=%d, expected avoidance!", wmY)
 		}
 	})
+
+	t.Run("LargeMarginNoPanic", func(t *testing.T) {
+		comicCanvas := image.NewRGBA(image.Rect(0, 0, 400, 800))
+		draw.Draw(comicCanvas, comicCanvas.Bounds(), image.White, image.Point{}, draw.Src)
+
+		// Test edge = right with margin > width (650 > 400)
+		placements, _ := ComputeWatermarkPlacements(comicCanvas, wmPath, 1, "right", 0, 650)
+		if len(placements) == 0 {
+			t.Fatal("Expected fallback placement, got none")
+		}
+
+		// Test edge = left with margin > width
+		placementsLeft, _ := ComputeWatermarkPlacements(comicCanvas, wmPath, 1, "left", 0, 500)
+		if len(placementsLeft) == 0 {
+			t.Fatal("Expected fallback placement, got none")
+		}
+	})
 }
+
+func TestExtractGrayAndSaturationSubImage(t *testing.T) {
+	parent := image.NewRGBA(image.Rect(0, 0, 200, 200))
+	draw.Draw(parent, parent.Bounds(), image.White, image.Point{}, draw.Src)
+
+	// In the bottom right corner (100, 100) to (200, 200), fill with red
+	redRect := image.Rect(100, 100, 200, 200)
+	draw.Draw(parent, redRect, image.NewUniform(color.RGBA{R: 255, G: 0, B: 0, A: 255}), image.Point{}, draw.Src)
+
+	// Take a SubImage of the red area
+	sub := parent.SubImage(redRect)
+	gray, sat, w, h := ExtractGrayAndSaturation(sub)
+	if w != 100 || h != 100 {
+		t.Fatalf("Expected 100x100, got %dx%d", w, h)
+	}
+
+	// Red pixel in grayscale is (255*77) >> 8 = 76
+	// Saturation is 255
+	if gray[0] != 76 {
+		t.Errorf("Expected gray[0] == 76 for SubImage, got %d", gray[0])
+	}
+	if sat[0] != 255 {
+		t.Errorf("Expected sat[0] == 255 for SubImage, got %d", sat[0])
+	}
+}
+

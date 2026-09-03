@@ -823,9 +823,6 @@ func (a *App) Start(params map[string]interface{}) {
 				}
 			}
 
-			if wmEnabled {
-				a.updateStep("watermark")
-			}
 			a.updateStep("process")
 
 			opts := pipeline.PipelineOptions{
@@ -878,6 +875,13 @@ func (a *App) Start(params map[string]interface{}) {
 
 			resPath, err := pipeline.MergerImages(processFolder, opts)
 			if err != nil {
+				if a.controller.CheckState() != nil {
+					a.changeStatusText(getMsg("stopped", lang))
+					a.updateStep("ready")
+					a.setButtonState("idle")
+					a.execJS("stopTimer();")
+					return
+				}
 				a.showError(err.Error(), true)
 			} else {
 				a.updateStep("save")
@@ -972,9 +976,6 @@ func (a *App) Start(params map[string]interface{}) {
 					}
 				}
 
-				if wmEnabled {
-					a.updateStep("watermark")
-				}
 				a.updateStep("process")
 
 				opts := pipeline.PipelineOptions{
@@ -1013,7 +1014,17 @@ func (a *App) Start(params map[string]interface{}) {
 				resPath, err := pipeline.MergerImages(processFolder, opts)
 				if err == nil {
 					a.lastOutput = resPath
+				} else if a.controller.CheckState() != nil {
+					break
 				}
+			}
+
+			if a.controller.CheckState() != nil {
+				a.changeStatusText(getMsg("stopped", lang))
+				a.updateStep("ready")
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
 			}
 
 			a.updateStep("save")

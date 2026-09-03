@@ -121,6 +121,7 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 
 	taskChan := make(chan noStitchTask, total)
 	var completed int64
+	var progressMu sync.Mutex
 
 	workers := opts.MaxWorkers
 	if workers <= 0 {
@@ -194,7 +195,9 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 				curr := atomic.AddInt64(&completed, 1)
 				if opts.ProgressCallback != nil {
 					pct := (float64(curr) / float64(total)) * 100.0
+					progressMu.Lock()
 					opts.ProgressCallback(pct, int(curr), total, filename)
+					progressMu.Unlock()
 				}
 			}
 		}()
@@ -206,6 +209,12 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	close(taskChan)
 	wg.Wait()
 
+	if opts.Controller != nil {
+		if err := opts.Controller.CheckState(); err != nil {
+			return "", err
+		}
+	}
+
 	finalResultPath := savePath
 	baseName := filepath.Base(savePath)
 	archiveCreated := false
@@ -214,28 +223,31 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 		zipPath := filepath.Join(filepath.Dir(savePath), baseName+".zip")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
-		if err := archive.CreateZip(zipPath, files); err == nil {
-			archiveCreated = true
-			finalResultPath = zipPath
+		if err := archive.CreateZip(zipPath, files); err != nil {
+			return "", fmt.Errorf("failed to create zip archive: %w", err)
 		}
+		archiveCreated = true
+		finalResultPath = zipPath
 	}
 	if opts.IsCbz {
 		cbzPath := filepath.Join(filepath.Dir(savePath), baseName+".cbz")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
-		if err := archive.CreateCbz(cbzPath, files); err == nil {
-			archiveCreated = true
-			finalResultPath = cbzPath
+		if err := archive.CreateCbz(cbzPath, files); err != nil {
+			return "", fmt.Errorf("failed to create cbz archive: %w", err)
 		}
+		archiveCreated = true
+		finalResultPath = cbzPath
 	}
 	if opts.IsPdf {
 		pdfPath := filepath.Join(filepath.Dir(savePath), baseName+".pdf")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
-		if err := archive.CreatePdfFromImages(pdfPath, files); err == nil {
-			archiveCreated = true
-			finalResultPath = pdfPath
+		if err := archive.CreatePdfFromImages(pdfPath, files); err != nil {
+			return "", fmt.Errorf("failed to create pdf archive: %w", err)
 		}
+		archiveCreated = true
+		finalResultPath = pdfPath
 	}
 
 	if archiveCreated {

@@ -15,6 +15,7 @@ import (
 	"photoslicer/engine/constants"
 
 	"github.com/chai2010/webp"
+	"github.com/gen2brain/avif"
 )
 
 func createTestPsd(path string, w, h int) error {
@@ -317,3 +318,40 @@ func TestPSDDecodingScenarios(t *testing.T) {
 		}
 	})
 }
+
+func createTestAvif(path string, w, h int) error {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.RGBA{R: 200, G: 100, B: 50, A: 255}}, image.Point{}, draw.Src)
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return avif.Encode(f, img)
+}
+
+func TestOpenImageAndGetSizeAVIF(t *testing.T) {
+	tempDir := t.TempDir()
+	avifPath := filepath.Join(tempDir, "test.avif")
+	if err := createTestAvif(avifPath, 320, 240); err != nil {
+		t.Fatalf("failed to create test avif: %v", err)
+	}
+
+	w, h, err := GetImageSizeFast(avifPath)
+	if err != nil {
+		t.Fatalf("GetImageSizeFast failed on AVIF: %v", err)
+	}
+	if w != 320 || h != 240 {
+		t.Errorf("expected 320x240, got %dx%d", w, h)
+	}
+
+	img, err := OpenImageRobust(avifPath)
+	if err != nil {
+		t.Fatalf("OpenImageRobust failed on AVIF: %v", err)
+	}
+	b := img.Bounds()
+	if b.Dx() != 320 || b.Dy() != 240 {
+		t.Errorf("expected bounds 320x240, got %dx%d", b.Dx(), b.Dy())
+	}
+}
+

@@ -141,6 +141,32 @@ func TestCreatePdfFromImages(t *testing.T) {
 	if !containsSubstring(data, []byte("%%EOF")) {
 		t.Errorf("expected %%EOF in pdf trailer")
 	}
+
+	t.Run("GrayscaleSupport", func(t *testing.T) {
+		grayImgPath := filepath.Join(tempDir, "gray.jpg")
+		grayImg := image.NewGray(image.Rect(0, 0, 100, 150))
+		f, err := os.Create(grayImgPath)
+		if err != nil {
+			t.Fatalf("failed to create gray file: %v", err)
+		}
+		if err := jpeg.Encode(f, grayImg, &jpeg.Options{Quality: 90}); err != nil {
+			f.Close()
+			t.Fatalf("failed to encode gray JPEG: %v", err)
+		}
+		f.Close()
+
+		grayPdf := filepath.Join(tempDir, "gray.pdf")
+		if err := CreatePdfFromImages(grayPdf, []string{grayImgPath}); err != nil {
+			t.Fatalf("CreatePdfFromImages failed for gray: %v", err)
+		}
+		pdfData, err := os.ReadFile(grayPdf)
+		if err != nil {
+			t.Fatalf("failed to read gray pdf: %v", err)
+		}
+		if !containsSubstring(pdfData, []byte("/DeviceGray")) {
+			t.Errorf("expected /DeviceGray in PDF dictionary for grayscale image")
+		}
+	})
 }
 
 func TestSafeRmtreeTemp(t *testing.T) {

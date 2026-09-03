@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"unicode/utf16"
 	"unicode/utf8"
 )
 
@@ -164,10 +165,13 @@ func marshalJSONAscii(v interface{}) string {
 	}
 	var buf strings.Builder
 	for _, r := range string(b) {
-		if r >= 128 {
+		if r < 128 {
+			buf.WriteRune(r)
+		} else if r <= 0xFFFF {
 			buf.WriteString(fmt.Sprintf("\\u%04x", r))
 		} else {
-			buf.WriteRune(r)
+			r1, r2 := utf16.EncodeRune(r)
+			buf.WriteString(fmt.Sprintf("\\u%04x\\u%04x", r1, r2))
 		}
 	}
 	return buf.String()

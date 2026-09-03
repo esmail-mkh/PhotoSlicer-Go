@@ -17,6 +17,7 @@ import (
 
 	"github.com/chai2010/webp"
 	"github.com/disintegration/imaging"
+	"github.com/gen2brain/avif"
 )
 
 // OpenImageRobust robustly decodes an image from disk.
@@ -37,6 +38,13 @@ func OpenImageRobust(path string) (image.Image, error) {
 	}
 	if ext == ".webp" {
 		img, err := webp.Decode(f)
+		if err == nil {
+			return img, nil
+		}
+		_, _ = f.Seek(0, 0)
+	}
+	if ext == ".avif" {
+		img, err := avif.Decode(f)
 		if err == nil {
 			return img, nil
 		}
@@ -67,6 +75,13 @@ func GetImageSizeFast(path string) (int, int, error) {
 			if w > 0 && h > 0 {
 				return w, h, nil
 			}
+		}
+		_, _ = f.Seek(0, 0)
+	}
+	if ext == ".avif" {
+		cfg, err := avif.DecodeConfig(f)
+		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
+			return cfg.Width, cfg.Height, nil
 		}
 		_, _ = f.Seek(0, 0)
 	}

@@ -328,6 +328,7 @@ func RunFastEnhancement(
 
 	taskChan := make(chan string, total)
 	var completed int64
+	var progressMu sync.Mutex
 
 	var wg sync.WaitGroup
 	for i := 0; i < maxWorkers; i++ {
@@ -363,6 +364,11 @@ func RunFastEnhancement(
 						slicesCount := math.Ceil(float64(h) / float64(constants.MaxEnhanceHeight))
 						cuts := append([]int{0}, slicing.FindSafeCutPoints(img, slicesCount)...)
 						for j := 0; j < len(cuts)-1; j++ {
+							if checkCanceled != nil {
+								if err := checkCanceled(); err != nil {
+									return
+								}
+							}
 							top := cuts[j]
 							bot := cuts[j+1]
 							subRect := image.Rect(0, top, img.Bounds().Dx(), bot)
@@ -384,7 +390,9 @@ func RunFastEnhancement(
 				curr := int(atomic.AddInt64(&completed, 1))
 				if progressCallback != nil {
 					pct := int(math.Round(float64(curr) / float64(total) * 100.0))
+					progressMu.Lock()
 					progressCallback(pct, curr, total)
+					progressMu.Unlock()
 				}
 			}
 		}()
@@ -571,6 +579,12 @@ func RunRealEsrganAI(
 	taskIdx := 0
 
 	for _, srcPath := range files {
+		if checkCanceled != nil {
+			if err := checkCanceled(); err != nil {
+				return "", err
+			}
+		}
+
 		base := filepath.Base(srcPath)
 		ext := strings.ToLower(filepath.Ext(base))
 		stem := strings.TrimSuffix(base, filepath.Ext(base))
@@ -612,6 +626,11 @@ func RunRealEsrganAI(
 			slicesCount := math.Ceil(float64(h) / float64(constants.MaxEnhanceHeight))
 			cuts := append([]int{0}, slicing.FindSafeCutPoints(img, slicesCount)...)
 			for j := 0; j < len(cuts)-1; j++ {
+				if checkCanceled != nil {
+					if err := checkCanceled(); err != nil {
+						return "", err
+					}
+				}
 				top := cuts[j]
 				bot := cuts[j+1]
 				subRect := image.Rect(0, top, img.Bounds().Dx(), bot)

@@ -44,6 +44,16 @@ func TestMarshalJSONAscii(t *testing.T) {
 	if out != expected {
 		t.Errorf("marshalJSONAscii(%v) = %q, expected %q", data, out, expected)
 	}
+
+	// Test Astral plane emoji (e.g. 🔥 U+1F525 -> \ud83d\udd25)
+	emojiData := map[string]string{
+		"badge": "🔥 Pro",
+	}
+	emojiOut := marshalJSONAscii(emojiData)
+	expectedEmoji := `{"badge":"\ud83d\udd25 Pro"}`
+	if emojiOut != expectedEmoji {
+		t.Errorf("marshalJSONAscii(%v) = %q, expected %q", emojiData, emojiOut, expectedEmoji)
+	}
 }
 
 func TestSanitizeSettingsPresets(t *testing.T) {

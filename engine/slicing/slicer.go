@@ -172,6 +172,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 
 	taskChan := make(chan sliceTask, numSlices)
 	var completedCount int64
+	var progressMu sync.Mutex
 
 	var workerWg sync.WaitGroup
 	for w := 0; w < opts.MaxWorkers; w++ {
@@ -235,7 +236,9 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 				done := atomic.AddInt64(&completedCount, 1)
 				if opts.ProgressCallback != nil {
 					pct := (float64(done) / float64(numSlices)) * 100.0
+					progressMu.Lock()
 					opts.ProgressCallback(pct, int(done), numSlices, filename)
+					progressMu.Unlock()
 				}
 			}
 		}()
@@ -260,28 +263,31 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		zipPath := filepath.Join(filepath.Dir(savePath), baseName+".zip")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
-		if err := archive.CreateZip(zipPath, files); err == nil {
-			archiveCreated = true
-			finalResultPath = zipPath
+		if err := archive.CreateZip(zipPath, files); err != nil {
+			return "", fmt.Errorf("failed to create zip archive: %w", err)
 		}
+		archiveCreated = true
+		finalResultPath = zipPath
 	}
 	if opts.IsCbz {
 		cbzPath := filepath.Join(filepath.Dir(savePath), baseName+".cbz")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
-		if err := archive.CreateCbz(cbzPath, files); err == nil {
-			archiveCreated = true
-			finalResultPath = cbzPath
+		if err := archive.CreateCbz(cbzPath, files); err != nil {
+			return "", fmt.Errorf("failed to create cbz archive: %w", err)
 		}
+		archiveCreated = true
+		finalResultPath = cbzPath
 	}
 	if opts.IsPdf {
 		pdfPath := filepath.Join(filepath.Dir(savePath), baseName+".pdf")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
-		if err := archive.CreatePdfFromImages(pdfPath, files); err == nil {
-			archiveCreated = true
-			finalResultPath = pdfPath
+		if err := archive.CreatePdfFromImages(pdfPath, files); err != nil {
+			return "", fmt.Errorf("failed to create pdf archive: %w", err)
 		}
+		archiveCreated = true
+		finalResultPath = pdfPath
 	}
 
 	if archiveCreated {
