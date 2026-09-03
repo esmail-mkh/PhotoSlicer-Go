@@ -54,9 +54,6 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	if opts.FilenameDigits <= 0 {
 		opts.FilenameDigits = 3
 	}
-	if opts.WatermarkWidthPercent <= 0 {
-		opts.WatermarkWidthPercent = 12
-	}
 
 	folderName := opts.SaveDirectory
 	if folderName == "" {

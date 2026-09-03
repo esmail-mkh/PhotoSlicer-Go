@@ -727,7 +727,7 @@ func (a *App) Start(params map[string]interface{}) {
 				WatermarkPath:         wmPath,
 				WatermarkCount:        wmCount,
 				WatermarkEdge:         wmEdge,
-				WatermarkWidthPercent: 12,
+				WatermarkWidthPercent: 0,
 				WatermarkMargin:       wmMargin,
 				Controller:            a.controller,
 				ProgressCallback: func(pct float64) {
@@ -826,7 +826,7 @@ func (a *App) Start(params map[string]interface{}) {
 					WatermarkPath:         wmPath,
 					WatermarkCount:        wmCount,
 					WatermarkEdge:         wmEdge,
-					WatermarkWidthPercent: 12,
+					WatermarkWidthPercent: 0,
 					WatermarkMargin:       wmMargin,
 					Controller:            a.controller,
 					ProgressCallback: func(pct float64) {

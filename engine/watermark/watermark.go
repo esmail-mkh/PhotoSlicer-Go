@@ -56,8 +56,9 @@ func getCachedWatermark(path string) *image.RGBA {
 	return rgba
 }
 
-// PrepareWatermark scales the watermark image to fit the canvas:
-// never wider than canvas width, and never taller than 80% of one of the `count` segments.
+// PrepareWatermark returns the watermark image sized to its native resolution,
+// scaled down only if it exceeds the canvas width or the vertical segment height.
+// If widthPercent > 0, it scales relative to canvas width (capped at canvas dimensions).
 func PrepareWatermark(watermarkPath string, canvasW, canvasH, count int, widthPercent int) *image.RGBA {
 	wmOrig := getCachedWatermark(watermarkPath)
 	if wmOrig == nil {
@@ -67,33 +68,48 @@ func PrepareWatermark(watermarkPath string, canvasW, canvasH, count int, widthPe
 	origW := wmOrig.Bounds().Dx()
 	origH := wmOrig.Bounds().Dy()
 
-	// Base target width from widthPercent (default ~12% of canvas width)
-	targetW := int(float64(canvasW) * (float64(widthPercent) / 100.0))
-	if targetW < 10 {
-		targetW = origW
-	}
-	if targetW > canvasW {
-		targetW = canvasW
+	targetW := origW
+	targetH := origH
+
+	// If a custom percentage is explicitly requested (> 0)
+	if widthPercent > 0 {
+		targetW = int(float64(canvasW) * (float64(widthPercent) / 100.0))
+		if targetW < 1 {
+			targetW = 1
+		}
+		targetH = int((float64(targetW) / float64(origW)) * float64(origH))
+		if targetH < 1 {
+			targetH = 1
+		}
 	}
 
-	targetH := int((float64(targetW) / float64(origW)) * float64(origH))
-	if targetH < 5 {
-		targetH = 5
+	// Never wider than canvas width
+	if canvasW > 0 && targetW > canvasW {
+		targetW = canvasW
+		targetH = int((float64(targetW) / float64(origW)) * float64(origH))
+		if targetH < 1 {
+			targetH = 1
+		}
 	}
 
 	if count <= 0 {
 		count = 1
 	}
-	maxAllowedH := int(float64(canvasH) / float64(count) * 0.8)
+	maxAllowedH := int(float64(canvasH) / float64(count))
 	if maxAllowedH > 0 && targetH > maxAllowedH {
 		targetH = maxAllowedH
-		if targetH < 5 {
-			targetH = 5
+		if targetH < 1 {
+			targetH = 1
 		}
 		targetW = int((float64(targetH) / float64(origH)) * float64(origW))
-		if targetW < 10 {
-			targetW = 10
+		if targetW < 1 {
+			targetW = 1
 		}
+	}
+
+	// If dimensions match original, return original directly without quality loss from resizing
+	if targetW == origW && targetH == origH {
+		return wmOrig
 	}
 
 	resized := imaging.Resize(wmOrig, targetW, targetH, imaging.Lanczos)
