@@ -1,0 +1,51 @@
+# Wails & Go build outputs
+build/bin/
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*-res.syso
+*.syso
+
+# Keep bundled AI upscaler binaries in up-model
+!up-model/*.exe
+!up-model/*.dll
+
+# Temporary test binaries and cover profiles
+*.test
+*.prof
+*.out
+
+# PhotoSlicer Output directories & temp extractions
+Results/
+_photoslicer_*
+photoslicer_extract_*
+photoslicer_fast_*
+photoslicer_enhanced_*
+
+# Frontend build cache (if applicable)
+frontend/dist/
+frontend/node_modules/
+
+# Operating System artifacts
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Editor & IDE settings
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.swp
+*~
+
+# Logs
+*.log
+photoslicer_error.log

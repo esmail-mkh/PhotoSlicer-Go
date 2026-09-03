@@ -1,0 +1,17 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "PhotoSlicer",
+  "outputfilename": "PhotoSlicer",
+  "frontend:dir": "frontend",
+  "author": {
+    "name": "Esmaeil MKH",
+    "email": "sokot121@gmail.com"
+  },
+  "info": {
+    "companyName": "Esmaeil MKH",
+    "productName": "PhotoSlicer",
+    "productVersion": "5.2.0",
+    "copyright": "Copyright (c) 2026 Esmaeil MKH",
+    "comments": "A specialized tool for stitching and slicing manhwa/webtoon images."
+  }
+}

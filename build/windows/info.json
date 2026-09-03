@@ -1,0 +1,28 @@
+{
+	"fixed": {
+		"file_version": "5.2.0.0",
+		"product_version": "5.2.0.0"
+	},
+	"info": {
+		"0000": {
+			"CompanyName": "Esmaeil MKH",
+			"FileVersion": "5.2.0.0",
+			"InternalName": "PhotoSlicer",
+			"LegalCopyright": "Copyright (c) 2026 Esmaeil MKH",
+			"OriginalFilename": "PhotoSlicer.exe",
+			"ProductName": "PhotoSlicer",
+			"ProductVersion": "5.2.0.0",
+			"Comments": "A specialized tool for stitching and slicing manhwa/webtoon images."
+		},
+		"0409": {
+			"CompanyName": "Esmaeil MKH",
+			"FileVersion": "5.2.0.0",
+			"InternalName": "PhotoSlicer",
+			"LegalCopyright": "Copyright (c) 2026 Esmaeil MKH",
+			"OriginalFilename": "PhotoSlicer.exe",
+			"ProductName": "PhotoSlicer",
+			"ProductVersion": "5.2.0.0",
+			"Comments": "A specialized tool for stitching and slicing manhwa/webtoon images."
+		}
+	}
+}

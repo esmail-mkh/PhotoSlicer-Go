@@ -1,0 +1,192 @@
+package archive
+
+import (
+	"bytes"
+	"fmt"
+	"image"
+	"image/jpeg"
+	_ "image/png"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
+	_ "github.com/chai2010/webp"
+)
+
+type pdfObject struct {
+	offset int64
+}
+
+// CreatePdfFromImages creates a multi-page PDF where each image is rendered on its own page
+// with dimensions matching the image's pixel dimensions.
+func CreatePdfFromImages(outputPath string, imagePaths []string) error {
+	if len(imagePaths) == 0 {
+		return fmt.Errorf("no images provided for PDF")
+	}
+
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	var currentOffset int64
+	writeStr := func(s string) error {
+		n, err := io.WriteString(outFile, s)
+		currentOffset += int64(n)
+		return err
+	}
+	writeBytes := func(b []byte) error {
+		n, err := outFile.Write(b)
+		currentOffset += int64(n)
+		return err
+	}
+
+	// 1. PDF Header
+	if err := writeStr("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"); err != nil {
+		return err
+	}
+
+	// Objects map: 1-indexed object IDs to offsets
+	var offsets []int64
+	// offset[0] is dummy for 0 0 R
+	offsets = append(offsets, 0)
+
+	numPages := len(imagePaths)
+
+	// Object numbering plan:
+	// 1: Catalog
+	// 2: Pages root
+	// For page i (0-indexed):
+	//   pageObjID: 3 + i*3
+	//   contentObjID: 4 + i*3
+	//   imageObjID: 5 + i*3
+
+	catalogID := 1
+	pagesID := 2
+
+	// We will record objects sequentially.
+	// First let's write Catalog (obj 1)
+	offsets = append(offsets, currentOffset)
+	if err := writeStr(fmt.Sprintf("%d 0 obj\n<< /Type /Catalog /Pages %d 0 R >>\nendobj\n", catalogID, pagesID)); err != nil {
+		return err
+	}
+
+	// Pages root (obj 2)
+	offsets = append(offsets, currentOffset)
+	var kids []string
+	for i := 0; i < numPages; i++ {
+		pageObjID := 3 + i*3
+		kids = append(kids, fmt.Sprintf("%d 0 R", pageObjID))
+	}
+	kidsStr := strings.Join(kids, " ")
+	if err := writeStr(fmt.Sprintf("%d 0 obj\n<< /Type /Pages /Kids [ %s ] /Count %d >>\nendobj\n", pagesID, kidsStr, numPages)); err != nil {
+		return err
+	}
+
+	// For each page: Page, Content, Image
+	for i, imgPath := range imagePaths {
+		pageObjID := 3 + i*3
+		contentObjID := 4 + i*3
+		imageObjID := 5 + i*3
+
+		// Read and normalize image to JPEG bytes
+		imgData, w, h, err := loadImageAsJpegBytes(imgPath)
+		if err != nil {
+			return fmt.Errorf("error processing image %s for PDF: %w", imgPath, err)
+		}
+
+		// Page object
+		offsets = append(offsets, currentOffset)
+		pageHeader := fmt.Sprintf("%d 0 obj\n<< /Type /Page /Parent %d 0 R /MediaBox [ 0 0 %d %d ] /Contents %d 0 R /Resources << /XObject << /Im %d 0 R >> >> >>\nendobj\n",
+			pageObjID, pagesID, w, h, contentObjID, imageObjID)
+		if err := writeStr(pageHeader); err != nil {
+			return err
+		}
+
+		// Content stream: paint image /Im across entire page (0 0 to W H)
+		contentStream := fmt.Sprintf("q\n%d 0 0 %d 0 0 cm\n/Im Do\nQ\n", w, h)
+		offsets = append(offsets, currentOffset)
+		contentHeader := fmt.Sprintf("%d 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n",
+			contentObjID, len(contentStream), contentStream)
+		if err := writeStr(contentHeader); err != nil {
+			return err
+		}
+
+		// Image XObject
+		offsets = append(offsets, currentOffset)
+		imageHeader := fmt.Sprintf("%d 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
+			imageObjID, w, h, len(imgData))
+		if err := writeStr(imageHeader); err != nil {
+			return err
+		}
+		if err := writeBytes(imgData); err != nil {
+			return err
+		}
+		if err := writeStr("\nendstream\nendobj\n"); err != nil {
+			return err
+		}
+	}
+
+	// xref table
+	xrefOffset := currentOffset
+	totalObjs := len(offsets) - 1 // object 1 through totalObjs
+	if err := writeStr(fmt.Sprintf("xref\n0 %d\n0000000000 65535 f \n", totalObjs+1)); err != nil {
+		return err
+	}
+	for o := 1; o <= totalObjs; o++ {
+		if err := writeStr(fmt.Sprintf("%010d 00000 n \n", offsets[o])); err != nil {
+			return err
+		}
+	}
+
+	// trailer
+	trailer := fmt.Sprintf("trailer\n<< /Size %d /Root %d 0 R >>\nstartxref\n%d\n%%%%EOF\n",
+		totalObjs+1, catalogID, xrefOffset)
+	return writeStr(trailer)
+}
+
+func loadImageAsJpegBytes(path string) ([]byte, int, int, error) {
+	ext := strings.ToLower(filepath.Ext(path))
+
+	// Fast path for JPEG
+	if ext == ".jpg" || ext == ".jpeg" {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		defer f.Close()
+
+		cfg, err := jpeg.DecodeConfig(f)
+		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
+			_, _ = f.Seek(0, 0)
+			data, err := io.ReadAll(f)
+			if err == nil {
+				return data, cfg.Width, cfg.Height, nil
+			}
+		}
+	}
+
+	// Other formats or fallback: decode to image and re-encode to JPEG
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer f.Close()
+
+	img, _, err := image.Decode(f)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 95}); err != nil {
+		return nil, 0, 0, err
+	}
+
+	return buf.Bytes(), w, h, nil
+}

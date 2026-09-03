@@ -1,0 +1,871 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"math"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+
+	"photoslicer/engine/archive"
+	"photoslicer/engine/constants"
+	"photoslicer/engine/enhancer"
+	"photoslicer/engine/pipeline"
+	"photoslicer/engine/sorting"
+
+	"github.com/atotto/clipboard"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+)
+
+var translations = map[string]map[string]string{
+	"en": {
+		"ready":                  "Ready to Slice",
+		"app_window_title":      "PhotoSlicer v" + constants.Version,
+		"paused":                "Paused... ⏸️",
+		"resuming":              "Resuming... ▶️",
+		"idle_done":             "Done! Idle. ✅",
+		"error_folder":          "Please select a directory first.",
+		"error_no_images":       "No images or subfolders found.",
+		"error_valid_dir":       "Select Valid Directory! 🚫",
+		"preparing":             "Preparing: %s... ✨",
+		"processing_single":     "Processing single folder... 🔥",
+		"processing_multi":      "Processing %s - %d/%d... 🔥",
+		"enhancer_missing":      "Enhancer not found! Ensure 'realesrgan-ncnn-vulkan.exe' is in the 'up-model' folder.",
+		"enhancing_load":        "Loading %d images to AI...",
+		"enhancing_run":         "Enhancing %d images... 🔥",
+		"enhancing_fast_run":    "Denoising %d images (Fast CPU)... ⚡",
+		"enhancing_done":        "Enhancement complete. ✅",
+		"enhancing_fail":        "Enhancement failed or skipped.",
+		"error_pre_process":     "Error during image pre-processing: %s",
+		"error_batch":           "Error during batch enhancement: %s",
+		"skip_folder":           "Skipping %s (enhancement failed).",
+		"no_images_process":     "No images found to process.",
+		"no_subfolders":         "No subfolders with images found!",
+		"open_folder_err":       "Could not open folder: %s",
+		"path_not_exist":        "Folder path does not exist.",
+		"stopping":              "Stopping... ⏹️",
+		"stopped":               "Stopped by user. ⏹️",
+		"webp_nostitch_fallback": "An image is larger than WebP's limit — stitching normally instead.",
+		"error_invalid_input":   "Please enter valid numbers for width, height, and quality.",
+		"error_watermark_path":  "Please select a valid PNG watermark image.",
+		"error_unexpected":      "An unexpected error occurred: %s",
+	},
+	"fa": {
+		"ready":                  "آماده برای شروع",
+		"app_window_title":      "فوتو اسلایسر - نسخه " + constants.Version,
+		"paused":                "توقف... ⏸️",
+		"resuming":              "در حال ادامه... ▶️",
+		"idle_done":             "تمام شد! آماده. ✅",
+		"error_folder":          "لطفا ابتدا یک پوشه انتخاب کنید.",
+		"error_no_images":       "هیچ تصویر یا زیرپوشه‌ای یافت نشد.",
+		"error_valid_dir":       "پوشه معتبر انتخاب کنید! 🚫",
+		"preparing":             "آماده‌سازی: %s... ✨",
+		"processing_single":     "پردازش پوشه تکی... 🔥",
+		"processing_multi":      "پردازش %s - %d/%d... 🔥",
+		"enhancer_missing":      "فایل هوش مصنوعی یافت نشد! مطمئن شوید 'realesrgan-ncnn-vulkan.exe' در پوشه 'up-model' است.",
+		"enhancing_load":        "بارگذاری %d تصویر در هوش مصنوعی...",
+		"enhancing_run":         "افزایش کیفیت %d تصویر... 🔥",
+		"enhancing_fast_run":    "نویزگیری سریع %d تصویر (پردازنده)... ⚡",
+		"enhancing_done":        "افزایش کیفیت تکمیل شد. ✅",
+		"enhancing_fail":        "افزایش کیفیت شکست خورد.",
+		"error_pre_process":     "خطا در پیش‌پردازش تصاویر: %s",
+		"error_batch":           "خطا در افزایش کیفیت گروهی: %s",
+		"skip_folder":           "رد کردن %s (خطا در AI).",
+		"no_images_process":     "تصویری برای پردازش یافت نشد.",
+		"no_subfolders":         "هیچ زیرپوشه‌ای یافت نشد! 🚫",
+		"open_folder_err":       "خطا در باز کردن پوشه: %s",
+		"path_not_exist":        "مسیر پوشه وجود ندارد.",
+		"stopping":              "در حال توقف... ⏹️",
+		"stopped":               "توسط کاربر متوقف شد. ⏹️",
+		"webp_nostitch_fallback": "یک تصویر بزرگ‌تر از حد مجاز WebP است؛ به‌جای حالت بدون چسباندن، به‌صورت عادی چسبانده می‌شود.",
+		"error_invalid_input":   "لطفاً برای عرض، ارتفاع و کیفیت عددهای معتبر وارد کنید.",
+		"error_watermark_path":  "لطفاً یک تصویر واترمارک PNG معتبر انتخاب کنید.",
+		"error_unexpected":      "خطای غیرمنتظره‌ای رخ داد: %s",
+	},
+}
+
+func getMsg(key, lang string, args ...interface{}) string {
+	dict, ok := translations[lang]
+	if !ok {
+		dict = translations["en"]
+	}
+	msg, ok := dict[key]
+	if !ok {
+		msg = key
+	}
+	if len(args) > 0 {
+		return fmt.Sprintf(msg, args...)
+	}
+	return msg
+}
+
+func formatDuration(seconds float64) string {
+	s := int(math.Round(seconds))
+	if s < 60 {
+		return fmt.Sprintf("%ds", s)
+	}
+	minutes := s / 60
+	remSec := s % 60
+	if minutes < 60 {
+		return fmt.Sprintf("%dm %02ds", minutes, remSec)
+	}
+	hours := minutes / 60
+	remMin := minutes % 60
+	return fmt.Sprintf("%dh %02dm", hours, remMin)
+}
+
+func calculateEta(startTime time.Time, currentPercent float64) string {
+	if currentPercent <= 0 || currentPercent >= 100 {
+		return ""
+	}
+	elapsed := time.Since(startTime).Seconds()
+	totalEst := elapsed / (currentPercent / 100.0)
+	rem := totalEst - elapsed
+	return formatDuration(rem)
+}
+
+type App struct {
+	ctx        context.Context
+	settingsMu sync.Mutex
+	settings   map[string]interface{}
+	controller *pipeline.Controller
+	isBusy     int32
+	startTime  time.Time
+	lastOutput string
+}
+
+func NewApp() *App {
+	return &App{
+		settings: make(map[string]interface{}),
+	}
+}
+
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
+		if len(paths) > 0 {
+			pathsJSON, err := json.Marshal(paths)
+			if err == nil {
+				wailsRuntime.WindowExecJS(ctx, fmt.Sprintf("if (typeof window.handleDroppedPaths === 'function') window.handleDroppedPaths(%s);", string(pathsJSON)))
+			}
+		}
+	})
+}
+
+func (a *App) defaultSettings() map[string]interface{} {
+	return map[string]interface{}{
+		"custom_width_checked": true,
+		"width":                800,
+		"height_limit":         16000,
+		"save_quality":         100,
+		"save_format":          "JPG",
+		"zip_checked":          false,
+		"pdf_checked":          false,
+		"cbz_checked":          false,
+		"enhance_checked":      false,
+		"enhance_engine":       "fast",
+		"no_stitch_checked":    false,
+		"selected_tab":         "process",
+		"theme":                "blue",
+		"language":             "fa",
+		"save_location":        "",
+		"save_next_to_source":  false,
+		"play_sound":           true,
+		"show_notification":    true,
+		"thread_count":         4,
+		"output_suffix":        " [Stitched]",
+		"filename_pattern":     "[number]",
+		"filename_digits":      3,
+		"custom_theme_color":   "",
+		"watermark_enabled":    false,
+		"watermark_path":       "",
+		"watermark_count":      1,
+		"watermark_edge":       "right",
+		"watermark_margin":     0,
+		"presets":              []interface{}{},
+		"default_preset":       nil,
+	}
+}
+
+func (a *App) loadSettings() map[string]interface{} {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+
+	defaults := a.defaultSettings()
+	filePath := constants.GetSettingsFile()
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		a.settings = defaults
+		return a.settings
+	}
+
+	var loaded map[string]interface{}
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		a.settings = defaults
+		return a.settings
+	}
+
+	for k, v := range defaults {
+		if _, exists := loaded[k]; !exists {
+			loaded[k] = v
+		}
+	}
+	a.settings = loaded
+	return a.settings
+}
+
+func (a *App) saveSettingsToDisk(settings map[string]interface{}) {
+	a.settingsMu.Lock()
+	defer a.settingsMu.Unlock()
+
+	dir := constants.GetSettingsDir()
+	_ = os.MkdirAll(dir, 0755)
+
+	filePath := constants.GetSettingsFile()
+
+	// Retain presets if not provided
+	if _, ok := settings["presets"]; !ok {
+		if existing, ok := a.settings["presets"]; ok {
+			settings["presets"] = existing
+		}
+	}
+
+	for k, v := range settings {
+		a.settings[k] = v
+	}
+
+	bytes, err := json.MarshalIndent(a.settings, "", "    ")
+	if err == nil {
+		_ = os.WriteFile(filePath, bytes, 0644)
+	}
+}
+
+func (a *App) execJS(js string) {
+	if a.ctx != nil {
+		wailsRuntime.WindowExecJS(a.ctx, js)
+	}
+}
+
+func (a *App) changeProgress(percent float64) {
+	pct := fmt.Sprintf("%.1f", percent)
+	a.execJS(fmt.Sprintf(`
+		if (document.getElementById('pr')) document.getElementById('pr').style.width = '%s%%';
+		if (document.getElementById('pr-text')) document.getElementById('pr-text').textContent = '%s%%';
+		if (document.getElementById('progress-percent')) document.getElementById('progress-percent').textContent = '%s%%';
+	`, pct, pct, pct))
+}
+
+func (a *App) changeProgressDetail(current, total int, filename, elapsed, eta string) {
+	fileJSON, _ := json.Marshal(filename)
+	elapsedJSON, _ := json.Marshal(elapsed)
+	etaJSON, _ := json.Marshal(eta)
+	a.execJS(fmt.Sprintf(`
+		if (typeof updateProgressInfo === 'function') {
+			updateProgressInfo(%d, %d, %s, %s, %s);
+		}
+	`, current, total, string(fileJSON), string(elapsedJSON), string(etaJSON)))
+}
+
+func (a *App) updateStep(stepName string) {
+	sJSON, _ := json.Marshal(stepName)
+	a.execJS(fmt.Sprintf(`
+		if (typeof updateStepIndicator === 'function') {
+			updateStepIndicator(%s);
+		}
+	`, string(sJSON)))
+}
+
+func (a *App) resetProgressUI() {
+	a.execJS(`if (typeof resetProgressUI === 'function') resetProgressUI();`)
+}
+
+func (a *App) changeStatusText(text string) {
+	tJSON, _ := json.Marshal(text)
+	a.execJS(fmt.Sprintf(`
+		if (document.getElementById('status')) document.getElementById('status').textContent = %s;
+		if (document.getElementById('progress-detail')) document.getElementById('progress-detail').textContent = %s;
+	`, string(tJSON), string(tJSON)))
+}
+
+func (a *App) changeStatusOnly(text string) {
+	tJSON, _ := json.Marshal(text)
+	a.execJS(fmt.Sprintf(`
+		if (document.getElementById('status')) document.getElementById('status').textContent = %s;
+	`, string(tJSON)))
+}
+
+func (a *App) showError(text string, force bool) {
+	tJSON, _ := json.Marshal(text)
+	if force {
+		a.execJS(fmt.Sprintf(`if (typeof showError === 'function') showError(%s);`, string(tJSON)))
+	} else {
+		a.execJS(fmt.Sprintf(`if (document.getElementById('show-notifications')?.checked !== false && typeof showError === 'function') showError(%s);`, string(tJSON)))
+	}
+}
+
+func (a *App) showSuccess(text string) {
+	tJSON, _ := json.Marshal(text)
+	a.execJS(fmt.Sprintf(`if (document.getElementById('show-notifications')?.checked !== false && typeof showSuccess === 'function') showSuccess(%s);`, string(tJSON)))
+}
+
+func (a *App) setButtonState(state string) {
+	sJSON, _ := json.Marshal(state)
+	a.execJS(fmt.Sprintf(`if (typeof setButtonState === 'function') setButtonState(%s);`, string(sJSON)))
+}
+
+func (a *App) showOpenFolderButton(path string) {
+	pJSON, _ := json.Marshal(path)
+	a.execJS(fmt.Sprintf(`if (typeof showOpenFolderButton === 'function') showOpenFolderButton(%s);`, string(pJSON)))
+}
+
+func (a *App) playAudio(path string) {
+	pJSON, _ := json.Marshal(path)
+	a.execJS(fmt.Sprintf(`if (typeof playAudio === 'function') playAudio(%s);`, string(pJSON)))
+}
+
+// AppReady is called when the frontend DOM and Wails runtime are ready.
+func (a *App) AppReady() {
+	settings := a.loadSettings()
+	lang, _ := settings["language"].(string)
+	if lang == "" {
+		lang = "fa"
+	}
+
+	wailsRuntime.WindowSetTitle(a.ctx, getMsg("app_window_title", lang))
+	a.changeStatusText(getMsg("ready", lang))
+	a.applySettingsToDOM(settings)
+}
+
+func (a *App) applySettingsToDOM(settings map[string]interface{}) {
+	sJSON, _ := json.Marshal(settings)
+	presetsJSON, _ := json.Marshal(settings["presets"])
+	defaultPresetJSON, _ := json.Marshal(settings["default_preset"])
+
+	js := fmt.Sprintf(`
+		(function() {
+			var s = %s;
+			if (!s) return;
+
+			function setVal(id, val) {
+				var el = document.getElementById(id);
+				if (el && val !== undefined) el.value = val;
+			}
+			function setChecked(id, val) {
+				var el = document.getElementById(id);
+				if (el && val !== undefined) el.checked = !!val;
+			}
+
+			setChecked('custom-width', s.custom_width_checked !== false);
+			setVal('width-input', s.width || 800);
+			setVal('height-input', s.height_limit || 16000);
+			setVal('quality-input', s.save_quality || 100);
+			setVal('format-select', (s.save_format || 'JPG').toUpperCase());
+			setChecked('is-zip', s.zip_checked);
+			setChecked('is-pdf', s.pdf_checked);
+			setChecked('is-cbz', s.cbz_checked);
+			setChecked('enhance-quality', s.enhance_checked);
+			setChecked('no-stitch', s.no_stitch_checked);
+			setVal('save-location-input', s.save_location || '');
+			setChecked('save-next-to-source', s.save_next_to_source);
+			setChecked('play-sound', s.play_sound !== false);
+			setChecked('show-notifications', s.show_notification !== false);
+			setVal('thread-count', s.thread_count || 4);
+			setVal('output-suffix', s.output_suffix || ' [Stitched]');
+			setVal('filename-pattern', s.filename_pattern || '[number]');
+			setVal('filename-digits', s.filename_digits || 3);
+			setVal('custom-theme-color', s.custom_theme_color || '');
+			setChecked('watermark-enabled', s.watermark_enabled);
+			setVal('watermark-path', s.watermark_path || '');
+			setVal('watermark-count', s.watermark_count || 1);
+			setVal('watermark-edge', s.watermark_edge || 'right');
+			setVal('watermark-margin', s.watermark_margin || 0);
+			setVal('enhance-engine-select', s.enhance_engine || 'fast');
+
+			if (typeof refreshSaveLocationState === 'function') refreshSaveLocationState();
+			if (typeof toggleWatermarkOptions === 'function') toggleWatermarkOptions();
+
+			if (typeof setTheme === 'function') setTheme(s.theme || 'blue');
+			if (s.custom_theme_color && typeof applyCustomTheme === 'function') applyCustomTheme(s.custom_theme_color);
+			if (typeof setLanguage === 'function') setLanguage(s.language || 'fa');
+			if (typeof showTab === 'function') showTab(s.selected_tab || 'process');
+			if (typeof syncFormatDropdown === 'function') syncFormatDropdown();
+			if (typeof initPresets === 'function') initPresets(%s, %s);
+		})();
+	`, string(sJSON), string(presetsJSON), string(defaultPresetJSON))
+
+	a.execJS(js)
+}
+
+func (a *App) SelectFolder() string {
+	res, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select Folder",
+	})
+	if err != nil {
+		return ""
+	}
+	return res
+}
+
+func (a *App) SelectWatermarkFile() string {
+	res, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select Watermark PNG",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "PNG Image (*.png)", Pattern: "*.png"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil {
+		return ""
+	}
+	return res
+}
+
+func (a *App) ExportPresets(jsonText string, suggestedFilename string) string {
+	if suggestedFilename == "" {
+		suggestedFilename = "photoslicer-presets.json"
+	}
+	res, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		Title:           "Export Presets",
+		DefaultFilename: suggestedFilename,
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "JSON File (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil || res == "" {
+		return ""
+	}
+	if !strings.HasSuffix(strings.ToLower(res), ".json") {
+		res += ".json"
+	}
+	if err := os.WriteFile(res, []byte(jsonText), 0644); err != nil {
+		return ""
+	}
+	return res
+}
+
+func (a *App) ImportPresets() string {
+	res, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Import Presets",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "JSON File (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	if err != nil || res == "" {
+		return ""
+	}
+	data, err := os.ReadFile(res)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func (a *App) SaveSettings(settings map[string]interface{}) {
+	a.saveSettingsToDisk(settings)
+	if lang, ok := settings["language"].(string); ok && lang != "" {
+		wailsRuntime.WindowSetTitle(a.ctx, getMsg("app_window_title", lang))
+	}
+}
+
+func (a *App) PauseProcessing() {
+	if a.controller != nil {
+		a.controller.Pause()
+		settings := a.loadSettings()
+		lang, _ := settings["language"].(string)
+		a.changeStatusText(getMsg("paused", lang))
+	}
+}
+
+func (a *App) ResumeProcessing() {
+	if a.controller != nil {
+		a.controller.Resume()
+		settings := a.loadSettings()
+		lang, _ := settings["language"].(string)
+		a.changeStatusText(getMsg("resuming", lang))
+	}
+}
+
+func (a *App) StopProcessing() {
+	if a.controller != nil {
+		a.controller.Stop()
+		settings := a.loadSettings()
+		lang, _ := settings["language"].(string)
+		a.changeStatusText(getMsg("stopped", lang))
+		a.setButtonState("idle")
+	}
+}
+
+func (a *App) OpenFileExplorer(path string) {
+	if path == "" {
+		return
+	}
+	cmd := exec.Command("explorer", path)
+	_ = cmd.Start()
+}
+
+func (a *App) GetClipboardText() string {
+	text, err := clipboard.ReadAll()
+	if err != nil {
+		return ""
+	}
+	return text
+}
+
+func (a *App) MinimizeWindow() {
+	wailsRuntime.WindowMinimise(a.ctx)
+}
+
+func (a *App) CloseWindow() {
+	wailsRuntime.Quit(a.ctx)
+}
+
+func (a *App) IsDirectory(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.IsDir()
+}
+
+func (a *App) FolderName(path string) string {
+	return filepath.Base(path)
+}
+
+// Start launches the main worker thread for single folder or batch slicing.
+func (a *App) Start(params map[string]interface{}) {
+	// Re-entrancy guard
+	if !atomic.CompareAndSwapInt32(&a.isBusy, 0, 1) {
+		return
+	}
+
+	go func() {
+		defer atomic.StoreInt32(&a.isBusy, 0)
+		defer archive.CleanupAllTempDirs()
+
+		a.controller = pipeline.NewController()
+
+		settings := a.loadSettings()
+		lang, _ := settings["language"].(string)
+		if lang == "" {
+			lang = "fa"
+		}
+
+		a.execJS("resetTimer(); startTimer(); if (typeof resetProgressUI === 'function') resetProgressUI();")
+		a.setButtonState("processing")
+		a.startTime = time.Now()
+
+		dirAddress, _ := params["directory"].(string)
+		dirAddress = strings.TrimSpace(dirAddress)
+
+		if dirAddress == "" {
+			a.showError(getMsg("error_folder", lang), true)
+			a.changeStatusText(getMsg("error_valid_dir", lang))
+			a.setButtonState("idle")
+			a.execJS("stopTimer();")
+			return
+		}
+
+		// Handle direct ZIP/CBZ/PDF input file
+		fi, err := os.Stat(dirAddress)
+		if err != nil {
+			a.showError(getMsg("path_not_exist", lang), true)
+			a.changeStatusText(getMsg("error_valid_dir", lang))
+			a.setButtonState("idle")
+			a.execJS("stopTimer();")
+			return
+		}
+
+		var archiveTempDir string
+		if !fi.IsDir() {
+			extLower := strings.ToLower(filepath.Ext(dirAddress))
+			if extLower == ".zip" || extLower == ".cbz" {
+				tempRoot, _ := os.MkdirTemp("", "photoslicer_extract_")
+				archive.RegisterTempDir(tempRoot)
+				extracted, err := archive.ExtractImagesFromZip(dirAddress, tempRoot)
+				if err == nil && extracted != "" {
+					dirAddress = extracted
+					archiveTempDir = tempRoot
+				}
+			}
+		}
+
+		// Output base directory
+		saveLocation, _ := params["save_location"].(string)
+		saveLocation = strings.TrimSpace(saveLocation)
+		outputBase := "./Results"
+		if saveLocation != "" {
+			outputBase = saveLocation
+		}
+		_ = os.MkdirAll(outputBase, 0755)
+
+		// Watermark check
+		wmEnabled, _ := params["watermark_enabled"].(bool)
+		wmPath, _ := params["watermark_path"].(string)
+		if wmEnabled {
+			if wmPath == "" {
+				a.showError(getMsg("error_watermark_path", lang), true)
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
+			}
+			if _, err := os.Stat(wmPath); err != nil {
+				a.showError(getMsg("error_watermark_path", lang), true)
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
+			}
+		}
+
+		// Update UI watermark step visibility
+		a.execJS(fmt.Sprintf("if (typeof setWatermarkStepVisible === 'function') setWatermarkStepVisible(%t);", wmEnabled))
+
+		// Parse parameters
+		isCustomWidth, _ := params["custom_width_checked"].(bool)
+		widthVal := int(getFloatOrInt(params["width"], 800))
+		heightLimitVal := int(getFloatOrInt(params["height_limit"], 16000))
+		saveQualityVal := int(getFloatOrInt(params["save_quality"], 100))
+		saveFormat, _ := params["save_format"].(string)
+		if saveFormat == "" {
+			saveFormat = "JPG"
+		}
+		isZip, _ := params["zip_checked"].(bool)
+		isPdf, _ := params["pdf_checked"].(bool)
+		isCbz, _ := params["cbz_checked"].(bool)
+		isEnhance, _ := params["enhance_checked"].(bool)
+		enhanceEngine, _ := params["enhance_engine"].(string)
+		if enhanceEngine == "" {
+			enhanceEngine = "fast"
+		}
+		isNoStitch, _ := params["no_stitch_checked"].(bool)
+		wmCount := int(getFloatOrInt(params["watermark_count"], 1))
+		wmEdge, _ := params["watermark_edge"].(string)
+		if wmEdge == "" {
+			wmEdge = "right"
+		}
+		wmMargin := int(getFloatOrInt(params["watermark_margin"], 0))
+		threadCount := int(getFloatOrInt(params["thread_count"], 4))
+		filenamePattern, _ := params["filename_pattern"].(string)
+		if filenamePattern == "" {
+			filenamePattern = "[number]"
+		}
+		filenameDigits := int(getFloatOrInt(params["filename_digits"], 3))
+
+		// Detect mode: check if directory contains supported images directly or subfolders
+		directImages, _ := sorting.GetAllImagesDirectory(dirAddress)
+		isSingleMode := len(directImages) > 0
+
+		currentDate := time.Now().Format("2006-01-02")
+
+		if isSingleMode {
+			a.changeStatusOnly(getMsg("processing_single", lang))
+			a.updateStep("stitching")
+
+			processFolder := dirAddress
+			if isEnhance {
+				a.updateStep("enhancing")
+				if enhanceEngine == "fast" {
+					a.changeStatusOnly(getMsg("enhancing_fast_run", lang, len(directImages)))
+					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, func(pct, curr, total int) {
+						a.changeProgress(float64(pct))
+						elapsed := time.Since(a.startTime).Seconds()
+						eta := calculateEta(a.startTime, float64(pct))
+						a.changeProgressDetail(curr, total, "Denoising...", formatDuration(elapsed), eta)
+					})
+					if err == nil && enhancedDir != "" {
+						processFolder = enhancedDir
+					}
+				} else {
+					exePath := enhancer.FindRealEsrganExecutable(".")
+					if exePath == "" {
+						a.showError(getMsg("enhancer_missing", lang), true)
+					} else {
+						a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
+						enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", func(pct, curr, total int) {
+							a.changeProgress(float64(pct))
+							elapsed := time.Since(a.startTime).Seconds()
+							eta := calculateEta(a.startTime, float64(pct))
+							a.changeProgressDetail(curr, total, "AI Enhancing...", formatDuration(elapsed), eta)
+						})
+						if err == nil && enhancedDir != "" {
+							processFolder = enhancedDir
+						}
+					}
+				}
+			}
+
+			if wmEnabled {
+				a.updateStep("watermark")
+			}
+			a.updateStep("slicing")
+
+			opts := pipeline.PipelineOptions{
+				Mode:                  "single",
+				NewWidth:              widthVal,
+				IsCustomWidth:         isCustomWidth,
+				SaveFormat:            saveFormat,
+				SaveQuality:           saveQualityVal,
+				SaveDirectory:         filepath.Base(dirAddress),
+				HeightLimit:           heightLimitVal,
+				CurrentDate:           currentDate,
+				IsZip:                 isZip,
+				IsPdf:                 isPdf,
+				IsCbz:                 isCbz,
+				IsNoStitch:            isNoStitch,
+				OutputBase:            outputBase,
+				MaxWorkers:            threadCount,
+				FilenamePattern:       filenamePattern,
+				FilenameDigits:        filenameDigits,
+				WatermarkEnabled:      wmEnabled,
+				WatermarkPath:         wmPath,
+				WatermarkCount:        wmCount,
+				WatermarkEdge:         wmEdge,
+				WatermarkWidthPercent: 12,
+				WatermarkMargin:       wmMargin,
+				Controller:            a.controller,
+				ProgressCallback: func(pct float64) {
+					a.changeProgress(pct)
+					elapsed := time.Since(a.startTime).Seconds()
+					eta := calculateEta(a.startTime, pct)
+					a.changeProgressDetail(int(pct), 100, filepath.Base(dirAddress), formatDuration(elapsed), eta)
+				},
+				WebpFallbackCallback: func() {
+					a.showError(getMsg("webp_nostitch_fallback", lang), false)
+				},
+			}
+
+			resPath, err := pipeline.MergerImages(processFolder, opts)
+			if err != nil {
+				a.showError(err.Error(), true)
+			} else {
+				a.lastOutput = resPath
+				a.showOpenFolderButton(resPath)
+				a.changeProgress(100)
+				a.changeStatusText(getMsg("idle_done", lang))
+				playSound, _ := params["play_sound"].(bool)
+				if playSound {
+					a.playAudio("success.wav")
+				}
+				a.showSuccess(getMsg("idle_done", lang))
+			}
+		} else {
+			// Batch mode
+			subfolders, _ := archive.FastScanDir(dirAddress)
+			var validFolders []string
+			for _, sf := range subfolders {
+				imgs, _ := sorting.GetAllImagesDirectory(sf)
+				if len(imgs) > 0 {
+					validFolders = append(validFolders, sf)
+				}
+			}
+
+			if len(validFolders) == 0 {
+				a.showError(getMsg("no_subfolders", lang), true)
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
+			}
+
+			totalFolders := len(validFolders)
+			for idx, fld := range validFolders {
+				if err := a.controller.CheckState(); err != nil {
+					break
+				}
+
+				fldName := filepath.Base(fld)
+				a.changeStatusOnly(getMsg("processing_multi", lang, fldName, idx+1, totalFolders))
+				a.updateStep("stitching")
+
+				processFolder := fld
+				if isEnhance {
+					a.updateStep("enhancing")
+					if enhanceEngine == "fast" {
+						enhancedDir, _ := enhancer.RunFastEnhancement(fld, threadCount, nil)
+						if enhancedDir != "" {
+							processFolder = enhancedDir
+						}
+					}
+				}
+
+				if wmEnabled {
+					a.updateStep("watermark")
+				}
+				a.updateStep("slicing")
+
+				opts := pipeline.PipelineOptions{
+					Mode:                  "multi",
+					NewWidth:              widthVal,
+					IsCustomWidth:         isCustomWidth,
+					SaveFormat:            saveFormat,
+					SaveQuality:           saveQualityVal,
+					SaveDirectory:         fldName,
+					HeightLimit:           heightLimitVal,
+					CurrentDate:           currentDate,
+					IsZip:                 isZip,
+					IsPdf:                 isPdf,
+					IsCbz:                 isCbz,
+					IsNoStitch:            isNoStitch,
+					OutputBase:            outputBase,
+					MaxWorkers:            threadCount,
+					FilenamePattern:       filenamePattern,
+					FilenameDigits:        filenameDigits,
+					WatermarkEnabled:      wmEnabled,
+					WatermarkPath:         wmPath,
+					WatermarkCount:        wmCount,
+					WatermarkEdge:         wmEdge,
+					WatermarkWidthPercent: 12,
+					WatermarkMargin:       wmMargin,
+					Controller:            a.controller,
+					ProgressCallback: func(pct float64) {
+						overallPct := (float64(idx)/float64(totalFolders))*100.0 + (pct / float64(totalFolders))
+						a.changeProgress(overallPct)
+						elapsed := time.Since(a.startTime).Seconds()
+						eta := calculateEta(a.startTime, overallPct)
+						a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
+					},
+				}
+
+				resPath, err := pipeline.MergerImages(processFolder, opts)
+				if err == nil {
+					a.lastOutput = resPath
+				}
+			}
+
+			a.changeProgress(100)
+			a.changeStatusText(getMsg("idle_done", lang))
+			if a.lastOutput != "" {
+				a.showOpenFolderButton(a.lastOutput)
+			}
+			playSound, _ := params["play_sound"].(bool)
+			if playSound {
+				a.playAudio("success.wav")
+			}
+			a.showSuccess(getMsg("idle_done", lang))
+		}
+
+		a.setButtonState("idle")
+		a.execJS("stopTimer();")
+		_ = archiveTempDir
+	}()
+}
+
+func getFloatOrInt(v interface{}, def float64) float64 {
+	switch val := v.(type) {
+	case float64:
+		return val
+	case float32:
+		return float64(val)
+	case int:
+		return float64(val)
+	case int64:
+		return float64(val)
+	default:
+		return def
+	}
+}
