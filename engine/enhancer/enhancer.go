@@ -1,10 +1,12 @@
 package enhancer
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -213,37 +215,130 @@ func RunFastEnhancement(inputFolder string, maxWorkers int, progressCallback fun
 	return outDir, nil
 }
 
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+
+func isPureASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] > 127 {
+			return false
+		}
+	}
+	return true
+}
+
+func getSafeAsciiTempDir(prefix string) (string, error) {
+	candidates := []string{
+		os.TempDir(),
+	}
+	if pub := os.Getenv("PUBLIC"); pub != "" {
+		candidates = append(candidates, filepath.Join(pub, "PhotoSlicerTemp"))
+	}
+	if sysDrive := os.Getenv("SystemDrive"); sysDrive != "" {
+		candidates = append(candidates, filepath.Join(sysDrive+"\\", "PhotoSlicerTemp"))
+	}
+	candidates = append(candidates, "C:\\PhotoSlicerTemp")
+
+	for _, base := range candidates {
+		if !isPureASCII(base) {
+			continue
+		}
+		if err := os.MkdirAll(base, 0755); err != nil {
+			continue
+		}
+		tmp, err := os.MkdirTemp(base, prefix)
+		if err == nil {
+			return tmp, nil
+		}
+	}
+	return os.MkdirTemp("", prefix)
+}
+
 // FindRealEsrganExecutable locates the Real-ESRGAN binary.
 func FindRealEsrganExecutable(appDir string) string {
-	var candidates []string
+	var searchDirs []string
+
+	// 1. Check directory of currently running executable and parents
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		searchDirs = append(searchDirs,
+			exeDir,
+			filepath.Join(exeDir, ".."),
+			filepath.Join(exeDir, "..", ".."),
+			filepath.Join(exeDir, "..", "Resources"),
+		)
+	}
+
+	// 2. Check current working directory and parent dirs
+	if cwd, err := os.Getwd(); err == nil {
+		searchDirs = append(searchDirs,
+			cwd,
+			filepath.Join(cwd, "build", "bin"),
+			filepath.Join(cwd, ".."),
+			filepath.Join(cwd, "..", "build", "bin"),
+			filepath.Join(cwd, "..", ".."),
+			filepath.Join(cwd, "..", "..", "build", "bin"),
+		)
+	}
+
+	// 3. User-specified appDir
+	if appDir != "" && appDir != "." {
+		searchDirs = append(searchDirs, appDir)
+	}
+	searchDirs = append(searchDirs, ".")
+
+	var binNames []string
 	switch runtime.GOOS {
 	case "windows":
-		candidates = []string{
-			filepath.Join(appDir, "up-model", "realesrgan-ncnn-vulkan.exe"),
-			filepath.Join("up-model", "realesrgan-ncnn-vulkan.exe"),
-		}
+		binNames = []string{"realesrgan-ncnn-vulkan.exe"}
 	case "darwin":
-		candidates = []string{
-			filepath.Join(appDir, "up-model", "realesrgan-ncnn-vulkan-macos"),
-			filepath.Join("up-model", "realesrgan-ncnn-vulkan-macos"),
-		}
+		binNames = []string{"realesrgan-ncnn-vulkan-macos", "realesrgan-ncnn-vulkan"}
 	default:
-		candidates = []string{
-			filepath.Join(appDir, "up-model", "realesrgan-ncnn-vulkan-ubuntu"),
-			filepath.Join("up-model", "realesrgan-ncnn-vulkan-ubuntu"),
-			filepath.Join("up-model", "realesrgan-ncnn-vulkan"),
+		binNames = []string{"realesrgan-ncnn-vulkan-ubuntu", "realesrgan-ncnn-vulkan"}
+	}
+
+	for _, dir := range searchDirs {
+		for _, name := range binNames {
+			p1 := filepath.Join(dir, "up-model", name)
+			if fi, err := os.Stat(p1); err == nil && !fi.IsDir() {
+				return p1
+			}
+			p2 := filepath.Join(dir, name)
+			if fi, err := os.Stat(p2); err == nil && !fi.IsDir() {
+				return p2
+			}
 		}
 	}
 
-	for _, c := range candidates {
-		if fi, err := os.Stat(c); err == nil && !fi.IsDir() {
-			return c
+	for _, name := range binNames {
+		if path, err := exec.LookPath(name); err == nil {
+			return path
 		}
 	}
+
 	return ""
 }
 
-// RunRealEsrganAI executes Real-ESRGAN Vulkan executable on the input folder.
+type stagedItem struct {
+	stagedName string // expected file name in stageOut (e.g. "task_00000.jpg")
+	destName   string // final destination file name in outDir (e.g. "صفحه ۰۱.jpg")
+}
+
+// RunRealEsrganAI executes Real-ESRGAN Vulkan executable on the input folder using safe ASCII staging.
 func RunRealEsrganAI(
 	exePath string,
 	inputFolder string,
@@ -254,29 +349,129 @@ func RunRealEsrganAI(
 	if err != nil || len(files) == 0 {
 		return "", fmt.Errorf("no valid images in folder: %s", inputFolder)
 	}
-	total := len(files)
 
+	// Create final output folder
 	outDir, err := os.MkdirTemp("", "photoslicer_ai_out_")
 	if err != nil {
 		return "", err
 	}
 	archive.RegisterTempDir(outDir)
 
+	// Create safe pure-ASCII staging directories
+	stageBase, err := getSafeAsciiTempDir("photoslicer_stage_")
+	if err != nil {
+		return "", fmt.Errorf("failed to create safe staging directory: %w", err)
+	}
+	archive.RegisterTempDir(stageBase)
+	defer func() {
+		_ = os.RemoveAll(stageBase)
+	}()
+
+	stageIn := filepath.Join(stageBase, "in")
+	stageOut := filepath.Join(stageBase, "out")
+	if err := os.MkdirAll(stageIn, 0755); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(stageOut, 0755); err != nil {
+		return "", err
+	}
+
+	var stagedList []stagedItem
+	taskIdx := 0
+
+	for _, srcPath := range files {
+		base := filepath.Base(srcPath)
+		ext := strings.ToLower(filepath.Ext(base))
+		stem := strings.TrimSuffix(base, filepath.Ext(base))
+
+		img, err := imageio.OpenImageRobust(srcPath)
+		if err != nil {
+			// Copy original directly to outDir on open failure
+			_ = copyFile(srcPath, filepath.Join(outDir, base))
+			continue
+		}
+
+		h := img.Bounds().Dy()
+		if h < constants.MinEnhanceHeight {
+			_ = copyFile(srcPath, filepath.Join(outDir, base))
+			continue
+		}
+
+		if h <= constants.MaxEnhanceHeight {
+			var stagedInName string
+			stagedOutName := fmt.Sprintf("task_%05d.jpg", taskIdx)
+
+			if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".webp" {
+				stagedInName = fmt.Sprintf("task_%05d%s", taskIdx, ext)
+				if err := copyFile(srcPath, filepath.Join(stageIn, stagedInName)); err != nil {
+					_ = imageio.SaveImage(img, filepath.Join(stageIn, stagedInName), "PNG", 100)
+				}
+			} else {
+				stagedInName = fmt.Sprintf("task_%05d.png", taskIdx)
+				_ = imageio.SaveImage(img, filepath.Join(stageIn, stagedInName), "PNG", 100)
+			}
+
+			stagedList = append(stagedList, stagedItem{
+				stagedName: stagedOutName,
+				destName:   stem + ".jpg",
+			})
+			taskIdx++
+		} else {
+			// Split tall image to prevent JPEG height overflow (>65535) and GPU memory issues
+			slicesCount := math.Ceil(float64(h) / float64(constants.MaxEnhanceHeight))
+			cuts := append([]int{0}, slicing.FindSafeCutPoints(img, slicesCount)...)
+			for j := 0; j < len(cuts)-1; j++ {
+				top := cuts[j]
+				bot := cuts[j+1]
+				subRect := image.Rect(0, top, img.Bounds().Dx(), bot)
+				var chunk image.Image
+				if sub, ok := img.(interface {
+					SubImage(r image.Rectangle) image.Image
+				}); ok {
+					chunk = sub.SubImage(subRect)
+				} else {
+					chunk = img
+				}
+
+				stagedInName := fmt.Sprintf("task_%05d_p%04d.jpg", taskIdx, j)
+				stagedOutName := fmt.Sprintf("task_%05d_p%04d.jpg", taskIdx, j)
+				_ = imageio.SaveImage(chunk, filepath.Join(stageIn, stagedInName), "JPG", 98)
+
+				stagedList = append(stagedList, stagedItem{
+					stagedName: stagedOutName,
+					destName:   fmt.Sprintf("%s__part_%04d.jpg", stem, j),
+				})
+			}
+			taskIdx++
+		}
+	}
+
+	if len(stagedList) == 0 {
+		return outDir, nil
+	}
+
+	totalTasks := len(stagedList)
+
 	if modelName == "" {
-		modelName = "realesr-animevideov3-x2"
+		modelName = "realesr-animevideov3"
 	}
 
 	modelsDir := filepath.Join(filepath.Dir(exePath), "models")
-	args := []string{"-i", inputFolder, "-o", outDir, "-n", modelName, "-s", "2", "-t", "400", "-f", "jpg"}
+	args := []string{"-i", stageIn, "-o", stageOut, "-n", modelName, "-s", "2", "-t", "400", "-f", "jpg"}
 	if fi, err := os.Stat(modelsDir); err == nil && fi.IsDir() {
 		args = append(args, "-m", modelsDir)
 	}
 
 	cmd := exec.Command(exePath, args...)
 	cmd.Dir = filepath.Dir(exePath)
+	cmd.Env = append(os.Environ(), "PATH="+filepath.Dir(exePath)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	prepareCommand(cmd)
+
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
 
 	if err := cmd.Start(); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to start Real-ESRGAN: %w", err)
 	}
 
 	// Poll output folder to track progress
@@ -285,28 +480,45 @@ func RunRealEsrganAI(
 		done <- cmd.Wait()
 	}()
 
-	ticker := time.NewTicker(400 * time.Millisecond)
+	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case err := <-done:
 			if err != nil {
+				errMsg := strings.TrimSpace(stderrBuf.String())
+				if errMsg != "" {
+					return "", fmt.Errorf("realesrgan failed: %v (%s)", err, errMsg)
+				}
 				return "", fmt.Errorf("realesrgan failed: %w", err)
 			}
+
+			// Successfully finished: move/copy all staged items to outDir with their destName
+			for _, item := range stagedList {
+				src := filepath.Join(stageOut, item.stagedName)
+				dst := filepath.Join(outDir, item.destName)
+				if _, statErr := os.Stat(src); statErr == nil {
+					if renErr := os.Rename(src, dst); renErr != nil {
+						_ = copyFile(src, dst)
+					}
+				}
+			}
+
 			if progressCallback != nil {
-				progressCallback(100, total, total)
+				progressCallback(100, totalTasks, totalTasks)
 			}
 			return outDir, nil
+
 		case <-ticker.C:
-			outFiles, _ := filepath.Glob(filepath.Join(outDir, "*"))
+			outFiles, _ := filepath.Glob(filepath.Join(stageOut, "*.jpg"))
 			curr := len(outFiles)
-			if curr > total {
-				curr = total
+			if curr > totalTasks {
+				curr = totalTasks
 			}
-			pct := int(math.Round(float64(curr) / float64(total) * 100.0))
+			pct := int(math.Round(float64(curr) / float64(totalTasks) * 100.0))
 			if progressCallback != nil {
-				progressCallback(pct, curr, total)
+				progressCallback(pct, curr, totalTasks)
 			}
 		}
 	}

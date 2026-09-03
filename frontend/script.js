@@ -89,7 +89,9 @@ const translations = {
         statusLabel: "Status",
         elapsedLabel: "Elapsed",
         etaLabel: "ETA",
-        statusEnhancing: "Enhancing images...",
+        statusEnhancing: "AI Enhancing...",
+        statusDenoising: "Denoising...",
+        statusProcessing: "Processing...",
         statusStitching: "Stitching images...",
         statusSlicing: "Slicing images...",
         statusWatermarking: "Watermarking...",
@@ -270,6 +272,8 @@ const translations = {
         elapsedLabel: "گذشته",
         etaLabel: "زمان باقیمانده",
         statusEnhancing: "افزایش کیفیت...",
+        statusDenoising: "نویزگیری...",
+        statusProcessing: "در حال پردازش...",
         statusStitching: "چسباندن...",
         statusSlicing: "برش...",
         statusWatermarking: "درج واترمارک...",
@@ -2144,11 +2148,32 @@ function resetProgressUI() {
 
 var PROGRESS_STATUS_MAP = {
     'Enhancing...': 'statusEnhancing',
+    'AI Enhancing...': 'statusEnhancing',
+    'status_enhancing': 'statusEnhancing',
+    'Denoising...': 'statusDenoising',
+    'status_denoising': 'statusDenoising',
     'Stitching...': 'statusStitching',
+    'status_stitching': 'statusStitching',
     'Slicing...': 'statusSlicing',
+    'status_slicing': 'statusSlicing',
+    'Processing...': 'statusProcessing',
+    'status_processing': 'statusProcessing',
     'Watermarking...': 'statusWatermarking',
+    'status_watermarking': 'statusWatermarking',
     'Preparing...': 'statusPreparing',
-    'Complete': 'statusComplete'
+    'status_preparing': 'statusPreparing',
+    'Complete': 'statusComplete',
+    'status_complete': 'statusComplete',
+    // Persian entries for status mode detection
+    'افزایش کیفیت...': 'statusEnhancing',
+    'نویزگیری...': 'statusDenoising',
+    'چسباندن...': 'statusStitching',
+    'برش...': 'statusSlicing',
+    'در حال پردازش...': 'statusProcessing',
+    'پردازش...': 'statusProcessing',
+    'درج واترمارک...': 'statusWatermarking',
+    'آماده‌سازی...': 'statusPreparing',
+    'پایان': 'statusComplete'
 };
 
 // Show/hide the optional Watermark step in the step indicator.
@@ -2190,13 +2215,13 @@ function updateProgressInfo(current, total, currentFile, elapsed, eta) {
 
     var currentEl = document.getElementById('pi-current');
     if (currentEl) {
-        currentEl.textContent = (displayFile && displayFile.length > 16) ? displayFile.slice(0, 13) + '...' : (displayFile || '-');
+        currentEl.title = displayFile || '';
+        currentEl.textContent = (displayFile && displayFile.length > 25) ? displayFile.slice(0, 22) + '...' : (displayFile || '-');
     }
     var elapsedEl = document.getElementById('pi-elapsed');
     if (elapsedEl) elapsedEl.textContent = elapsed || '00:00:00';
     var etaEl = document.getElementById('pi-eta');
     if (etaEl) etaEl.textContent = eta || '-';
-
 }
 
 function resetProgressInfo() {

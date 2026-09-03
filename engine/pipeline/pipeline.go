@@ -85,7 +85,7 @@ type PipelineOptions struct {
 	IsPdf                 bool
 	IsCbz                 bool
 	IsNoStitch            bool
-	ProgressCallback      func(percent float64)
+	ProgressCallback      func(percent float64, curr, total int, item string)
 	WebpFallbackCallback  func()
 	OutputBase            string
 	MaxWorkers            int
@@ -108,6 +108,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	total := len(images)
 	if total == 0 {
 		return nil
+	}
+
+	if opts.ProgressCallback != nil {
+		opts.ProgressCallback(0, 0, total, "Processing...")
 	}
 
 	type noStitchTask struct {
@@ -190,7 +194,7 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 				curr := atomic.AddInt64(&completed, 1)
 				if opts.ProgressCallback != nil {
 					pct := (float64(curr) / float64(total)) * 100.0
-					opts.ProgressCallback(pct)
+					opts.ProgressCallback(pct, int(curr), total, filename)
 				}
 			}
 		}()

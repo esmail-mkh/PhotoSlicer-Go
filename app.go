@@ -55,6 +55,11 @@ var translations = map[string]map[string]string{
 		"error_invalid_input":   "Please enter valid numbers for width, height, and quality.",
 		"error_watermark_path":  "Please select a valid PNG watermark image.",
 		"error_unexpected":      "An unexpected error occurred: %s",
+		"status_enhancing":      "AI Enhancing...",
+		"status_denoising":      "Denoising...",
+		"status_slicing":        "Slicing...",
+		"status_stitching":      "Stitching...",
+		"status_processing":     "Processing...",
 	},
 	"fa": {
 		"ready":                  "آماده برای شروع",
@@ -87,6 +92,11 @@ var translations = map[string]map[string]string{
 		"error_invalid_input":   "لطفاً برای عرض، ارتفاع و کیفیت عددهای معتبر وارد کنید.",
 		"error_watermark_path":  "لطفاً یک تصویر واترمارک PNG معتبر انتخاب کنید.",
 		"error_unexpected":      "خطای غیرمنتظره‌ای رخ داد: %s",
+		"status_enhancing":      "افزایش کیفیت...",
+		"status_denoising":      "نویزگیری...",
+		"status_slicing":        "برش...",
+		"status_stitching":      "چسباندن...",
+		"status_processing":     "در حال پردازش...",
 	},
 }
 
@@ -755,26 +765,46 @@ func (a *App) Start(params map[string]interface{}) {
 						a.changeProgress(float64(pct))
 						elapsed := time.Since(a.startTime).Seconds()
 						eta := calculateEta(a.startTime, float64(pct))
-						a.changeProgressDetail(curr, total, "Denoising...", formatDuration(elapsed), eta)
+						a.changeProgressDetail(curr, total, getMsg("status_denoising", lang), formatDuration(elapsed), eta)
 					})
-					if err == nil && enhancedDir != "" {
+					if err != nil {
+						a.showError(fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error()), true)
+						a.changeStatusText(getMsg("enhancing_fail", lang))
+						a.updateStep("ready")
+						a.setButtonState("idle")
+						a.execJS("stopTimer();")
+						return
+					}
+					if enhancedDir != "" {
 						processFolder = enhancedDir
 					}
 				} else {
-					exePath := enhancer.FindRealEsrganExecutable(".")
+					exePath := enhancer.FindRealEsrganExecutable("")
 					if exePath == "" {
 						a.showError(getMsg("enhancer_missing", lang), true)
-					} else {
-						a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
-						enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", func(pct, curr, total int) {
-							a.changeProgress(float64(pct))
-							elapsed := time.Since(a.startTime).Seconds()
-							eta := calculateEta(a.startTime, float64(pct))
-							a.changeProgressDetail(curr, total, "AI Enhancing...", formatDuration(elapsed), eta)
-						})
-						if err == nil && enhancedDir != "" {
-							processFolder = enhancedDir
-						}
+						a.changeStatusText(getMsg("enhancing_fail", lang))
+						a.updateStep("ready")
+						a.setButtonState("idle")
+						a.execJS("stopTimer();")
+						return
+					}
+					a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
+					enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", func(pct, curr, total int) {
+						a.changeProgress(float64(pct))
+						elapsed := time.Since(a.startTime).Seconds()
+						eta := calculateEta(a.startTime, float64(pct))
+						a.changeProgressDetail(curr, total, getMsg("status_enhancing", lang), formatDuration(elapsed), eta)
+					})
+					if err != nil {
+						a.showError(fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error()), true)
+						a.changeStatusText(getMsg("enhancing_fail", lang))
+						a.updateStep("ready")
+						a.setButtonState("idle")
+						a.execJS("stopTimer();")
+						return
+					}
+					if enhancedDir != "" {
+						processFolder = enhancedDir
 					}
 				}
 			}
@@ -808,11 +838,24 @@ func (a *App) Start(params map[string]interface{}) {
 				WatermarkWidthPercent: 0,
 				WatermarkMargin:       wmMargin,
 				Controller:            a.controller,
-				ProgressCallback: func(pct float64) {
+				ProgressCallback: func(pct float64, curr, total int, item string) {
 					a.changeProgress(pct)
 					elapsed := time.Since(a.startTime).Seconds()
 					eta := calculateEta(a.startTime, pct)
-					a.changeProgressDetail(int(pct), 100, filepath.Base(dirAddress), formatDuration(elapsed), eta)
+					displayItem := item
+					if displayItem == "" {
+						displayItem = filepath.Base(dirAddress)
+					} else {
+						switch displayItem {
+						case "Slicing...":
+							displayItem = getMsg("status_slicing", lang)
+						case "Processing...":
+							displayItem = getMsg("status_processing", lang)
+						case "Stitching...":
+							displayItem = getMsg("status_stitching", lang)
+						}
+					}
+					a.changeProgressDetail(curr, total, displayItem, formatDuration(elapsed), eta)
 				},
 				WebpFallbackCallback: func() {
 					a.showError(getMsg("webp_nostitch_fallback", lang), false)
@@ -872,17 +915,39 @@ func (a *App) Start(params map[string]interface{}) {
 				if isEnhance {
 					a.updateStep("process")
 					if enhanceEngine == "fast" {
-						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, nil)
-						if err == nil && enhancedDir != "" {
+						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, func(pct, curr, total int) {
+							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
+							a.changeProgress(overallPct)
+							elapsed := time.Since(a.startTime).Seconds()
+							eta := calculateEta(a.startTime, overallPct)
+							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
+						})
+						if err != nil {
+							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
+						} else if enhancedDir != "" {
 							processFolder = enhancedDir
 						}
 					} else {
-						exePath := enhancer.FindRealEsrganExecutable(".")
-						if exePath != "" {
-							enhancedDir, err := enhancer.RunRealEsrganAI(exePath, fld, "", nil)
-							if err == nil && enhancedDir != "" {
-								processFolder = enhancedDir
-							}
+						exePath := enhancer.FindRealEsrganExecutable("")
+						if exePath == "" {
+							a.showError(getMsg("enhancer_missing", lang), true)
+							a.changeStatusText(getMsg("enhancing_fail", lang))
+							a.updateStep("ready")
+							a.setButtonState("idle")
+							a.execJS("stopTimer();")
+							return
+						}
+						enhancedDir, err := enhancer.RunRealEsrganAI(exePath, fld, "", func(pct, curr, total int) {
+							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
+							a.changeProgress(overallPct)
+							elapsed := time.Since(a.startTime).Seconds()
+							eta := calculateEta(a.startTime, overallPct)
+							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
+						})
+						if err != nil {
+							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
+						} else if enhancedDir != "" {
+							processFolder = enhancedDir
 						}
 					}
 				}
@@ -916,7 +981,7 @@ func (a *App) Start(params map[string]interface{}) {
 					WatermarkWidthPercent: 0,
 					WatermarkMargin:       wmMargin,
 					Controller:            a.controller,
-					ProgressCallback: func(pct float64) {
+					ProgressCallback: func(pct float64, curr, total int, item string) {
 						overallPct := (float64(idx)/float64(totalFolders))*100.0 + (pct / float64(totalFolders))
 						a.changeProgress(overallPct)
 						elapsed := time.Since(a.startTime).Seconds()

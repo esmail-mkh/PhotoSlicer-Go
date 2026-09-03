@@ -27,7 +27,7 @@ type SlicerOptions struct {
 	IsZip                 bool
 	IsPdf                 bool
 	IsCbz                 bool
-	ProgressCallback      func(percent float64)
+	ProgressCallback      func(percent float64, curr, total int, item string)
 	OutputBase            string
 	MaxWorkers            int
 	FilenamePattern       string
@@ -160,6 +160,10 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		cutPoints = []int{0, imgHeight}
 	}
 
+	if opts.ProgressCallback != nil {
+		opts.ProgressCallback(0, 0, numSlices, "Slicing...")
+	}
+
 	type sliceTask struct {
 		index int
 		start int
@@ -231,7 +235,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 				done := atomic.AddInt64(&completedCount, 1)
 				if opts.ProgressCallback != nil {
 					pct := (float64(done) / float64(numSlices)) * 100.0
-					opts.ProgressCallback(pct)
+					opts.ProgressCallback(pct, int(done), numSlices, filename)
 				}
 			}
 		}()
