@@ -9,6 +9,7 @@ import (
 	"image/jpeg"
 	_ "image/png"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -87,6 +88,29 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 		return err
 	}
 
+	// Acrobat Reader limit: maximum page dimension is 14,400 points (200 inches).
+	// Beyond 14,400 points, Acrobat Reader displays:
+	// "The dimensions of this page are out-of-range. Page content might be truncated."
+	// and truncates content. We scale MediaBox and page coordinates to <= 14,000 points
+	// while preserving 100% of the original pixel resolution in the Image XObject.
+	const maxPDFDimension = 14000.0
+
+	maxDim := 0
+	for _, imgPath := range imagePaths {
+		w, h := getImageDimensionsFast(imgPath)
+		if w > maxDim {
+			maxDim = w
+		}
+		if h > maxDim {
+			maxDim = h
+		}
+	}
+
+	globalScale := 1.0
+	if float64(maxDim) > maxPDFDimension {
+		globalScale = maxPDFDimension / float64(maxDim)
+	}
+
 	// For each page: Page, Content, Image
 	for i, imgPath := range imagePaths {
 		pageObjID := 3 + i*3
@@ -99,16 +123,33 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 			return fmt.Errorf("error processing image %s for PDF: %w", imgPath, err)
 		}
 
+		pageScale := globalScale
+		if float64(w)*pageScale > maxPDFDimension || float64(h)*pageScale > maxPDFDimension {
+			maxSide := math.Max(float64(w), float64(h))
+			if maxSide > 0 {
+				pageScale = maxPDFDimension / maxSide
+			}
+		}
+
+		pageW := int(math.Round(float64(w) * pageScale))
+		pageH := int(math.Round(float64(h) * pageScale))
+		if pageW < 1 {
+			pageW = 1
+		}
+		if pageH < 1 {
+			pageH = 1
+		}
+
 		// Page object
 		offsets = append(offsets, currentOffset)
 		pageHeader := fmt.Sprintf("%d 0 obj\n<< /Type /Page /Parent %d 0 R /MediaBox [ 0 0 %d %d ] /Contents %d 0 R /Resources << /XObject << /Im %d 0 R >> >> >>\nendobj\n",
-			pageObjID, pagesID, w, h, contentObjID, imageObjID)
+			pageObjID, pagesID, pageW, pageH, contentObjID, imageObjID)
 		if err := writeStr(pageHeader); err != nil {
 			return err
 		}
 
-		// Content stream: paint image /Im across entire page (0 0 to W H)
-		contentStream := fmt.Sprintf("q\n%d 0 0 %d 0 0 cm\n/Im Do\nQ\n", w, h)
+		// Content stream: paint image /Im across entire page (0 0 to pageW pageH)
+		contentStream := fmt.Sprintf("q\n%d 0 0 %d 0 0 cm\n/Im Do\nQ\n", pageW, pageH)
 		offsets = append(offsets, currentOffset)
 		contentHeader := fmt.Sprintf("%d 0 obj\n<< /Length %d >>\nstream\n%sendstream\nendobj\n",
 			contentObjID, len(contentStream), contentStream)
@@ -116,7 +157,7 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 			return err
 		}
 
-		// Image XObject
+		// Image XObject (preserves 100% full original pixel resolution w x h)
 		offsets = append(offsets, currentOffset)
 		imageHeader := fmt.Sprintf("%d 0 obj\n<< /Type /XObject /Subtype /Image /Width %d /Height %d /ColorSpace %s /BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n",
 			imageObjID, w, h, colorSpace, len(imgData))
@@ -211,4 +252,27 @@ func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {
 	}
 
 	return buf.Bytes(), w, h, "/DeviceRGB", nil
+}
+
+func getImageDimensionsFast(path string) (int, int) {
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".jpg" || ext == ".jpeg" {
+		f, err := os.Open(path)
+		if err == nil {
+			defer f.Close()
+			cfg, err := jpeg.DecodeConfig(f)
+			if err == nil && cfg.Width > 0 && cfg.Height > 0 {
+				return cfg.Width, cfg.Height
+			}
+		}
+	}
+	f, err := os.Open(path)
+	if err == nil {
+		defer f.Close()
+		cfg, _, err := image.DecodeConfig(f)
+		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
+			return cfg.Width, cfg.Height
+		}
+	}
+	return 0, 0
 }

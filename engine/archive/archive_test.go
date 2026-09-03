@@ -167,6 +167,34 @@ func TestCreatePdfFromImages(t *testing.T) {
 			t.Errorf("expected /DeviceGray in PDF dictionary for grayscale image")
 		}
 	})
+
+	t.Run("Acrobat14400PointLimitConstrained", func(t *testing.T) {
+		tallImgPath := filepath.Join(tempDir, "tall_16000.jpg")
+		createSampleJpeg(t, tallImgPath, 800, 16000)
+
+		tallPdf := filepath.Join(tempDir, "tall.pdf")
+		if err := CreatePdfFromImages(tallPdf, []string{tallImgPath}); err != nil {
+			t.Fatalf("CreatePdfFromImages failed: %v", err)
+		}
+
+		pdfData, err := os.ReadFile(tallPdf)
+		if err != nil {
+			t.Fatalf("failed to read tall pdf: %v", err)
+		}
+
+		// Verify Image XObject retains full 800x16000 resolution
+		if !containsSubstring(pdfData, []byte("/Width 800 /Height 16000")) {
+			t.Errorf("expected Image XObject to preserve full /Width 800 /Height 16000")
+		}
+
+		// Verify MediaBox does NOT exceed 14,400 points
+		if containsSubstring(pdfData, []byte("/MediaBox [ 0 0 800 16000 ]")) {
+			t.Errorf("MediaBox exceeds 14,400 points limit, triggering Acrobat out-of-range error!")
+		}
+		if !containsSubstring(pdfData, []byte("/MediaBox [ 0 0 700 14000 ]")) {
+			t.Errorf("expected MediaBox to be scaled to [ 0 0 700 14000 ]")
+		}
+	})
 }
 
 func TestSafeRmtreeTemp(t *testing.T) {
