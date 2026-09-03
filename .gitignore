@@ -49,3 +49,6 @@ $RECYCLE.BIN/
 # Logs
 *.log
 photoslicer_error.log
+
+# AI agent instructions
+AGENTS.md
