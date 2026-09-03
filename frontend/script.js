@@ -373,7 +373,14 @@ function toggleLanguage() {
 function setLanguage(lang) {
     currentLang = lang;
     const texts = translations[lang];
-    
+    if (!texts) return;
+
+    // Preserve values of all select elements whose options may be re-translated
+    const selectValues = {};
+    document.querySelectorAll('select').forEach(sel => {
+        if (sel.id) selectValues[sel.id] = sel.value;
+    });
+
     document.body.setAttribute('dir', lang === 'fa' ? 'rtl' : 'ltr');
     
     const langIcon = document.getElementById('lang-icon');
@@ -399,6 +406,14 @@ function setLanguage(lang) {
         if (texts[key]) el.title = texts[key];
     });
 
+    // Restore select values so option re-translation never resets user selections
+    Object.keys(selectValues).forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel && selectValues[id] !== undefined) {
+            sel.value = selectValues[id];
+        }
+    });
+
     // Rebuild custom format dropdown so option descriptions follow the language
     if (typeof buildFormatMenu === 'function') {
         buildFormatMenu();
@@ -412,6 +427,7 @@ function setLanguage(lang) {
         renderPresetMenu();
         updatePresetTrigger();
     }
+}
 	
 	document.querySelector('.logo-icon').title = texts.tipLogo;
     document.querySelector('.lang-switch').title = texts.tipLang;
@@ -1608,6 +1624,10 @@ function applyPresetValues(values) {
                 el.value = values[f.key];
             }
         } else {
+            // If field is not defined in this preset, do not overwrite global/engine preferences
+            if (f.key === 'enhance_engine' || f.key === 'thread_count') {
+                return;
+            }
             if (f.type === 'check') el.checked = !!f.def;
             else el.value = f.def !== undefined ? f.def : '';
         }
@@ -2577,6 +2597,7 @@ function toggleWatermarkOptions() {
     document.querySelectorAll('.watermark-option').forEach(row => {
         row.classList.toggle('disabled-by-checkbox', !enabled);
     });
+    updateSettings();
 }
 
 function validateWatermarkSettings() {

@@ -216,6 +216,14 @@ func (a *App) loadSettings() map[string]interface{} {
 			loaded[k] = v
 		}
 	}
+
+	if sanitizeSettingsPresets(loaded) {
+		bytes, err := json.MarshalIndent(loaded, "", "    ")
+		if err == nil {
+			_ = os.WriteFile(filePath, bytes, 0644)
+		}
+	}
+
 	a.settings = loaded
 	return a.settings
 }
@@ -343,9 +351,31 @@ func (a *App) AppReady() {
 }
 
 func (a *App) applySettingsToDOM(settings map[string]interface{}) {
-	sJSON, _ := json.Marshal(settings)
-	presetsJSON, _ := json.Marshal(settings["presets"])
-	defaultPresetJSON, _ := json.Marshal(settings["default_preset"])
+	// Create an effective copy of settings, overlaying default_preset values if configured (matching Python behavior)
+	eff := make(map[string]interface{})
+	for k, v := range settings {
+		eff[k] = v
+	}
+	if defPresetName, ok := settings["default_preset"].(string); ok && defPresetName != "" {
+		if presetsList, ok := settings["presets"].([]interface{}); ok {
+			for _, p := range presetsList {
+				if pMap, ok := p.(map[string]interface{}); ok {
+					if pMap["name"] == defPresetName {
+						if vals, ok := pMap["values"].(map[string]interface{}); ok {
+							for k, v := range vals {
+								eff[k] = v
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	sJSON := marshalJSONAscii(eff)
+	presetsJSON := marshalJSONAscii(settings["presets"])
+	defaultPresetJSON := marshalJSONAscii(settings["default_preset"])
 
 	js := fmt.Sprintf(`
 		(function() {
@@ -354,11 +384,11 @@ func (a *App) applySettingsToDOM(settings map[string]interface{}) {
 
 			function setVal(id, val) {
 				var el = document.getElementById(id);
-				if (el && val !== undefined) el.value = val;
+				if (el && val !== undefined && val !== null) el.value = val;
 			}
 			function setChecked(id, val) {
 				var el = document.getElementById(id);
-				if (el && val !== undefined) el.checked = !!val;
+				if (el && val !== undefined && val !== null) el.checked = !!val;
 			}
 
 			setChecked('custom-width', s.custom_width_checked !== false);
@@ -387,17 +417,23 @@ func (a *App) applySettingsToDOM(settings map[string]interface{}) {
 			setVal('watermark-margin', s.watermark_margin || 0);
 			setVal('enhance-engine-select', s.enhance_engine || 'fast');
 
-			if (typeof refreshSaveLocationState === 'function') refreshSaveLocationState();
-			if (typeof toggleWatermarkOptions === 'function') toggleWatermarkOptions();
-
 			if (typeof setTheme === 'function') setTheme(s.theme || 'blue');
 			if (s.custom_theme_color && typeof applyCustomTheme === 'function') applyCustomTheme(s.custom_theme_color);
 			if (typeof setLanguage === 'function') setLanguage(s.language || 'fa');
+
+			// Re-affirm select values after setLanguage to prevent any browser option translation reset
+			setVal('enhance-engine-select', s.enhance_engine || 'fast');
+			setVal('watermark-edge', s.watermark_edge || 'right');
+
+			if (typeof refreshSaveLocationState === 'function') refreshSaveLocationState();
+			if (typeof toggleWatermarkOptions === 'function') toggleWatermarkOptions();
+			if (typeof refreshFilenamePreview === 'function') refreshFilenamePreview();
+
 			if (typeof showTab === 'function') showTab(s.selected_tab || 'process');
 			if (typeof syncFormatDropdown === 'function') syncFormatDropdown();
 			if (typeof initPresets === 'function') initPresets(%s, %s);
 		})();
-	`, string(sJSON), string(presetsJSON), string(defaultPresetJSON))
+	`, sJSON, presetsJSON, defaultPresetJSON)
 
 	a.execJS(js)
 }
@@ -464,7 +500,7 @@ func (a *App) ImportPresets() string {
 	if err != nil {
 		return ""
 	}
-	return string(data)
+	return fixPresetsJSONMojibake(string(data))
 }
 
 func (a *App) SaveSettings(settings map[string]interface{}) {

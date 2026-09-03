@@ -41,7 +41,10 @@
         resume_processing: () => window.go?.main?.App?.ResumeProcessing(),
         stop_processing: () => window.go?.main?.App?.StopProcessing(),
         open_file_explorer: (path) => window.go?.main?.App?.OpenFileExplorer(path),
-        start: () => window.go?.main?.App?.Start(gatherUIParams()),
+        start: () => {
+            if (typeof updateSettings === 'function') updateSettings();
+            return window.go?.main?.App?.Start(gatherUIParams());
+        },
         minimize_window: () => window.go?.main?.App?.MinimizeWindow(),
         close_window: () => window.go?.main?.App?.CloseWindow(),
         get_clipboard_text: () => window.go?.main?.App?.GetClipboardText(),
