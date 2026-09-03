@@ -304,7 +304,12 @@ func FastDenoiseImage(img image.Image) *image.RGBA {
 }
 
 // RunFastEnhancement batch-processes images in inputFolder using fast CPU denoising.
-func RunFastEnhancement(inputFolder string, maxWorkers int, progressCallback func(pct, curr, total int)) (string, error) {
+func RunFastEnhancement(
+	inputFolder string,
+	maxWorkers int,
+	checkCanceled func() error,
+	progressCallback func(pct, curr, total int),
+) (string, error) {
 	files, err := sorting.GetAllImagesDirectory(inputFolder)
 	if err != nil || len(files) == 0 {
 		return "", fmt.Errorf("no valid images in folder: %s", inputFolder)
@@ -330,6 +335,12 @@ func RunFastEnhancement(inputFolder string, maxWorkers int, progressCallback fun
 		go func() {
 			defer wg.Done()
 			for srcPath := range taskChan {
+				if checkCanceled != nil {
+					if err := checkCanceled(); err != nil {
+						return
+					}
+				}
+
 				base := filepath.Base(srcPath)
 				stem := strings.TrimSuffix(base, filepath.Ext(base))
 				dstPath := filepath.Join(outDir, stem+".jpg")
@@ -384,6 +395,12 @@ func RunFastEnhancement(inputFolder string, maxWorkers int, progressCallback fun
 	}
 	close(taskChan)
 	wg.Wait()
+
+	if checkCanceled != nil {
+		if err := checkCanceled(); err != nil {
+			return "", err
+		}
+	}
 
 	return outDir, nil
 }
@@ -516,6 +533,7 @@ func RunRealEsrganAI(
 	exePath string,
 	inputFolder string,
 	modelName string,
+	checkCanceled func() error,
 	progressCallback func(pct, curr, total int),
 ) (string, error) {
 	files, err := sorting.GetAllImagesDirectory(inputFolder)
@@ -684,6 +702,14 @@ func RunRealEsrganAI(
 			return outDir, nil
 
 		case <-ticker.C:
+			if checkCanceled != nil {
+				if err := checkCanceled(); err != nil {
+					if cmd.Process != nil {
+						_ = cmd.Process.Kill()
+					}
+					return "", err
+				}
+			}
 			outFiles, _ := filepath.Glob(filepath.Join(stageOut, "*.jpg"))
 			curr := len(outFiles)
 			if curr > totalTasks {

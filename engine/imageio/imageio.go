@@ -1,6 +1,7 @@
 package imageio
 
 import (
+	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
@@ -27,6 +28,13 @@ func OpenImageRobust(path string) (image.Image, error) {
 	defer f.Close()
 
 	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".psd" {
+		img, err := DecodePSDComposite(f)
+		if err == nil {
+			return img, nil
+		}
+		_, _ = f.Seek(0, 0)
+	}
 	if ext == ".webp" {
 		img, err := webp.Decode(f)
 		if err == nil {
@@ -49,6 +57,19 @@ func GetImageSizeFast(path string) (int, int, error) {
 		return 0, 0, err
 	}
 	defer f.Close()
+
+	ext := strings.ToLower(filepath.Ext(path))
+	if ext == ".psd" {
+		var header [26]byte
+		if _, err := io.ReadFull(f, header[:]); err == nil && string(header[:4]) == "8BPS" {
+			h := int(binary.BigEndian.Uint32(header[14:18]))
+			w := int(binary.BigEndian.Uint32(header[18:22]))
+			if w > 0 && h > 0 {
+				return w, h, nil
+			}
+		}
+		_, _ = f.Seek(0, 0)
+	}
 
 	cfg, _, err := image.DecodeConfig(f)
 	if err != nil {
@@ -106,7 +127,12 @@ func SaveImage(img image.Image, outputPath string, format string, quality int) e
 	}
 	defer f.Close()
 
-	return EncodeImage(f, img, format, quality)
+	if err := EncodeImage(f, img, format, quality); err != nil {
+		_ = f.Close()
+		_ = os.Remove(outputPath)
+		return err
+	}
+	return nil
 }
 
 func EncodeImage(w io.Writer, img image.Image, format string, quality int) error {

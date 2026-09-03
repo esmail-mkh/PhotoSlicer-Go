@@ -7,6 +7,7 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -118,3 +119,81 @@ func TestPipelineZipAndPdf(t *testing.T) {
 		t.Errorf("Expected non-empty pdf at %s", resPdf)
 	}
 }
+
+func TestProcessBatchNoStitchReturnsZip(t *testing.T) {
+	tempSrc := t.TempDir()
+	tempOut := t.TempDir()
+
+	_ = createTestImages(t, tempSrc, 2, 200, 200)
+
+	opts := PipelineOptions{
+		Mode:            "single",
+		IsNoStitch:      true,
+		SaveFormat:      "JPG",
+		SaveQuality:     90,
+		IsZip:           true,
+		OutputBase:      tempOut,
+		MaxWorkers:      2,
+		FilenamePattern: "[number]",
+		FilenameDigits:  2,
+	}
+
+	resPath, err := MergerImages(tempSrc, opts)
+	if err != nil {
+		t.Fatalf("MergerImages no-stitch failed: %v", err)
+	}
+
+	// Verify that resPath is the actual existing ZIP file and NOT the deleted raw directory
+	fi, err := os.Stat(resPath)
+	if err != nil {
+		t.Fatalf("returned path does not exist on disk: %s (err: %v)", resPath, err)
+	}
+	if fi.IsDir() {
+		t.Errorf("expected return path to be the zip file, but got a directory: %s", resPath)
+	}
+	if filepath.Ext(resPath) != ".zip" {
+		t.Errorf("expected .zip extension, got %s", resPath)
+	}
+}
+
+func TestPipelineMultiArchiveBothZipAndPdf(t *testing.T) {
+	tempSrc := t.TempDir()
+	tempOut := t.TempDir()
+
+	_ = createTestImages(t, tempSrc, 2, 200, 200)
+
+	opts := PipelineOptions{
+		Mode:            "single",
+		NewWidth:        200,
+		SaveFormat:      "JPG",
+		SaveQuality:     90,
+		HeightLimit:     250,
+		CurrentDate:     "2026-09-03",
+		IsZip:           true,
+		IsPdf:           true,
+		OutputBase:      tempOut,
+		MaxWorkers:      2,
+		FilenamePattern: "[number]",
+		FilenameDigits:  2,
+	}
+
+	resPath, err := MergerImages(tempSrc, opts)
+	if err != nil {
+		t.Fatalf("MergerImages multi-archive failed: %v", err)
+	}
+
+	// Both .zip and .pdf must exist on disk!
+	baseDir := filepath.Dir(resPath)
+	baseStem := strings.TrimSuffix(filepath.Base(resPath), filepath.Ext(resPath))
+
+	zipFile := filepath.Join(baseDir, baseStem+".zip")
+	pdfFile := filepath.Join(baseDir, baseStem+".pdf")
+
+	if fi, err := os.Stat(zipFile); err != nil || fi.Size() == 0 {
+		t.Errorf("expected valid zip file at %s", zipFile)
+	}
+	if fi, err := os.Stat(pdfFile); err != nil || fi.Size() == 0 {
+		t.Errorf("expected valid pdf file at %s", pdfFile)
+	}
+}
+

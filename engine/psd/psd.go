@@ -6,10 +6,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"image"
+	"image/color"
+	"image/draw"
 	"os"
 	"unicode/utf16"
 
-	"photoslicer/engine/imageio"
 	"photoslicer/engine/watermark"
 )
 
@@ -83,6 +84,16 @@ type layerRecord struct {
 	b      []byte
 }
 
+func flattenToRGB(img image.Image) *image.RGBA {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	white := image.NewUniform(color.White)
+	draw.Draw(dst, dst.Bounds(), white, image.Point{}, draw.Src)
+	draw.Draw(dst, dst.Bounds(), img, b.Min, draw.Over)
+	return dst
+}
+
 // SavePSDLayered writes a multi-layer PSD file with slice art on the base layer
 // and watermarks as movable/editable layers on top.
 func SavePSDLayered(
@@ -95,7 +106,7 @@ func SavePSDLayered(
 	watermarkWidthPercent int,
 	watermarkMargin int,
 ) error {
-	baseRGB := imageio.FlattenToRGB(baseImage)
+	baseRGB := flattenToRGB(baseImage)
 	bounds := baseRGB.Bounds()
 	w, h := int32(bounds.Dx()), int32(bounds.Dy())
 

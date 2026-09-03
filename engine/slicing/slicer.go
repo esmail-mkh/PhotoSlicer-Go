@@ -254,31 +254,38 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	// Handle archive outputs
 	finalResultPath := savePath
 	baseName := filepath.Base(savePath)
+	archiveCreated := false
 
 	if opts.IsZip {
 		zipPath := filepath.Join(filepath.Dir(savePath), baseName+".zip")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
 		if err := archive.CreateZip(zipPath, files); err == nil {
-			_ = os.RemoveAll(savePath)
+			archiveCreated = true
 			finalResultPath = zipPath
 		}
-	} else if opts.IsCbz {
+	}
+	if opts.IsCbz {
 		cbzPath := filepath.Join(filepath.Dir(savePath), baseName+".cbz")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
 		if err := archive.CreateCbz(cbzPath, files); err == nil {
-			_ = os.RemoveAll(savePath)
+			archiveCreated = true
 			finalResultPath = cbzPath
 		}
-	} else if opts.IsPdf {
+	}
+	if opts.IsPdf {
 		pdfPath := filepath.Join(filepath.Dir(savePath), baseName+".pdf")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
 		if err := archive.CreatePdfFromImages(pdfPath, files); err == nil {
-			_ = os.RemoveAll(savePath)
+			archiveCreated = true
 			finalResultPath = pdfPath
 		}
+	}
+
+	if archiveCreated {
+		_ = os.RemoveAll(savePath)
 	}
 
 	return finalResultPath, nil

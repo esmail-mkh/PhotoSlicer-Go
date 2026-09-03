@@ -100,14 +100,14 @@ type PipelineOptions struct {
 	Controller            *Controller
 }
 
-func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions) error {
+func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions) (string, error) {
 	if err := os.MkdirAll(savePath, 0755); err != nil {
-		return err
+		return "", err
 	}
 
 	total := len(images)
 	if total == 0 {
-		return nil
+		return savePath, nil
 	}
 
 	if opts.ProgressCallback != nil {
@@ -206,31 +206,43 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	close(taskChan)
 	wg.Wait()
 
+	finalResultPath := savePath
 	baseName := filepath.Base(savePath)
+	archiveCreated := false
+
 	if opts.IsZip {
 		zipPath := filepath.Join(filepath.Dir(savePath), baseName+".zip")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
 		if err := archive.CreateZip(zipPath, files); err == nil {
-			_ = os.RemoveAll(savePath)
+			archiveCreated = true
+			finalResultPath = zipPath
 		}
-	} else if opts.IsCbz {
+	}
+	if opts.IsCbz {
 		cbzPath := filepath.Join(filepath.Dir(savePath), baseName+".cbz")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
 		if err := archive.CreateCbz(cbzPath, files); err == nil {
-			_ = os.RemoveAll(savePath)
+			archiveCreated = true
+			finalResultPath = cbzPath
 		}
-	} else if opts.IsPdf {
+	}
+	if opts.IsPdf {
 		pdfPath := filepath.Join(filepath.Dir(savePath), baseName+".pdf")
 		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
 		files = sorting.SortKeyImproved(files)
 		if err := archive.CreatePdfFromImages(pdfPath, files); err == nil {
-			_ = os.RemoveAll(savePath)
+			archiveCreated = true
+			finalResultPath = pdfPath
 		}
 	}
 
-	return nil
+	if archiveCreated {
+		_ = os.RemoveAll(savePath)
+	}
+
+	return finalResultPath, nil
 }
 
 // MergerImages executes the full image stitching/slicing or no-stitch pipeline for a folder.
@@ -302,8 +314,7 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 	}
 
 	if opts.IsNoStitch {
-		err := ProcessBatchNoStitch(images, savePath, opts)
-		return savePath, err
+		return ProcessBatchNoStitch(images, savePath, opts)
 	}
 
 	// Stitched mode

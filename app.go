@@ -761,13 +761,20 @@ func (a *App) Start(params map[string]interface{}) {
 				a.updateStep("process")
 				if enhanceEngine == "fast" {
 					a.changeStatusOnly(getMsg("enhancing_fast_run", lang, len(directImages)))
-					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, func(pct, curr, total int) {
+					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, a.controller.CheckState, func(pct, curr, total int) {
 						a.changeProgress(float64(pct))
 						elapsed := time.Since(a.startTime).Seconds()
 						eta := calculateEta(a.startTime, float64(pct))
 						a.changeProgressDetail(curr, total, getMsg("status_denoising", lang), formatDuration(elapsed), eta)
 					})
 					if err != nil {
+						if a.controller.CheckState() != nil {
+							a.changeStatusText(getMsg("stopped", lang))
+							a.updateStep("ready")
+							a.setButtonState("idle")
+							a.execJS("stopTimer();")
+							return
+						}
 						a.showError(fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error()), true)
 						a.changeStatusText(getMsg("enhancing_fail", lang))
 						a.updateStep("ready")
@@ -789,13 +796,20 @@ func (a *App) Start(params map[string]interface{}) {
 						return
 					}
 					a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
-					enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", func(pct, curr, total int) {
+					enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", a.controller.CheckState, func(pct, curr, total int) {
 						a.changeProgress(float64(pct))
 						elapsed := time.Since(a.startTime).Seconds()
 						eta := calculateEta(a.startTime, float64(pct))
 						a.changeProgressDetail(curr, total, getMsg("status_enhancing", lang), formatDuration(elapsed), eta)
 					})
 					if err != nil {
+						if a.controller.CheckState() != nil {
+							a.changeStatusText(getMsg("stopped", lang))
+							a.updateStep("ready")
+							a.setButtonState("idle")
+							a.execJS("stopTimer();")
+							return
+						}
 						a.showError(fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error()), true)
 						a.changeStatusText(getMsg("enhancing_fail", lang))
 						a.updateStep("ready")
@@ -915,7 +929,7 @@ func (a *App) Start(params map[string]interface{}) {
 				if isEnhance {
 					a.updateStep("process")
 					if enhanceEngine == "fast" {
-						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, func(pct, curr, total int) {
+						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, a.controller.CheckState, func(pct, curr, total int) {
 							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
 							a.changeProgress(overallPct)
 							elapsed := time.Since(a.startTime).Seconds()
@@ -923,6 +937,9 @@ func (a *App) Start(params map[string]interface{}) {
 							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 						})
 						if err != nil {
+							if a.controller.CheckState() != nil {
+								break
+							}
 							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
 						} else if enhancedDir != "" {
 							processFolder = enhancedDir
@@ -937,7 +954,7 @@ func (a *App) Start(params map[string]interface{}) {
 							a.execJS("stopTimer();")
 							return
 						}
-						enhancedDir, err := enhancer.RunRealEsrganAI(exePath, fld, "", func(pct, curr, total int) {
+						enhancedDir, err := enhancer.RunRealEsrganAI(exePath, fld, "", a.controller.CheckState, func(pct, curr, total int) {
 							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
 							a.changeProgress(overallPct)
 							elapsed := time.Since(a.startTime).Seconds()
@@ -945,6 +962,9 @@ func (a *App) Start(params map[string]interface{}) {
 							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 						})
 						if err != nil {
+							if a.controller.CheckState() != nil {
+								break
+							}
 							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
 						} else if enhancedDir != "" {
 							processFolder = enhancedDir

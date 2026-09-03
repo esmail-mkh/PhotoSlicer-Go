@@ -21,13 +21,9 @@ type resizeTask struct {
 	path    string
 	targetW int
 	targetH int
+	yOffset int
 }
 
-type resizeResult struct {
-	index int
-	img   *image.RGBA
-	err   error
-}
 
 // GetConcatVOptimized stitches images vertically into a single tall canvas.
 // 1. Concurrently inspects dimensions.
@@ -79,7 +75,6 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 
 	finalHeights := make([]int, totalImgs)
 	var validIndices []int
-	totalHeight := 0
 
 	for i, dr := range dimResults {
 		if dr.err == nil && dr.w > 0 {
@@ -89,11 +84,22 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 			}
 			finalHeights[i] = newH
 			validIndices = append(validIndices, i)
-			totalHeight += newH
 		}
 	}
 
-	if totalHeight <= 0 || len(validIndices) == 0 {
+	if len(validIndices) == 0 {
+		return nil, fmt.Errorf("no valid images could be processed for stitching")
+	}
+
+	yOffsets := make([]int, totalImgs)
+	currentY := 0
+	for _, idx := range validIndices {
+		yOffsets[idx] = currentY
+		currentY += finalHeights[idx]
+	}
+	totalHeight := currentY
+
+	if totalHeight <= 0 {
 		return nil, fmt.Errorf("no valid images could be processed for stitching")
 	}
 
@@ -101,11 +107,11 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 	canvas := image.NewRGBA(image.Rect(0, 0, targetWidth, totalHeight))
 	draw.Draw(canvas, canvas.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 
-	// --- Pass 2: Concurrent Resize & Sequential Direct Blit ---
+	// --- Pass 2: Concurrent Resize & Direct Memory-Optimized Blit ---
 	tasksChan := make(chan resizeTask, len(validIndices))
-	resultsChan := make(chan resizeResult, len(validIndices))
-
+	var canvasMu sync.Mutex
 	var workerWg sync.WaitGroup
+
 	for w := 0; w < maxWorkers; w++ {
 		workerWg.Add(1)
 		go func() {
@@ -113,12 +119,14 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 			for task := range tasksChan {
 				srcImg, err := OpenImageRobust(task.path)
 				if err != nil {
-					resultsChan <- resizeResult{index: task.index, err: err}
 					continue
 				}
 
 				resized := ResizeBicubic(srcImg, task.targetW, task.targetH)
-				resultsChan <- resizeResult{index: task.index, img: resized}
+				canvasMu.Lock()
+				dstRect := image.Rect(0, task.yOffset, targetWidth, task.yOffset+resized.Bounds().Dy())
+				draw.Draw(canvas, dstRect, resized, resized.Bounds().Min, draw.Src)
+				canvasMu.Unlock()
 			}
 		}()
 	}
@@ -129,42 +137,11 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 			path:    imagePaths[idx],
 			targetW: targetWidth,
 			targetH: finalHeights[idx],
+			yOffset: yOffsets[idx],
 		}
 	}
 	close(tasksChan)
-
-	go func() {
-		workerWg.Wait()
-		close(resultsChan)
-	}()
-
-	resultsMap := make(map[int]*image.RGBA)
-	for res := range resultsChan {
-		if res.err == nil && res.img != nil {
-			resultsMap[res.index] = res.img
-		}
-	}
-
-	currentY := 0
-	for _, idx := range validIndices {
-		img, ok := resultsMap[idx]
-		if !ok || img == nil {
-			continue
-		}
-
-		h := img.Bounds().Dy()
-		dstRect := image.Rect(0, currentY, targetWidth, currentY+h)
-		draw.Draw(canvas, dstRect, img, img.Bounds().Min, draw.Src)
-		currentY += h
-	}
-
-	if currentY < totalHeight {
-		if currentY > 0 {
-			// Sub-image crop to actual pasted height
-			return canvas.SubImage(image.Rect(0, 0, targetWidth, currentY)).(*image.RGBA), nil
-		}
-		return nil, fmt.Errorf("failed to stitch any images")
-	}
+	workerWg.Wait()
 
 	return canvas, nil
 }

@@ -104,11 +104,23 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error)
 			}
 		}
 
-		if len(validParts) != 1 || strings.HasPrefix(validParts[0], ".") {
+		if len(validParts) == 0 {
 			continue
 		}
 
-		rawName := validParts[0]
+		// Skip hidden files, macOS metadata, and system trash
+		hasHidden := false
+		for _, p := range validParts {
+			if strings.HasPrefix(p, ".") || p == "__MACOSX" {
+				hasHidden = true
+				break
+			}
+		}
+		if hasHidden {
+			continue
+		}
+
+		rawName := validParts[len(validParts)-1]
 		ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(rawName), "."))
 		if !constants.SupportedExtensions[ext] {
 			continue
@@ -149,7 +161,7 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error)
 	}
 
 	if extractedCount == 0 {
-		return "", fmt.Errorf("no valid images found in root of zip")
+		return "", fmt.Errorf("no valid images found in zip archive")
 	}
 
 	return outputDir, nil

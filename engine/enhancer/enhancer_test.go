@@ -65,7 +65,7 @@ func TestRunRealEsrganAIWithPersianPathAndFile(t *testing.T) {
 	}
 
 	progressCalled := false
-	outDir, err := RunRealEsrganAI(exe, testDir, "", func(pct, curr, total int) {
+	outDir, err := RunRealEsrganAI(exe, testDir, "", nil, func(pct, curr, total int) {
 		progressCalled = true
 	})
 	if err != nil {
@@ -106,7 +106,7 @@ func TestEnhancerAndPipelineIntegration(t *testing.T) {
 		t.Fatalf("failed to copy sample image: %v", err)
 	}
 
-	enhancedDir, err := RunRealEsrganAI(exe, testDir, "", nil)
+	enhancedDir, err := RunRealEsrganAI(exe, testDir, "", nil, nil)
 	if err != nil {
 		t.Fatalf("RunRealEsrganAI failed: %v", err)
 	}
@@ -221,7 +221,7 @@ func TestRunFastEnhancementBatch(t *testing.T) {
 	_ = copyFile(srcImg, dstImg2)
 
 	progressCount := 0
-	outDir, err := RunFastEnhancement(testDir, 4, func(pct, curr, total int) {
+	outDir, err := RunFastEnhancement(testDir, 4, nil, func(pct, curr, total int) {
 		progressCount++
 	})
 	if err != nil {
@@ -236,6 +236,32 @@ func TestRunFastEnhancementBatch(t *testing.T) {
 	files, err := os.ReadDir(outDir)
 	if err != nil || len(files) < 2 {
 		t.Fatalf("expected at least 2 processed files in outDir, got %d", len(files))
+	}
+}
+
+func TestRunFastEnhancementCancellation(t *testing.T) {
+	testDir, err := os.MkdirTemp("", "تست_کنسل_")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(testDir)
+
+	srcImg := filepath.Join("..", "..", "assets", "app-v4.2-en-image.jpg")
+	for i := 0; i < 5; i++ {
+		dstImg := filepath.Join(testDir, "test_img.jpg")
+		_ = copyFile(srcImg, dstImg)
+	}
+
+	cancelledErr := os.ErrInvalid
+	outDir, err := RunFastEnhancement(testDir, 1, func() error {
+		return cancelledErr
+	}, nil)
+
+	if err != cancelledErr {
+		t.Errorf("expected cancellation error %v, got %v", cancelledErr, err)
+	}
+	if outDir != "" {
+		_ = os.RemoveAll(outDir)
 	}
 }
 
