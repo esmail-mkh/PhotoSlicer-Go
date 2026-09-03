@@ -427,7 +427,6 @@ function setLanguage(lang) {
         renderPresetMenu();
         updatePresetTrigger();
     }
-}
 	
 	document.querySelector('.logo-icon').title = texts.tipLogo;
     document.querySelector('.lang-switch').title = texts.tipLang;
