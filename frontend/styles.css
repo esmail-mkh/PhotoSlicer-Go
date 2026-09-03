@@ -3510,6 +3510,16 @@ body.workspace-processing .progress-track {
     min-width: 2px;
 }
 
+/* Zero-state hiding for progress fill: prevent glowing dot/bar when at 0% */
+.progress-fill[style*="width: 0%"],
+.progress-fill[style*="width: 0.0%"],
+.progress-fill[style*="width: 0;"],
+.progress-fill[style*="width:0%"] {
+    opacity: 0;
+    min-width: 0;
+    box-shadow: none;
+}
+
 @keyframes progressFlow {
     0% { background-position: 0% 50%; }
     100% { background-position: 300% 50%; }
@@ -3534,6 +3544,13 @@ body.is-processing .progress-fill {
     filter: blur(1.5px);
     pointer-events: none;
     z-index: 3;
+}
+
+/* RTL Trailing edge highlight (anchor to leading head on the left) */
+[dir="rtl"] .progress-fill::after {
+    right: auto;
+    left: 0;
+    border-radius: 10px 0 0 10px;
 }
 
 /* --- Progress Text (legacy, kept hidden) --- */

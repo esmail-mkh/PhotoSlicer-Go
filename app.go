@@ -663,12 +663,14 @@ func (a *App) Start(params map[string]interface{}) {
 		currentDate := time.Now().Format("2006-01-02")
 
 		if isSingleMode {
+			a.changeProgress(0)
+			a.updateStep("scan")
 			a.changeStatusOnly(getMsg("processing_single", lang))
-			a.updateStep("stitching")
+			a.updateStep("process")
 
 			processFolder := dirAddress
 			if isEnhance {
-				a.updateStep("enhancing")
+				a.updateStep("process")
 				if enhanceEngine == "fast" {
 					a.changeStatusOnly(getMsg("enhancing_fast_run", lang, len(directImages)))
 					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, func(pct, curr, total int) {
@@ -702,7 +704,7 @@ func (a *App) Start(params map[string]interface{}) {
 			if wmEnabled {
 				a.updateStep("watermark")
 			}
-			a.updateStep("slicing")
+			a.updateStep("process")
 
 			opts := pipeline.PipelineOptions{
 				Mode:                  "single",
@@ -743,9 +745,11 @@ func (a *App) Start(params map[string]interface{}) {
 			if err != nil {
 				a.showError(err.Error(), true)
 			} else {
+				a.updateStep("save")
 				a.lastOutput = resPath
 				a.showOpenFolderButton(resPath)
 				a.changeProgress(100)
+				a.updateStep("done")
 				a.changeStatusText(getMsg("idle_done", lang))
 				playSound, _ := params["play_sound"].(bool)
 				if playSound {
@@ -755,6 +759,8 @@ func (a *App) Start(params map[string]interface{}) {
 			}
 		} else {
 			// Batch mode
+			a.changeProgress(0)
+			a.updateStep("scan")
 			subfolders, _ := archive.FastScanDir(dirAddress)
 			var validFolders []string
 			for _, sf := range subfolders {
@@ -767,6 +773,7 @@ func (a *App) Start(params map[string]interface{}) {
 			if len(validFolders) == 0 {
 				a.showError(getMsg("no_subfolders", lang), true)
 				a.changeStatusText(getMsg("error_valid_dir", lang))
+				a.updateStep("ready")
 				a.setButtonState("idle")
 				a.execJS("stopTimer();")
 				return
@@ -780,11 +787,11 @@ func (a *App) Start(params map[string]interface{}) {
 
 				fldName := filepath.Base(fld)
 				a.changeStatusOnly(getMsg("processing_multi", lang, fldName, idx+1, totalFolders))
-				a.updateStep("stitching")
+				a.updateStep("process")
 
 				processFolder := fld
 				if isEnhance {
-					a.updateStep("enhancing")
+					a.updateStep("process")
 					if enhanceEngine == "fast" {
 						enhancedDir, _ := enhancer.RunFastEnhancement(fld, threadCount, nil)
 						if enhancedDir != "" {
@@ -796,7 +803,7 @@ func (a *App) Start(params map[string]interface{}) {
 				if wmEnabled {
 					a.updateStep("watermark")
 				}
-				a.updateStep("slicing")
+				a.updateStep("process")
 
 				opts := pipeline.PipelineOptions{
 					Mode:                  "multi",
@@ -837,7 +844,9 @@ func (a *App) Start(params map[string]interface{}) {
 				}
 			}
 
+			a.updateStep("save")
 			a.changeProgress(100)
+			a.updateStep("done")
 			a.changeStatusText(getMsg("idle_done", lang))
 			if a.lastOutput != "" {
 				a.showOpenFolderButton(a.lastOutput)

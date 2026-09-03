@@ -2105,6 +2105,10 @@ function resetProgressUI() {
     if (info) info.classList.remove('visible');
     var steps = document.getElementById('step-indicator');
     if (steps) steps.classList.remove('visible');
+    var pr = document.getElementById('pr');
+    if (pr) pr.style.width = '0%';
+    var prText = document.getElementById('pr-text');
+    if (prText) prText.textContent = '0%';
     resetProgressInfo();
     resetStepIndicator();
     var percent = document.getElementById('progress-percent');
@@ -2185,29 +2189,73 @@ function resetProgressInfo() {
     applyProgressModeLabel('');
 }
 
+var STEP_ALIASES = {
+    'ready': 'ready',
+    'scan': 'scan',
+    'scanning': 'scan',
+    'stitching': 'process',
+    'enhancing': 'process',
+    'slicing': 'process',
+    'process': 'process',
+    'processing': 'process',
+    'watermark': 'watermark',
+    'watermarking': 'watermark',
+    'save': 'save',
+    'saving': 'save',
+    'done': 'done',
+    'complete': 'done',
+    'completed': 'done'
+};
+
 function updateStepIndicator(step) {
-    var steps = document.querySelectorAll('.step-indicator .step');
-    var lines = document.querySelectorAll('.step-indicator .step-line');
-    var passed = true;
-    steps.forEach(function(s, i) {
-        var sStep = s.getAttribute('data-step');
-        if (sStep === step) {
-            s.classList.add('active');
-            s.classList.remove('completed');
-            passed = false;
-        } else if (passed) {
+    var raw = (step || '').toString().toLowerCase();
+    var targetStep = STEP_ALIASES[raw] || raw;
+
+    // Filter to visible steps (watermark step may be hidden via display: none)
+    var allSteps = Array.from(document.querySelectorAll('.step-indicator .step'));
+    var visibleSteps = allSteps.filter(function(el) {
+        return el.style.display !== 'none' && window.getComputedStyle(el).display !== 'none';
+    });
+
+    var allLines = Array.from(document.querySelectorAll('.step-indicator .step-line'));
+    var visibleLines = allLines.filter(function(el) {
+        return el.style.display !== 'none' && window.getComputedStyle(el).display !== 'none';
+    });
+
+    var targetIndex = -1;
+    visibleSteps.forEach(function(s, idx) {
+        if (s.getAttribute('data-step') === targetStep) {
+            targetIndex = idx;
+        }
+    });
+
+    // Guard: if step is unrecognized or not currently visible, do not mark all as completed
+    if (targetIndex === -1) {
+        console.warn('Unknown or inactive step in updateStepIndicator:', step);
+        return;
+    }
+
+    visibleSteps.forEach(function(s, idx) {
+        if (targetStep === 'done') {
             s.classList.remove('active');
             s.classList.add('completed');
+        } else if (idx < targetIndex) {
+            s.classList.remove('active');
+            s.classList.add('completed');
+        } else if (idx === targetIndex) {
+            s.classList.add('active');
+            s.classList.remove('completed');
         } else {
             s.classList.remove('active');
             s.classList.remove('completed');
         }
-        if (lines[i]) {
-            if (passed && sStep !== step) {
-                lines[i].classList.add('completed');
-            } else {
-                lines[i].classList.remove('completed');
-            }
+    });
+
+    visibleLines.forEach(function(l, idx) {
+        if (targetStep === 'done' || idx < targetIndex) {
+            l.classList.add('completed');
+        } else {
+            l.classList.remove('completed');
         }
     });
 }
