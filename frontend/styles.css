@@ -1997,79 +1997,106 @@ input#save-location-input[readonly] {
     padding-left: 134px !important;
 }
 
+/* Make room for inline inspection badge when present */
+.folder-wrapper.has-inspection input:focus,
+.folder-wrapper.has-inspection input:not(:placeholder-shown) {
+    padding-right: 188px !important;
+}
+
+[dir="rtl"] .folder-wrapper.has-inspection input:focus,
+[dir="rtl"] .folder-wrapper.has-inspection input:not(:placeholder-shown) {
+    padding-right: 18px !important;
+    padding-left: 188px !important;
+}
+
 /* ============================================
-   PRE-FLIGHT DIRECTORY INSPECTION BADGE
+   PRE-FLIGHT DIRECTORY INSPECTION BADGE (INLINE)
    ============================================ */
-.dir-inspection-badge-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    margin-top: 9px;
-    padding: 0 4px;
-}
-
-[dir="rtl"] .dir-inspection-badge-wrap {
-    justify-content: flex-start;
-}
-
 .dir-inspection-badge {
-    display: inline-flex;
+    display: none;
     align-items: center;
-    gap: 8px;
-    padding: 5px 13px;
-    border-radius: 9999px;
-    background: rgba(15, 23, 42, 0.65);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    font-size: 0.8rem;
-    font-weight: 500;
+    justify-content: center;
+    gap: 4.5px;
+    height: 100%;
+    padding: 0 8px;
+    border-radius: 9px;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1;
     color: var(--text-primary, #f8fafc);
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-    animation: badgeSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    transition: all 0.25s ease;
+    cursor: help;
+    user-select: none;
+    transition: all var(--transition-fast);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    animation: badgePopIn 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-@keyframes badgeSlideDown {
+@keyframes badgePopIn {
     from {
         opacity: 0;
-        transform: translateY(-5px) scale(0.98);
+        transform: scale(0.9);
     }
     to {
         opacity: 1;
-        transform: translateY(0) scale(1);
+        transform: scale(1);
     }
+}
+
+.dir-inspection-badge:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.15);
 }
 
 .dir-inspection-badge .badge-icon {
     display: inline-flex;
     align-items: center;
-    font-size: 0.95rem;
+    justify-content: center;
     line-height: 1;
 }
 
+.dir-inspection-badge .badge-icon svg {
+    width: 13px;
+    height: 13px;
+    display: block;
+}
+
+.dir-inspection-badge .badge-count {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.2px;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
 .dir-inspection-badge.badge-single {
-    border-color: rgba(14, 165, 233, 0.4);
-    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
-    color: #e0f2fe;
+    background: rgba(14, 165, 233, 0.14);
+    border-color: rgba(14, 165, 233, 0.45);
+    color: #38bdf8;
+    box-shadow: 0 2px 10px rgba(14, 165, 233, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .dir-inspection-badge.badge-batch {
-    border-color: rgba(168, 85, 247, 0.4);
-    box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
-    color: #f3e8ff;
+    background: rgba(168, 85, 247, 0.14);
+    border-color: rgba(168, 85, 247, 0.45);
+    color: #c084fc;
+    box-shadow: 0 2px 10px rgba(168, 85, 247, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .dir-inspection-badge.badge-archive {
-    border-color: rgba(16, 185, 129, 0.4);
-    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
-    color: #d1fae5;
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.45);
+    color: #34d399;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .dir-inspection-badge.badge-empty {
-    border-color: rgba(239, 68, 68, 0.4);
-    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15);
-    color: #fee2e2;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #f87171;
+    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* ============================================

@@ -124,8 +124,12 @@
                             </svg>
                         </button> -->
 
-                            <!-- Inline actions: clear / paste / browse -->
+                            <!-- Inline actions: inspection badge / clear / paste / browse -->
                         <div class="action-buttons">
+                            <div class="dir-inspection-badge" id="dir-inspection-badge" style="display: none;" role="status" aria-live="polite">
+                                <span class="badge-icon" id="badge-icon"></span>
+                                <span class="badge-count" id="badge-count"></span>
+                            </div>
                             <button type="button" onclick="clearDirectory()" class="icon-btn clear-btn" data-i18n-title="clearPath" title="Clear" aria-label="Clear path">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>
@@ -142,12 +146,6 @@
                                     <path d="M3.5 2A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 12.5 4H8.207a.5.5 0 0 1-.353-.146L7.147 3.147A1.5 1.5 0 0 0 6.086 2.5H3.5z"/>
                                 </svg>
                             </button>
-                        </div>
-                    </div>
-                    <div class="dir-inspection-badge-wrap" id="dir-inspection-badge-wrap" style="display: none;">
-                        <div class="dir-inspection-badge" id="dir-inspection-badge">
-                            <span class="badge-icon" id="badge-icon"></span>
-                            <span class="badge-text" id="badge-text"></span>
                         </div>
                     </div>
                 </div>

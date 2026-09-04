@@ -548,14 +548,17 @@ function selectFolder() {
 
 let _inspectDebounce = null;
 async function updateDirectoryInspection(path) {
-    const wrap = document.getElementById('dir-inspection-badge-wrap');
     const badge = document.getElementById('dir-inspection-badge');
+    const input = document.getElementById('directory-input');
+    const wrapper = input ? input.closest('.folder-wrapper') : document.getElementById('folder-wrapper');
     const startBtn = document.getElementById('start-button');
-    if (!badge || !wrap) return;
+    if (!badge) return;
 
     if (!path || !path.trim()) {
-        wrap.style.display = 'none';
+        badge.style.display = 'none';
         badge.className = 'dir-inspection-badge';
+        badge.removeAttribute('data-tooltip-text');
+        if (wrapper) wrapper.classList.remove('has-inspection');
         if (startBtn) startBtn.classList.remove('btn-ready');
         return;
     }
@@ -567,7 +570,7 @@ async function updateDirectoryInspection(path) {
         if (!res) return;
 
         const iconEl = document.getElementById('badge-icon');
-        const textEl = document.getElementById('badge-text');
+        const countEl = document.getElementById('badge-count');
         const isFa = (currentLang === 'fa');
 
         badge.className = 'dir-inspection-badge';
@@ -575,44 +578,59 @@ async function updateDirectoryInspection(path) {
         if (res.status === 'ok') {
             if (res.mode === 'single') {
                 badge.classList.add('badge-single');
-                if (iconEl) iconEl.textContent = '🖼️';
-                if (textEl) textEl.textContent = isFa 
+                if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                if (countEl) countEl.textContent = res.item_count;
+                const desc = isFa 
                     ? `${res.item_count} تصویر معتبر (پوشه تکی)` 
                     : `${res.item_count} valid images found (Single Folder)`;
+                badge.setAttribute('data-tooltip-text', desc);
             } else if (res.mode === 'batch') {
                 badge.classList.add('badge-batch');
-                if (iconEl) iconEl.textContent = '📚';
-                if (textEl) textEl.textContent = isFa 
+                if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M2 10h20"/></svg>';
+                if (countEl) countEl.textContent = res.item_count;
+                const desc = isFa 
                     ? `${res.item_count} چپتر شناسایی شد (پردازش گروهی)` 
                     : `${res.item_count} chapters detected (Batch Mode)`;
+                badge.setAttribute('data-tooltip-text', desc);
             } else if (res.mode === 'archive_zip' || res.mode === 'archive_cbz') {
                 badge.classList.add('badge-archive');
-                if (iconEl) iconEl.textContent = '📦';
+                if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
+                if (countEl) countEl.textContent = res.item_count;
                 const ext = res.mode === 'archive_cbz' ? 'CBZ' : 'ZIP';
-                if (textEl) textEl.textContent = isFa 
+                const desc = isFa 
                     ? `${res.item_count} تصویر در آرشیو ${ext}` 
                     : `${res.item_count} images in ${ext} archive`;
+                badge.setAttribute('data-tooltip-text', desc);
             }
-            wrap.style.display = 'flex';
+            badge.style.display = 'inline-flex';
+            if (wrapper) wrapper.classList.add('has-inspection');
             if (startBtn) startBtn.classList.add('btn-ready');
         } else if (res.status === 'empty') {
             badge.classList.add('badge-empty');
-            if (iconEl) iconEl.textContent = '⚠️';
-            if (textEl) textEl.textContent = isFa 
+            if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+            if (countEl) countEl.textContent = '0';
+            const desc = isFa 
                 ? 'هیچ تصویر یا زیرپوشه‌ای یافت نشد' 
                 : 'No supported images found in directory';
-            wrap.style.display = 'flex';
+            badge.setAttribute('data-tooltip-text', desc);
+            badge.style.display = 'inline-flex';
+            if (wrapper) wrapper.classList.add('has-inspection');
             if (startBtn) startBtn.classList.remove('btn-ready');
         } else if (res.status === 'not_found') {
             badge.classList.add('badge-empty');
-            if (iconEl) iconEl.textContent = '🚫';
-            if (textEl) textEl.textContent = isFa 
+            if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>';
+            if (countEl) countEl.textContent = '!';
+            const desc = isFa 
                 ? 'مسیر مورد نظر یافت نشد' 
                 : 'Path does not exist';
-            wrap.style.display = 'flex';
+            badge.setAttribute('data-tooltip-text', desc);
+            badge.style.display = 'inline-flex';
+            if (wrapper) wrapper.classList.add('has-inspection');
             if (startBtn) startBtn.classList.remove('btn-ready');
         } else {
-            wrap.style.display = 'none';
+            badge.style.display = 'none';
+            badge.removeAttribute('data-tooltip-text');
+            if (wrapper) wrapper.classList.remove('has-inspection');
             if (startBtn) startBtn.classList.remove('btn-ready');
         }
     } catch (e) {
@@ -630,6 +648,16 @@ function refreshDirectoryState() {
     wrapper.classList.toggle('has-value', hasValue);
     input.title = hasValue ? input.value : '';
 
+    if (!hasValue) {
+        const badge = document.getElementById('dir-inspection-badge');
+        if (badge) {
+            badge.style.display = 'none';
+            badge.className = 'dir-inspection-badge';
+            badge.removeAttribute('data-tooltip-text');
+        }
+        wrapper.classList.remove('has-inspection');
+    }
+
     clearTimeout(_inspectDebounce);
     _inspectDebounce = setTimeout(() => {
         updateDirectoryInspection(input.value);
@@ -638,8 +666,21 @@ function refreshDirectoryState() {
 
 function clearDirectory(shouldFocus = true) {
     const input = document.getElementById('directory-input');
+    const badge = document.getElementById('dir-inspection-badge');
+    const wrapper = input && input.closest('.folder-wrapper');
     if (!input) return;
     input.value = '';
+    if (badge) {
+        badge.style.display = 'none';
+        badge.className = 'dir-inspection-badge';
+        badge.removeAttribute('data-tooltip-text');
+    }
+    if (wrapper) {
+        wrapper.classList.remove('has-inspection');
+    }
+    if (typeof hideTooltipPopup === 'function') {
+        hideTooltipPopup();
+    }
     refreshDirectoryState();
     updateSettings();
     if (shouldFocus) {
@@ -1635,9 +1676,14 @@ function initTooltipSystem() {
         clearTimeout(_tooltipTimer);
         _tooltipTimer = setTimeout(() => {
             const key = el.getAttribute('data-tooltip-key');
-            if (!key) return;
-            const texts = translations[currentLang] || {};
-            const text = texts[key];
+            let text = '';
+            if (key) {
+                const texts = translations[currentLang] || {};
+                text = texts[key] || '';
+            }
+            if (!text) {
+                text = el.getAttribute('data-tooltip-text') || '';
+            }
             if (!text) return;
 
             _tooltipPopupEl.textContent = text;
@@ -1667,10 +1713,16 @@ function initTooltipSystem() {
         }, 150);
     }
 
-    document.querySelectorAll('[data-tooltip-key]').forEach(el => {
+    document.querySelectorAll('[data-tooltip-key], [data-tooltip-text]').forEach(el => {
         el.addEventListener('mouseenter', () => showTooltip(el));
         el.addEventListener('mouseleave', hideTooltipPopup);
     });
+
+    const badgeEl = document.getElementById('dir-inspection-badge');
+    if (badgeEl) {
+        badgeEl.addEventListener('mouseenter', () => showTooltip(badgeEl));
+        badgeEl.addEventListener('mouseleave', hideTooltipPopup);
+    }
 
     window.addEventListener('scroll', hideTooltipPopup, { passive: true });
     window.addEventListener('resize', hideTooltipPopup, { passive: true });
