@@ -52,3 +52,8 @@ photoslicer_error.log
 
 # AI agent instructions
 AGENTS.md
+
+# Planning & Audit documentation
+.planning/
+planning/
+
