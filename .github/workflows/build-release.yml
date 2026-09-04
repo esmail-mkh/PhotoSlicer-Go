@@ -11,6 +11,11 @@ on:
         type: boolean
         required: true
         default: true
+      draft:
+        description: 'Create Release as Draft'
+        type: boolean
+        required: false
+        default: true
       version_tag:
         description: 'Release Tag Version (leave blank to auto-detect from wails.json)'
         type: string
@@ -209,10 +214,16 @@ jobs:
           echo "CLEAN_VERSION=$CLEAN_VER" >> $GITHUB_ENV
           echo "RELEASE_TITLE=Version $CLEAN_VER" >> $GITHUB_ENV
 
+          IS_DRAFT="true"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.draft }}" = "false" ]; then
+            IS_DRAFT="false"
+          fi
+          echo "IS_DRAFT=$IS_DRAFT" >> $GITHUB_ENV
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: false
+          draft: ${{ env.IS_DRAFT == 'true' }}
           tag_name: ${{ env.RELEASE_TAG }}
           name: ${{ env.RELEASE_TITLE }}
           files: release_assets/**/*.zip
