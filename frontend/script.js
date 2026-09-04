@@ -24,6 +24,14 @@ const translations = {
         zip: "ZIP Archive",
         pdf: "PDF File",
         cbz: "CBZ Archive",
+        archivePackage: "Packaging & Archive",
+        tipWidth: "Resize all pages to a uniform width while maintaining aspect ratio",
+        tipHeight: "Maximum vertical height per slice (16000px safe limit for WebP and browser canvas)",
+        tipQuality: "Output compression quality from 1 to 100 (100 is lossless/highest)",
+        tipFormat: "Output image format (JPG, PNG, compressed WebP, or layered PSD)",
+        tipAiEnhance: "Quality enhancement via Fast CPU denoiser or Real-ESRGAN GPU upscaler",
+        tipNoStitch: "Process, resize, and watermark files individually without stitching into a tall strip",
+        tipArchive: "Automatically bundle results into a ZIP archive, multi-page PDF, or CBZ comic book",
         readyStatus: "Ready to Slice",
         // Presets
         noPreset: "No Preset",
@@ -208,6 +216,14 @@ const translations = {
         zip: "فشرده‌سازی ZIP",
         pdf: "تبدیل به PDF",
         cbz: "خروجی CBZ",
+        archivePackage: "بسته‌بندی و خروجی آرشیو",
+        tipWidth: "تغییر عرض تمام صفحات به یک اندازه مشخص با حفظ نسبت ابعاد",
+        tipHeight: "حداکثر ارتفاع هر برش (پیش‌فرض ۱۶۰۰۰ پیکسل برای ایمنی WebP و روان بودن مرورگر)",
+        tipQuality: "کیفیت فشرده‌سازی خروجی از ۱ تا ۱۰۰ (۱۰۰ برای بالاترین وضوح)",
+        tipFormat: "انتخاب فرمت خروجی تصویر (JPG, PNG, WebP فشرده، یا PSD لایه‌باز)",
+        tipAiEnhance: "ارتقای هوشمند کیفیت با دو موتور: پردازنده سریع (CPU) یا هوش مصنوعی Real-ESRGAN (GPU)",
+        tipNoStitch: "پردازش، ریسایز و واترمارک مجزای فایل‌ها بدون چسباندن آن‌ها در یک نوار بلند وب‌تون",
+        tipArchive: "بسته‌بندی خودکار خروجی در قالب فایل فشرده، سند پی‌دی‌اف یا کتاب الکترونیک کمیک",
         readyStatus: "آماده برای شروع",
         // Presets
         noPreset: "بدون پریست",
@@ -454,6 +470,10 @@ function setLanguage(lang) {
     const dirInput = document.getElementById('directory-input');
     if (dirInput && dirInput.value.trim()) {
         updateDirectoryInspection(dirInput.value.trim());
+    }
+
+    if (typeof hideTooltipPopup === 'function') {
+        hideTooltipPopup();
     }
 }
 
@@ -1577,6 +1597,83 @@ function syncControlStates() {
         noStitchEl.addEventListener('change', syncControlStates);
     }
     syncControlStates();
+})();
+
+/* ============================================
+   GLASSMORPHIC TOOLTIP SYSTEM
+   ============================================ */
+let _tooltipPopupEl = null;
+
+function hideTooltipPopup() {
+    if (_tooltipPopupEl) {
+        _tooltipPopupEl.classList.remove('show');
+        _tooltipPopupEl.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function initTooltipSystem() {
+    if (!_tooltipPopupEl) {
+        _tooltipPopupEl = document.createElement('div');
+        _tooltipPopupEl.id = 'custom-tooltip-popup';
+        _tooltipPopupEl.className = 'custom-tooltip-popup';
+        _tooltipPopupEl.setAttribute('role', 'tooltip');
+        _tooltipPopupEl.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(_tooltipPopupEl);
+    }
+
+    function showTooltip(btn) {
+        const key = btn.getAttribute('data-tooltip-key');
+        if (!key) return;
+        const texts = translations[currentLang] || {};
+        const text = texts[key];
+        if (!text) return;
+
+        _tooltipPopupEl.textContent = text;
+        _tooltipPopupEl.setAttribute('aria-hidden', 'false');
+        _tooltipPopupEl.classList.add('show');
+
+        const rect = btn.getBoundingClientRect();
+        const popupRect = _tooltipPopupEl.getBoundingClientRect();
+        const margin = 8;
+
+        // Position vertically: prefer above, fallback to below
+        let top = rect.top - popupRect.height - margin;
+        if (top < 10) {
+            top = rect.bottom + margin;
+        }
+
+        // Position horizontally: centered on trigger, clamped to viewport bounds
+        let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+        if (left < 12) left = 12;
+        if (left + popupRect.width > window.innerWidth - 12) {
+            left = window.innerWidth - 12 - popupRect.width;
+        }
+
+        _tooltipPopupEl.style.top = `${Math.round(top)}px`;
+        _tooltipPopupEl.style.left = `${Math.round(left)}px`;
+    }
+
+    document.querySelectorAll('.info-tooltip-btn').forEach(btn => {
+        btn.addEventListener('mouseenter', () => showTooltip(btn));
+        btn.addEventListener('mouseleave', hideTooltipPopup);
+        btn.addEventListener('focus', () => showTooltip(btn));
+        btn.addEventListener('blur', hideTooltipPopup);
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    });
+
+    window.addEventListener('scroll', hideTooltipPopup, { passive: true });
+    window.addEventListener('resize', hideTooltipPopup, { passive: true });
+}
+
+(function startTooltips() {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTooltipSystem);
+    } else {
+        initTooltipSystem();
+    }
 })();
 
 /* ============================================
