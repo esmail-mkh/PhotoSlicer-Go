@@ -20,6 +20,7 @@ const translations = {
         engineFast: "⚡ Fast Manhwa Line Clean (CPU)",
         engineRealESRGAN: "🔥 Real-ESRGAN (GPU)",
         noStitch: "No Stitch",
+        inactiveNoStitch: "No Stitch",
         zip: "ZIP Archive",
         pdf: "PDF File",
         cbz: "CBZ Archive",
@@ -203,6 +204,7 @@ const translations = {
         engineFast: "⚡ پاک‌سازی خطوط مانهوا (پردازنده - بدون تغییر رنگ)",
         engineRealESRGAN: "🔥 مدل عمیق Real-ESRGAN (کارت گرافیک)",
         noStitch: "بدون چسباندن (تغییر فرمت)",
+        inactiveNoStitch: "بدون چسباندن",
         zip: "فشرده‌سازی ZIP",
         pdf: "تبدیل به PDF",
         cbz: "خروجی CBZ",
@@ -1532,6 +1534,51 @@ document.querySelectorAll('input, select').forEach(element => {
     refreshDirectoryState();
 })();
 
+// Sync contextual dimming for Width and Height control cards
+function syncControlStates() {
+    const customWidthEl = document.getElementById('custom-width');
+    const widthCard = document.getElementById('width-input')?.closest('.control-card');
+    const widthInput = document.getElementById('width-input');
+    const isCustomWidth = customWidthEl ? customWidthEl.checked : true;
+
+    if (widthCard && widthInput) {
+        if (isCustomWidth) {
+            widthCard.classList.remove('card-disabled');
+            widthInput.disabled = false;
+        } else {
+            widthCard.classList.add('card-disabled');
+            widthInput.disabled = true;
+        }
+    }
+
+    const noStitchEl = document.getElementById('no-stitch');
+    const heightCard = document.getElementById('height-input')?.closest('.control-card');
+    const heightInput = document.getElementById('height-input');
+    const isNoStitch = noStitchEl ? noStitchEl.checked : false;
+
+    if (heightCard && heightInput) {
+        if (isNoStitch) {
+            heightCard.classList.add('card-disabled');
+            heightInput.disabled = true;
+        } else {
+            heightCard.classList.remove('card-disabled');
+            heightInput.disabled = false;
+        }
+    }
+}
+
+(function initControlCardStates() {
+    const customWidthEl = document.getElementById('custom-width');
+    if (customWidthEl) {
+        customWidthEl.addEventListener('change', syncControlStates);
+    }
+    const noStitchEl = document.getElementById('no-stitch');
+    if (noStitchEl) {
+        noStitchEl.addEventListener('change', syncControlStates);
+    }
+    syncControlStates();
+})();
+
 /* ============================================
    Custom output-format dropdown
    Drives the hidden <select id="format-select">,
@@ -1729,6 +1776,7 @@ function applyPresetValues(values) {
     if (typeof refreshSaveLocationState === 'function') refreshSaveLocationState();
     if (typeof toggleWatermarkOptions === 'function') toggleWatermarkOptions();
     if (typeof refreshFilenamePreview === 'function') refreshFilenamePreview();
+    if (typeof syncControlStates === 'function') syncControlStates();
     updateSettings();
 }
 

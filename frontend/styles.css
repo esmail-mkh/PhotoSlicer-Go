@@ -2165,6 +2165,59 @@ input#save-location-input[readonly] {
         linear-gradient(160deg, var(--theme-glow-soft) 0%, rgba(255, 255, 255, 0.02) 100%);
 }
 
+/* Contextual Control Dimming */
+.control-card.card-disabled,
+.control-card.card-disabled:hover,
+.control-card.card-disabled:focus-within {
+    opacity: 0.42;
+    filter: grayscale(45%);
+    border-color: rgba(255, 255, 255, 0.04) !important;
+    transform: none !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%) !important;
+}
+
+.control-card.card-disabled::before,
+.control-card.card-disabled::after {
+    display: none !important;
+}
+
+.control-card.card-disabled .input-with-unit {
+    pointer-events: none;
+    opacity: 0.65;
+}
+
+.control-card.card-disabled input {
+    cursor: not-allowed;
+}
+
+.control-card.card-disabled .toggle-switch,
+.control-card.card-disabled .card-header label,
+.control-card.card-disabled .info-tooltip-btn {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.disabled-pill-note {
+    display: none;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.02em;
+    line-height: 1.2;
+    text-transform: none;
+    transition: all 0.2s ease;
+}
+
+.control-card.card-disabled .disabled-pill-note {
+    display: inline-flex;
+    align-items: center;
+}
+
 /* Card Header */
 .card-header {
     display: flex;
