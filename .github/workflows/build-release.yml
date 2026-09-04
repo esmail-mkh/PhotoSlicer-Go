@@ -50,7 +50,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: 'stable'
+          check-latest: true
           cache: true
 
       - name: Install System Dependencies (Linux)
@@ -64,6 +65,10 @@ jobs:
 
       - name: Build Application (Windows)
         if: matrix.target_os == 'windows'
+        env:
+          CGO_ENABLED: '1'
+          CGO_CFLAGS: '-O3'
+          CGO_CXXFLAGS: '-O3'
         run: wails build -clean
 
       - name: Build Application (Linux)
