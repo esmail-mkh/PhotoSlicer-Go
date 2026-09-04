@@ -96,16 +96,19 @@ func runeToDecimalDigit(r rune) (rune, bool) {
 	}
 	if unicode.Is(unicode.Nd, r) {
 		// In Unicode, all Nd ranges consist of groups of 10 consecutive digits 0..9
-		for _, r16 := range unicode.Nd.R16 {
-			if uint16(r) >= r16.Lo && uint16(r) <= r16.Hi {
-				val := (r - rune(r16.Lo)) % 10
-				return '0' + rune(val), true
+		if r <= 0xFFFF {
+			for _, r16 := range unicode.Nd.R16 {
+				if uint16(r) >= r16.Lo && uint16(r) <= r16.Hi {
+					val := (r - rune(r16.Lo)) % 10
+					return '0' + rune(val), true
+				}
 			}
-		}
-		for _, r32 := range unicode.Nd.R32 {
-			if uint32(r) >= r32.Lo && uint32(r) <= r32.Hi {
-				val := (r - rune(r32.Lo)) % 10
-				return '0' + rune(val), true
+		} else {
+			for _, r32 := range unicode.Nd.R32 {
+				if uint32(r) >= r32.Lo && uint32(r) <= r32.Hi {
+					val := (r - rune(r32.Lo)) % 10
+					return '0' + rune(val), true
+				}
 			}
 		}
 	}

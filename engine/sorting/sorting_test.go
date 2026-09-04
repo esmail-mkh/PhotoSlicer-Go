@@ -102,4 +102,12 @@ func TestSortKeyImproved(t *testing.T) {
 			t.Errorf("Expected %v, got %v", expected, actual)
 		}
 	})
+
+	t.Run("SupplementaryUnicodeDigits", func(t *testing.T) {
+		// Mathematical Bold Digit Zero U+1D7CE is in Nd and > 0xFFFF
+		r, ok := runeToDecimalDigit(0x1D7CE)
+		if !ok || r != '0' {
+			t.Errorf("Expected '0', got %c (ok: %v)", r, ok)
+		}
+	})
 }

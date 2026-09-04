@@ -197,3 +197,35 @@ func TestPipelineMultiArchiveBothZipAndPdf(t *testing.T) {
 	}
 }
 
+func TestPipelineMultiModeDateNesting(t *testing.T) {
+	tempSrc := t.TempDir()
+	tempOut := t.TempDir()
+
+	_ = createTestImages(t, tempSrc, 2, 200, 200)
+
+	dateStr := "2026-09-04"
+	opts := PipelineOptions{
+		Mode:            "multi",
+		NewWidth:        200,
+		SaveFormat:      "JPG",
+		SaveQuality:     90,
+		HeightLimit:     250,
+		CurrentDate:     dateStr,
+		OutputBase:      tempOut,
+		SaveDirectory:   "Chapter_01",
+		MaxWorkers:      2,
+		FilenamePattern: "[number]",
+		FilenameDigits:  2,
+	}
+
+	resPath, err := MergerImages(tempSrc, opts)
+	if err != nil {
+		t.Fatalf("MergerImages in multi mode failed: %v", err)
+	}
+
+	expectedParent := filepath.Join(tempOut, dateStr)
+	if filepath.Dir(resPath) != expectedParent {
+		t.Errorf("expected parent directory to be %s, but got %s", expectedParent, filepath.Dir(resPath))
+	}
+}
+

@@ -57,11 +57,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 
 	folderName := opts.SaveDirectory
 	if folderName == "" {
-		if opts.Mode == "single" {
-			folderName = "PhotoSlicer_Output"
-		} else {
-			folderName = opts.CurrentDate
-		}
+		folderName = "PhotoSlicer_Output"
 	}
 
 	var savePath string
@@ -180,7 +176,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		go func() {
 			defer workerWg.Done()
 			for t := range taskChan {
-				subRect := image.Rect(0, t.start, imgWidth, t.end)
+				subRect := image.Rect(b.Min.X, b.Min.Y+t.start, b.Min.X+imgWidth, b.Min.Y+t.end)
 				var sliceImg image.Image
 				if sub, ok := img.(interface {
 					SubImage(r image.Rectangle) image.Image
@@ -190,7 +186,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 					rgba := image.NewRGBA(image.Rect(0, 0, imgWidth, t.end-t.start))
 					for sy := t.start; sy < t.end; sy++ {
 						for sx := 0; sx < imgWidth; sx++ {
-							rgba.Set(sx, sy-t.start, img.At(sx, sy))
+							rgba.Set(sx, sy-t.start, img.At(b.Min.X+sx, b.Min.Y+sy))
 						}
 					}
 					sliceImg = rgba

@@ -103,4 +103,33 @@ func TestSlicing(t *testing.T) {
 			t.Errorf("expected valid pdf at %s", pdfPath)
 		}
 	})
+
+	t.Run("SlicerSubImageNonZeroBounds", func(t *testing.T) {
+		tempOut := t.TempDir()
+		fullImg := image.NewRGBA(image.Rect(0, 0, 200, 300))
+		draw.Draw(fullImg, fullImg.Bounds(), &image.Uniform{C: color.RGBA{R: 200, G: 100, B: 50, A: 255}}, image.Point{}, draw.Src)
+
+		sub := fullImg.SubImage(image.Rect(20, 30, 180, 270))
+
+		opts := SlicerOptions{
+			SaveFormat:      "JPG",
+			SlicesCount:     2,
+			SaveQuality:     90,
+			Mode:            "single",
+			OutputBase:      tempOut,
+			MaxWorkers:      2,
+			FilenamePattern: "[number]",
+			FilenameDigits:  2,
+		}
+
+		resPath, err := Slicer(sub, opts)
+		if err != nil {
+			t.Fatalf("Slicer failed with SubImage: %v", err)
+		}
+
+		files, err := os.ReadDir(resPath)
+		if err != nil || len(files) == 0 {
+			t.Fatalf("expected output slices from SubImage, got none")
+		}
+	})
 }

@@ -1069,6 +1069,10 @@ func (a *App) Start(params map[string]interface{}) {
 			a.changeStatusText(getMsg("idle_done", lang))
 			if a.lastOutput != "" {
 				openTarget := outputBase
+				dateTarget := filepath.Join(outputBase, currentDate)
+				if fi, err := os.Stat(dateTarget); err == nil && fi.IsDir() {
+					openTarget = dateTarget
+				}
 				if fi, err := os.Stat(openTarget); err == nil && fi.IsDir() {
 					a.showOpenFolderButton(openTarget)
 				} else {

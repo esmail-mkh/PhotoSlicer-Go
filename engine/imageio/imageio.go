@@ -140,10 +140,13 @@ func SaveImage(img image.Image, outputPath string, format string, quality int) e
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
 	if err := EncodeImage(f, img, format, quality); err != nil {
 		_ = f.Close()
+		_ = os.Remove(outputPath)
+		return err
+	}
+	if err := f.Close(); err != nil {
 		_ = os.Remove(outputPath)
 		return err
 	}

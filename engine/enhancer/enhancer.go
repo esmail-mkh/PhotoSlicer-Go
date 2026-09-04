@@ -633,14 +633,21 @@ func RunRealEsrganAI(
 				}
 				top := cuts[j]
 				bot := cuts[j+1]
-				subRect := image.Rect(0, top, img.Bounds().Dx(), bot)
+				b := img.Bounds()
+				subRect := image.Rect(b.Min.X, b.Min.Y+top, b.Min.X+b.Dx(), b.Min.Y+bot)
 				var chunk image.Image
 				if sub, ok := img.(interface {
 					SubImage(r image.Rectangle) image.Image
 				}); ok {
 					chunk = sub.SubImage(subRect)
 				} else {
-					chunk = img
+					rgba := image.NewRGBA(image.Rect(0, 0, b.Dx(), bot-top))
+					for sy := top; sy < bot; sy++ {
+						for sx := 0; sx < b.Dx(); sx++ {
+							rgba.Set(sx, sy-top, img.At(b.Min.X+sx, b.Min.Y+sy))
+						}
+					}
+					chunk = rgba
 				}
 
 				stagedInName := fmt.Sprintf("task_%05d_p%04d.jpg", taskIdx, j)

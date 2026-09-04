@@ -289,11 +289,7 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 
 	folderName := opts.SaveDirectory
 	if folderName == "" {
-		if opts.Mode == "single" {
-			folderName = filepath.Base(inputFolder)
-		} else {
-			folderName = opts.CurrentDate
-		}
+		folderName = filepath.Base(inputFolder)
 	}
 
 	var savePath string
@@ -360,7 +356,7 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 		SaveFormat:            opts.SaveFormat,
 		SlicesCount:           slicesCount,
 		SaveQuality:           opts.SaveQuality,
-		Mode:                  opts.Mode,
+		Mode:                  "single",
 		CurrentDate:           opts.CurrentDate,
 		SaveDirectory:         filepath.Base(savePath),
 		IsZip:                 opts.IsZip,

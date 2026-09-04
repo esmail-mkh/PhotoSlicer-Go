@@ -179,9 +179,19 @@ func SavePSDLayered(
 			wmG := make([]byte, cTotal)
 			wmB := make([]byte, cTotal)
 
+			srcXOffset := 0
+			if p.X < 0 {
+				srcXOffset = -p.X
+			}
+			srcYOffset := 0
+			if p.Y < 0 {
+				srcYOffset = -p.Y
+			}
+
+			wmBounds := wm.Bounds()
 			for ly := 0; ly < ch; ly++ {
 				for lx := 0; lx < cw; lx++ {
-					c := wm.RGBAAt(lx, ly)
+					c := wm.RGBAAt(wmBounds.Min.X+srcXOffset+lx, wmBounds.Min.Y+srcYOffset+ly)
 					cIdx := ly*cw + lx
 					wmA[cIdx] = c.A
 					wmR[cIdx] = c.R
@@ -284,34 +294,79 @@ func SavePSDLayered(
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
-	// 1. Header (26 bytes)
-	f.Write([]byte("8BPS"))
-	f.Write(beU16(1))
-	f.Write(make([]byte, 6)) // Reserved
-	f.Write(beU16(3))        // 3 Channels (RGB)
-	f.Write(beU32(uint32(h)))
-	f.Write(beU32(uint32(w)))
-	f.Write(beU16(8)) // 8-bit depth
-	f.Write(beU16(3)) // RGB Mode
+	writeErr := func() error {
+		// 1. Header (26 bytes)
+		if _, err := f.Write([]byte("8BPS")); err != nil {
+			return err
+		}
+		if _, err := f.Write(beU16(1)); err != nil {
+			return err
+		}
+		if _, err := f.Write(make([]byte, 6)); err != nil {
+			return err
+		}
+		if _, err := f.Write(beU16(3)); err != nil {
+			return err
+		}
+		if _, err := f.Write(beU32(uint32(h))); err != nil {
+			return err
+		}
+		if _, err := f.Write(beU32(uint32(w))); err != nil {
+			return err
+		}
+		if _, err := f.Write(beU16(8)); err != nil {
+			return err
+		}
+		if _, err := f.Write(beU16(3)); err != nil {
+			return err
+		}
 
-	// 2. Color Mode Data
-	f.Write(beU32(0))
+		// 2. Color Mode Data
+		if _, err := f.Write(beU32(0)); err != nil {
+			return err
+		}
 
-	// 3. Image Resources
-	f.Write(beU32(0))
+		// 3. Image Resources
+		if _, err := f.Write(beU32(0)); err != nil {
+			return err
+		}
 
-	// 4. Layer and Mask Section
-	f.Write(beU32(uint32(lmSection.Len())))
-	f.Write(lmSection.Bytes())
+		// 4. Layer and Mask Section
+		if _, err := f.Write(beU32(uint32(lmSection.Len()))); err != nil {
+			return err
+		}
+		if _, err := f.Write(lmSection.Bytes()); err != nil {
+			return err
+		}
 
-	// 5. Global Image Data (Composite preview)
-	// Compression code 0 (raw bytes): R plane, G plane, B plane
-	f.Write(beU16(0))
-	f.Write(baseR)
-	f.Write(baseG)
-	f.Write(baseB)
+		// 5. Global Image Data (Composite preview)
+		// Compression code 0 (raw bytes): R plane, G plane, B plane
+		if _, err := f.Write(beU16(0)); err != nil {
+			return err
+		}
+		if _, err := f.Write(baseR); err != nil {
+			return err
+		}
+		if _, err := f.Write(baseG); err != nil {
+			return err
+		}
+		if _, err := f.Write(baseB); err != nil {
+			return err
+		}
+		return nil
+	}()
+
+	if writeErr != nil {
+		_ = f.Close()
+		_ = os.Remove(outputPath)
+		return writeErr
+	}
+
+	if err := f.Close(); err != nil {
+		_ = os.Remove(outputPath)
+		return err
+	}
 
 	return nil
 }

@@ -73,10 +73,15 @@ func SafeRmtreeTemp(targetPath string) bool {
 		}
 	}
 
-	// Drive roots
-	for _, drive := range []string{"c:\\", "d:\\", "e:\\", "f:\\", "g:\\", "h:\\", "m:\\", "/"} {
-		protected[drive] = true
+	// Drive roots and filesystem roots
+	if vol := filepath.VolumeName(absTarget); vol != "" {
+		volLower := strings.ToLower(vol)
+		protected[volLower] = true
+		protected[volLower+"\\"] = true
+		protected[volLower+"/"] = true
 	}
+	protected["/"] = true
+	protected["\\"] = true
 
 	tempDir := os.TempDir()
 	if absTemp, err := filepath.EvalSymlinks(tempDir); err == nil {
