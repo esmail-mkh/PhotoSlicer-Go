@@ -7,7 +7,7 @@
 [![Download](https://img.shields.io/github/downloads/esmail-mkh/PhotoSlicer-Go/total?label=Downloads&color=success)](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest)
 [![Stars](https://img.shields.io/github/stars/esmail-mkh/PhotoSlicer-Go?style=flat&label=Stars&color=tomato)](https://github.com/esmail-mkh/PhotoSlicer-Go)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational?color=blue)](<#-installation--downloads>)
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Wails](https://img.shields.io/badge/Wails-v2-red)](https://wails.io/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -132,7 +132,7 @@ Download the latest release archive from [Releases](https://github.com/esmail-mk
 
 | Dependency | Minimum Version | Note |
 |:---|:---:|:---|
-| **Go** | `1.22+` | Backend language |
+| **Go** | `1.25+` | Backend language |
 | **Wails v2** | `v2.9.0+` | Desktop runtime framework |
 | **C Compiler** | MinGW-w64 (Windows), GCC (Linux), Clang (macOS) | Required by CGo |
 | **System Libraries (Linux)** | `libgtk-3-dev`, `libwebkit2gtk-4.0-dev` (or `4.1`) | WebView dependencies |
@@ -243,7 +243,7 @@ Navigate to **Settings → Appearance → Custom Color** to design your own pale
 
 | Layer | Technology |
 |:---|:---|
-| **Language & Backend** | **Go 1.22+** (Goroutines, worker pools, native cross-platform runtime) |
+| **Language & Backend** | **Go 1.25+** (Goroutines, worker pools, native cross-platform runtime) |
 | **Desktop Framework** | **Wails v2** (Native WebView2 on Windows, WebKitGTK on Linux, WebKit on macOS) |
 | **Image Processing** | `github.com/disintegration/imaging`, pure-Go encoders & decoders |
 | **Document & Container Encoders** | Pure-Go PDF, layered PSD, ZIP, and CBZ writers |

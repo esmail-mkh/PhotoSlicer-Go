@@ -19,7 +19,7 @@
 
 # 🚀 فوتو اسلایسر نسخه ۵.۲: بازنویسی کامل با Go و Wails v2
 
-**نسخه ۵.۲ منتشر شد!** این نسخه یک بازنویسی بنیادین و اساسی از پایتون به زبان **Go 1.22+** و فریم‌ورک دسکتاپ **Wails v2** است که سرعتی خیره‌کننده، مصرف حافظه ناچیز و پکیج‌های اجرایی مستقل برای ویندوز، لینوکس و مک را به ارمغان آورده است.
+**نسخه ۵.۲ منتشر شد!** این نسخه یک بازنویسی بنیادین و اساسی از پایتون به زبان **Go 1.25+** و فریم‌ورک دسکتاپ **Wails v2** است که سرعتی خیره‌کننده، مصرف حافظه ناچیز و پکیج‌های اجرایی مستقل برای ویندوز، لینوکس و مک را به ارمغان آورده است.
 
 ### 🌟 تغییرات جدید (نسخه ۵.۲)
 
@@ -150,7 +150,7 @@
 
 # 🚀 PhotoSlicer v5.2: Complete Rewrite in Go & Wails v2
 
-**Version 5.2 is here!** A ground-up rewrite from Python into **Go 1.22+** and **Wails v2**, bringing 2x–3x faster performance, ultra-lightweight memory footprint, and true cross-platform standalone binaries for Windows, Linux, and macOS without any runtime dependencies.
+**Version 5.2 is here!** A ground-up rewrite from Python into **Go 1.25+** and **Wails v2**, bringing 2x–3x faster performance, ultra-lightweight memory footprint, and true cross-platform standalone binaries for Windows, Linux, and macOS without any runtime dependencies.
 
 ### 🌟 What's New (v5.2)
 

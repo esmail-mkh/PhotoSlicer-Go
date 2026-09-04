@@ -9,7 +9,7 @@
 [![Download](https://img.shields.io/github/downloads/esmail-mkh/PhotoSlicer-Go/total?label=Downloads&color=success)](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest)
 [![Stars](https://img.shields.io/github/stars/esmail-mkh/PhotoSlicer-Go?style=flat&label=Stars&color=tomato)](https://github.com/esmail-mkh/PhotoSlicer-Go)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-informational?color=blue)](<#-دانلود-و-نصب>)
-[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Wails](https://img.shields.io/badge/Wails-v2-red)](https://wails.io/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -133,7 +133,7 @@
 
 | نیازمندی | حداقل نسخه | توضیحات |
 |:---|:---:|:---|
-| **Go** | `1.22+` | زبان اصلی موتور بک‌اند |
+| **Go** | `1.25+` | زبان اصلی موتور بک‌اند |
 | **Wails v2** | `v2.9.0+` | فریم‌ورک ساخت برنامه‌های دسکتاپ بومی |
 | **کامپایلر C** | MinGW-w64 (ویندوز)، GCC (لینوکس)، Clang (مک) | مورد نیاز برای CGo |
 | **کتابخانه‌های سیستمی لینوکس** | `libgtk-3-dev`, `libwebkit2gtk-4.0-dev` (یا `4.1`) | رانتایم WebView در لینوکس |
@@ -244,7 +244,7 @@ wails build
 
 | لایه | تکنولوژی‌های به کار رفته |
 |:---|:---|
-| **بک‌اند و موتور پردازش** | **Go 1.22+** (گوروتین‌ها، مخزن پردازش موازی، کدهای با کارایی بالا) |
+| **بک‌اند و موتور پردازش** | **Go 1.25+** (گوروتین‌ها، مخزن پردازش موازی، کدهای با کارایی بالا) |
 | **فریم‌ورک دسکتاپ** | **Wails v2** (با رانتایم بومی WebView2 در ویندوز، WebKitGTK در لینوکس و WebKit در مک) |
 | **موتورهای تصویر** | کتابخانه پردازش تصویر `imaging` و انکودرهای بومی |
 | **فرمت‌ها و آرشیوها** | انکودرهای داخلی و بومی Go برای فایل‌های PDF, PSD, ZIP و CBZ |
