@@ -563,7 +563,14 @@ func (a *App) OpenFileExplorer(path string) {
 	if path == "" {
 		return
 	}
-	cmd := exec.Command("explorer", path)
+	cleanPath := filepath.Clean(path)
+	fi, err := os.Stat(cleanPath)
+	if err == nil && !fi.IsDir() {
+		cmd := exec.Command("explorer", fmt.Sprintf("/select,%s", cleanPath))
+		_ = cmd.Start()
+		return
+	}
+	cmd := exec.Command("explorer", cleanPath)
 	_ = cmd.Start()
 }
 
@@ -643,13 +650,35 @@ func (a *App) Start(params map[string]interface{}) {
 		if originalIsFile {
 			extLower := strings.ToLower(filepath.Ext(dirAddress))
 			if extLower == ".zip" || extLower == ".cbz" {
-				tempRoot, _ := os.MkdirTemp("", "photoslicer_extract_")
+				tempRoot, err := os.MkdirTemp("", "photoslicer_extract_")
+				if err != nil {
+					a.showError(err.Error(), true)
+					a.changeStatusText(getMsg("error_valid_dir", lang))
+					a.setButtonState("idle")
+					a.execJS("stopTimer();")
+					return
+				}
 				archive.RegisterTempDir(tempRoot)
 				extracted, err := archive.ExtractImagesFromZip(dirAddress, tempRoot)
-				if err == nil && extracted != "" {
-					dirAddress = extracted
-					archiveTempDir = tempRoot
+				if err != nil || extracted == "" {
+					errMsg := getMsg("error_no_images", lang)
+					if err != nil {
+						errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
+					}
+					a.showError(errMsg, true)
+					a.changeStatusText(getMsg("error_valid_dir", lang))
+					a.setButtonState("idle")
+					a.execJS("stopTimer();")
+					return
 				}
+				dirAddress = extracted
+				archiveTempDir = tempRoot
+			} else {
+				a.showError(getMsg("error_folder", lang), true)
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
 			}
 		}
 
@@ -920,6 +949,19 @@ func (a *App) Start(params map[string]interface{}) {
 			}
 
 			totalFolders := len(validFolders)
+			var aiExePath string
+			if isEnhance && enhanceEngine != "fast" {
+				aiExePath = enhancer.FindRealEsrganExecutable("")
+				if aiExePath == "" {
+					a.showError(getMsg("enhancer_missing", lang), true)
+					a.changeStatusText(getMsg("enhancing_fail", lang))
+					a.updateStep("ready")
+					a.setButtonState("idle")
+					a.execJS("stopTimer();")
+					return
+				}
+			}
+
 			for idx, fld := range validFolders {
 				if err := a.controller.CheckState(); err != nil {
 					break
@@ -949,16 +991,7 @@ func (a *App) Start(params map[string]interface{}) {
 							processFolder = enhancedDir
 						}
 					} else {
-						exePath := enhancer.FindRealEsrganExecutable("")
-						if exePath == "" {
-							a.showError(getMsg("enhancer_missing", lang), true)
-							a.changeStatusText(getMsg("enhancing_fail", lang))
-							a.updateStep("ready")
-							a.setButtonState("idle")
-							a.execJS("stopTimer();")
-							return
-						}
-						enhancedDir, err := enhancer.RunRealEsrganAI(exePath, fld, "", a.controller.CheckState, func(pct, curr, total int) {
+						enhancedDir, err := enhancer.RunRealEsrganAI(aiExePath, fld, "", a.controller.CheckState, func(pct, curr, total int) {
 							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
 							a.changeProgress(overallPct)
 							elapsed := time.Since(a.startTime).Seconds()
@@ -1014,8 +1047,11 @@ func (a *App) Start(params map[string]interface{}) {
 				resPath, err := pipeline.MergerImages(processFolder, opts)
 				if err == nil {
 					a.lastOutput = resPath
-				} else if a.controller.CheckState() != nil {
-					break
+				} else {
+					if a.controller.CheckState() != nil {
+						break
+					}
+					a.showError(fmt.Sprintf("%s (%s): %s", getMsg("error_folder", lang), fldName, err.Error()), true)
 				}
 			}
 
@@ -1032,7 +1068,12 @@ func (a *App) Start(params map[string]interface{}) {
 			a.updateStep("done")
 			a.changeStatusText(getMsg("idle_done", lang))
 			if a.lastOutput != "" {
-				a.showOpenFolderButton(a.lastOutput)
+				openTarget := outputBase
+				if fi, err := os.Stat(openTarget); err == nil && fi.IsDir() {
+					a.showOpenFolderButton(openTarget)
+				} else {
+					a.showOpenFolderButton(a.lastOutput)
+				}
 			}
 			playSound, _ := params["play_sound"].(bool)
 			if playSound {

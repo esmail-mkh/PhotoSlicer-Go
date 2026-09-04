@@ -19,6 +19,12 @@ func TestSlicing(t *testing.T) {
 		if result != expected {
 			t.Errorf("Expected %s, got %s", expected, result)
 		}
+
+		// Trailing space/dot cleanup & empty fallback
+		resBlank := FormatFilename(".  ", 5, 3, "jpg", "", 10)
+		if resBlank != "005.jpg" {
+			t.Errorf("Expected fallback 005.jpg, got %s", resBlank)
+		}
 	})
 
 	t.Run("CapSliceGapsLimitsExcessiveHeights", func(t *testing.T) {

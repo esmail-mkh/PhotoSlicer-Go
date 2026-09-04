@@ -78,23 +78,25 @@ func SafeRmtreeTemp(targetPath string) bool {
 		protected[drive] = true
 	}
 
-	targetLower := strings.ToLower(absTarget)
-	if protected[targetLower] {
-		return false
-	}
-
 	tempDir := os.TempDir()
 	if absTemp, err := filepath.EvalSymlinks(tempDir); err == nil {
 		tempDir = absTemp
 	}
 	tempLower := strings.ToLower(tempDir)
+	protected[tempLower] = true
 
-	isInTemp := strings.HasPrefix(targetLower, tempLower)
+	targetLower := strings.ToLower(absTarget)
+	if protected[targetLower] || targetLower == tempLower {
+		return false
+	}
+
+	rel, err := filepath.Rel(tempLower, targetLower)
+	isInTemp := (err == nil && rel != "." && !strings.HasPrefix(rel, ".."))
 	baseLower := strings.ToLower(filepath.Base(absTarget))
 	hasPrefix := strings.HasPrefix(baseLower, "photoslicer_") || strings.HasPrefix(baseLower, "_photoslicer_")
 
 	if !isInTemp && !hasPrefix {
-		// Neither in system temp nor starts with photoslicer prefix
+		// Neither inside system temp nor starts with photoslicer prefix
 		return false
 	}
 

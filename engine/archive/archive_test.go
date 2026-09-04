@@ -212,11 +212,14 @@ func TestSafeRmtreeTemp(t *testing.T) {
 		t.Errorf("expected %s to be deleted", tempRoot)
 	}
 
-	// Protected directories check - should refuse to delete system/home/cwd
+	// Protected directories check - should refuse to delete system/home/cwd/temp
 	if cwd, err := os.Getwd(); err == nil {
 		if SafeRmtreeTemp(cwd) {
 			t.Errorf("SafeRmtreeTemp should NEVER delete current working directory!")
 		}
+	}
+	if SafeRmtreeTemp(os.TempDir()) {
+		t.Errorf("SafeRmtreeTemp should NEVER delete system temp directory!")
 	}
 }
 

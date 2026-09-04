@@ -725,6 +725,10 @@ func RunRealEsrganAI(
 				if err := checkCanceled(); err != nil {
 					if cmd.Process != nil {
 						_ = cmd.Process.Kill()
+						select {
+						case <-done:
+						case <-time.After(2 * time.Second):
+						}
 					}
 					return "", err
 				}

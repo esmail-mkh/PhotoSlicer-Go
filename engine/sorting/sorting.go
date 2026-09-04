@@ -131,7 +131,6 @@ func naturalSortTokens(value string) []sortToken {
 					break
 				}
 			}
-			part := string(runes[start:i])
 			var decimalDigits strings.Builder
 			for _, dr := range runes[start:i] {
 				digitRune, _ := runeToDecimalDigit(dr)
@@ -144,7 +143,7 @@ func naturalSortTokens(value string) []sortToken {
 			tokens = append(tokens, sortToken{
 				kind:       tokenNumber,
 				numVal:     bigInt,
-				numLen:     len(part),
+				numLen:     i - start,
 				digitsText: dStr,
 			})
 		} else {

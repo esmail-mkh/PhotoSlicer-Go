@@ -15,6 +15,8 @@ import (
 	"strings"
 
 	_ "github.com/chai2010/webp"
+
+	"photoslicer/engine/imageio"
 )
 
 type pdfObject struct {
@@ -97,12 +99,14 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 
 	maxDim := 0
 	for _, imgPath := range imagePaths {
-		w, h := getImageDimensionsFast(imgPath)
-		if w > maxDim {
-			maxDim = w
-		}
-		if h > maxDim {
-			maxDim = h
+		w, h, err := imageio.GetImageSizeFast(imgPath)
+		if err == nil {
+			if w > maxDim {
+				maxDim = w
+			}
+			if h > maxDim {
+				maxDim = h
+			}
 		}
 	}
 
@@ -187,7 +191,10 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 	// trailer
 	trailer := fmt.Sprintf("trailer\n<< /Size %d /Root %d 0 R >>\nstartxref\n%d\n%%%%EOF\n",
 		totalObjs+1, catalogID, xrefOffset)
-	return writeStr(trailer)
+	if err := writeStr(trailer); err != nil {
+		return err
+	}
+	return outFile.Close()
 }
 
 func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {
@@ -220,14 +227,8 @@ func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {
 		}
 	}
 
-	// Other formats or fallback: decode to image and normalize
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, 0, 0, "", err
-	}
-	defer f.Close()
-
-	img, _, err := image.Decode(f)
+	// Other formats (PNG, WebP, AVIF, PSD composite) or fallback: decode to image and normalize
+	img, err := imageio.OpenImageRobust(path)
 	if err != nil {
 		return nil, 0, 0, "", err
 	}
@@ -252,27 +253,4 @@ func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {
 	}
 
 	return buf.Bytes(), w, h, "/DeviceRGB", nil
-}
-
-func getImageDimensionsFast(path string) (int, int) {
-	ext := strings.ToLower(filepath.Ext(path))
-	if ext == ".jpg" || ext == ".jpeg" {
-		f, err := os.Open(path)
-		if err == nil {
-			defer f.Close()
-			cfg, err := jpeg.DecodeConfig(f)
-			if err == nil && cfg.Width > 0 && cfg.Height > 0 {
-				return cfg.Width, cfg.Height
-			}
-		}
-	}
-	f, err := os.Open(path)
-	if err == nil {
-		defer f.Close()
-		cfg, _, err := image.DecodeConfig(f)
-		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
-			return cfg.Width, cfg.Height
-		}
-	}
-	return 0, 0
 }

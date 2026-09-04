@@ -15,6 +15,8 @@ import (
 	"golang.org/x/text/unicode/norm"
 )
 
+var invalidArchiveChars = regexp.MustCompile(`[\x00-\x1f\\/:*?"<>|]`)
+
 func CreateZip(outputPath string, files []string) error {
 	zipFile, err := os.Create(outputPath)
 	if err != nil {
@@ -54,6 +56,13 @@ func CreateZip(outputPath string, files []string) error {
 		}
 	}
 
+	if err := w.Close(); err != nil {
+		return err
+	}
+	if err := zipFile.Close(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -65,8 +74,7 @@ func sanitizeArchiveComponent(component string) string {
 	component = norm.NFKC.String(component)
 	component = strings.TrimSpace(component)
 	component = strings.TrimRight(component, ". ")
-	re := regexp.MustCompile(`[\x00-\x1f\\/:*?"<>|]`)
-	component = re.ReplaceAllString(component, "_")
+	component = invalidArchiveChars.ReplaceAllString(component, "_")
 	if component == "" {
 		return "_"
 	}
@@ -167,18 +175,14 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error)
 	return outputDir, nil
 }
 
-// FastScanDir scans subdirectories and extracts ZIP/CBZ/PDF files into temporary directories.
+// FastScanDir scans subdirectories and extracts ZIP/CBZ files into temporary directories.
 func FastScanDir(dirname string) ([]string, error) {
 	entries, err := os.ReadDir(dirname)
 	if err != nil {
 		return nil, err
 	}
 
-	tempRoot, err := os.MkdirTemp("", "photoslicer_extract_")
-	if err == nil {
-		RegisterTempDir(tempRoot)
-	}
-
+	var tempRoot string
 	var result []string
 
 	for _, entry := range entries {
@@ -189,10 +193,18 @@ func FastScanDir(dirname string) ([]string, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if (ext == ".zip" || ext == ".cbz") && tempRoot != "" {
-			extracted, err := ExtractImagesFromZip(fullPath, tempRoot)
-			if err == nil && extracted != "" {
-				result = append(result, extracted)
+		if ext == ".zip" || ext == ".cbz" {
+			if tempRoot == "" {
+				tempRoot, err = os.MkdirTemp("", "photoslicer_extract_")
+				if err == nil {
+					RegisterTempDir(tempRoot)
+				}
+			}
+			if tempRoot != "" {
+				extracted, err := ExtractImagesFromZip(fullPath, tempRoot)
+				if err == nil && extracted != "" {
+					result = append(result, extracted)
+				}
 			}
 		}
 	}

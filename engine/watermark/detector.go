@@ -69,7 +69,7 @@ func ExtractGrayAndSaturation(img image.Image) ([]byte, []byte, int, int) {
 		pix := rgba.Pix
 		stride := rgba.Stride
 		for y := 0; y < h; y++ {
-			rowOff := y * stride
+			rowOff := (b.Min.Y+y-rgba.Rect.Min.Y)*stride + (b.Min.X-rgba.Rect.Min.X)*4
 			destRow := y * w
 			for x := 0; x < w; x++ {
 				idx := rowOff + x*4
@@ -81,6 +81,46 @@ func ExtractGrayAndSaturation(img image.Image) ([]byte, []byte, int, int) {
 				gray[destRow+x] = uint8((r*77 + g*150 + bl*29) >> 8)
 
 				// Saturation: ((max - min) * 255) / max
+				maxVal := r
+				if g > maxVal {
+					maxVal = g
+				}
+				if bl > maxVal {
+					maxVal = bl
+				}
+
+				minVal := r
+				if g < minVal {
+					minVal = g
+				}
+				if bl < minVal {
+					minVal = bl
+				}
+
+				if maxVal > 0 {
+					sat[destRow+x] = uint8(((maxVal - minVal) * 255) / maxVal)
+				} else {
+					sat[destRow+x] = 0
+				}
+			}
+		}
+		return gray, sat, w, h
+	}
+
+	if nrgba, ok := img.(*image.NRGBA); ok {
+		pix := nrgba.Pix
+		stride := nrgba.Stride
+		for y := 0; y < h; y++ {
+			rowOff := (b.Min.Y+y-nrgba.Rect.Min.Y)*stride + (b.Min.X-nrgba.Rect.Min.X)*4
+			destRow := y * w
+			for x := 0; x < w; x++ {
+				idx := rowOff + x*4
+				r := uint32(pix[idx])
+				g := uint32(pix[idx+1])
+				bl := uint32(pix[idx+2])
+
+				gray[destRow+x] = uint8((r*77 + g*150 + bl*29) >> 8)
+
 				maxVal := r
 				if g > maxVal {
 					maxVal = g

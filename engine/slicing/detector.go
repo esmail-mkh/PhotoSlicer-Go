@@ -42,11 +42,12 @@ func (a *bandedRowAccessor) getRow(r int) []uint8 {
 
 		bandH := bEnd - bStart
 		band := make([][]uint8, bandH)
+		b := a.img.Bounds()
 		for y := 0; y < bandH; y++ {
 			row := make([]uint8, a.width)
 			actualY := bStart + y
 			for x := 0; x < a.width; x++ {
-				c := a.img.At(x, actualY)
+				c := a.img.At(b.Min.X+x, b.Min.Y+actualY)
 				r32, g32, b32, _ := c.RGBA()
 				// Convert to 8-bit grayscale matching PIL's convert('L'): (r*299 + g*587 + b*114) / 1000
 				gray := (uint32(r32>>8)*299 + uint32(g32>>8)*587 + uint32(b32>>8)*114) / 1000
@@ -91,7 +92,19 @@ func isRowUniform(accessor *bandedRowAccessor, row, width, ignorablePixels, thre
 		}
 	}
 
+	minVal, maxVal := span[0], span[0]
 	for i := 1; i < n; i++ {
+		v := span[i]
+		if v < minVal {
+			minVal = v
+		}
+		if v > maxVal {
+			maxVal = v
+		}
+		if int(maxVal)-int(minVal) > threshold {
+			return false
+		}
+
 		diff := int(span[i]) - int(span[i-1])
 		if diff < 0 {
 			diff = -diff
@@ -204,8 +217,14 @@ func FindSafeCutPoints(img image.Image, slicesCount float64) []int {
 		}
 	}
 
-	if validatedCuts[len(validatedCuts)-1] != height {
-		validatedCuts[len(validatedCuts)-1] = height
+	if len(validatedCuts) == 0 {
+		validatedCuts = []int{0, height}
+	} else if validatedCuts[len(validatedCuts)-1] != height {
+		if len(validatedCuts) == 1 || height-validatedCuts[len(validatedCuts)-1] >= minHeight {
+			validatedCuts = append(validatedCuts, height)
+		} else {
+			validatedCuts[len(validatedCuts)-1] = height
+		}
 	}
 
 	// Fallback to even cuts if no safe cut points were found

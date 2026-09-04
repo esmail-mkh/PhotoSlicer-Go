@@ -75,6 +75,14 @@ func TestSortKeyImproved(t *testing.T) {
 		if !reflect.DeepEqual(actual, expected) {
 			t.Errorf("Expected %v, got %v", expected, actual)
 		}
+
+		// Zero padding with Persian digits vs 3-digit English: 2-digit Persian ۰۱ should sort before 3-digit 001
+		inputPad := []string{"page 001.jpg", "page ۰۱.jpg"}
+		expectedPad := []string{"page ۰۱.jpg", "page 001.jpg"}
+		actualPad := SortKeyImproved(inputPad)
+		if !reflect.DeepEqual(actualPad, expectedPad) {
+			t.Errorf("Expected %v, got %v", expectedPad, actualPad)
+		}
 	})
 
 	t.Run("ExtensionBreaksSameStemTie", func(t *testing.T) {

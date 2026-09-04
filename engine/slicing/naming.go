@@ -25,7 +25,10 @@ func FormatFilename(pattern string, number int, digits int, extension string, fo
 	padFmt := fmt.Sprintf("%%0%dd", digits)
 	padded := fmt.Sprintf(padFmt, number)
 
-	name := pattern
+	name := strings.TrimRight(strings.TrimSpace(pattern), ". ")
+	if name == "" {
+		name = "[number]"
+	}
 	if strings.Contains(name, "[number]") {
 		name = strings.ReplaceAll(name, "[number]", padded)
 	} else {
@@ -45,6 +48,11 @@ func FormatFilename(pattern string, number int, digits int, extension string, fo
 
 	// Clean invalid filesystem characters
 	name = invalidFilenameChars.ReplaceAllString(name, "_")
+	name = strings.TrimSpace(name)
+	name = strings.TrimRight(name, ". ")
+	if name == "" {
+		name = padded
+	}
 	extLower := strings.ToLower(strings.TrimPrefix(extension, "."))
 	return fmt.Sprintf("%s.%s", name, extLower)
 }
