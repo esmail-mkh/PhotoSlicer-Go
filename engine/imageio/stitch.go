@@ -103,6 +103,11 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 		return nil, fmt.Errorf("no valid images could be processed for stitching")
 	}
 
+	totalPixels := int64(targetWidth) * int64(totalHeight)
+	if totalPixels > 300_000_000 {
+		return nil, fmt.Errorf("stitched image exceeds memory limit (%d pixels, height %dpx); please use No-Stitch mode or reduce width", totalPixels, totalHeight)
+	}
+
 	// Create composite canvas with white background
 	canvas := image.NewRGBA(image.Rect(0, 0, targetWidth, totalHeight))
 	draw.Draw(canvas, canvas.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)

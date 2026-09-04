@@ -56,4 +56,35 @@ func TestInspectDirectory(t *testing.T) {
 	if res["status"] != "ok" || res["mode"] != "archive_cbz" || res["item_count"] != 1 {
 		t.Errorf("expected ok archive_cbz 1, got %v", res)
 	}
+
+	// 5. Batch folder containing archives
+	batchArchivesDir := t.TempDir()
+	ch1Zip := filepath.Join(batchArchivesDir, "Chapter 1.zip")
+	zf1, _ := os.Create(ch1Zip)
+	w1 := zip.NewWriter(zf1)
+	f1, _ := w1.Create("01.jpg")
+	_, _ = f1.Write([]byte("fake"))
+	_ = w1.Close()
+	_ = zf1.Close()
+
+	res = app.InspectDirectory(batchArchivesDir)
+	if res["status"] != "ok" || res["mode"] != "batch" || res["item_count"] != 1 {
+		t.Errorf("expected ok batch 1 for folder with archive chapters, got %v", res)
+	}
+}
+
+func TestSaveSettingsToDiskAtomic(t *testing.T) {
+	app := NewApp()
+	settings := map[string]interface{}{
+		"language": "en",
+		"width":    float64(1200),
+	}
+	app.saveSettingsToDisk(settings)
+	loaded := app.loadSettings()
+	if loaded["language"] != "en" {
+		t.Errorf("expected language 'en', got %v", loaded["language"])
+	}
+	if w, ok := loaded["width"].(float64); !ok || w != 1200 {
+		t.Errorf("expected width 1200, got %v", loaded["width"])
+	}
 }

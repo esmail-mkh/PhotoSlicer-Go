@@ -247,3 +247,37 @@ func containsSubstring(data []byte, sub []byte) bool {
 	}
 	return false
 }
+
+func TestCountImagesInArchive(t *testing.T) {
+	tempDir := t.TempDir()
+	zipPath := filepath.Join(tempDir, "count_test.zip")
+	zFile, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatalf("failed to create zip: %v", err)
+	}
+
+	w := zip.NewWriter(zFile)
+	imgTmp := filepath.Join(tempDir, "sample.jpg")
+	createSampleJpeg(t, imgTmp, 50, 50)
+	imgBytes, _ := os.ReadFile(imgTmp)
+
+	f1, _ := w.Create("001.jpg")
+	_, _ = f1.Write(imgBytes)
+	f2, _ := w.Create("002.png")
+	_, _ = f2.Write(imgBytes)
+	f3, _ := w.Create("notes.txt")
+	_, _ = f3.Write([]byte("not an image"))
+	f4, _ := w.Create("__MACOSX/._001.jpg")
+	_, _ = f4.Write([]byte("metadata"))
+
+	_ = w.Close()
+	_ = zFile.Close()
+
+	count, err := CountImagesInArchive(zipPath)
+	if err != nil {
+		t.Fatalf("CountImagesInArchive failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("expected 2 images, got %d", count)
+	}
+}

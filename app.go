@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -145,10 +146,47 @@ type App struct {
 	ctx        context.Context
 	settingsMu sync.Mutex
 	settings   map[string]interface{}
+	stateMu    sync.RWMutex
 	controller *pipeline.Controller
 	isBusy     int32
 	startTime  time.Time
 	lastOutput string
+}
+
+func (a *App) getController() *pipeline.Controller {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.controller
+}
+
+func (a *App) setController(c *pipeline.Controller) {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	a.controller = c
+}
+
+func (a *App) getLastOutput() string {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.lastOutput
+}
+
+func (a *App) setLastOutput(out string) {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	a.lastOutput = out
+}
+
+func (a *App) getStartTime() time.Time {
+	a.stateMu.RLock()
+	defer a.stateMu.RUnlock()
+	return a.startTime
+}
+
+func (a *App) setStartTime(t time.Time) {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	a.startTime = t
 }
 
 func NewApp() *App {
@@ -266,9 +304,14 @@ func (a *App) saveSettingsToDisk(settings map[string]interface{}) {
 	}
 
 	bytes, err := json.MarshalIndent(a.settings, "", "    ")
-	if err == nil {
-		_ = os.WriteFile(filePath, bytes, 0644)
+	if err != nil {
+		return
 	}
+	tmpFile := fmt.Sprintf("%s.%d.tmp", filePath, time.Now().UnixNano())
+	if err := os.WriteFile(tmpFile, bytes, 0644); err != nil {
+		return
+	}
+	_ = os.Rename(tmpFile, filePath)
 }
 
 func (a *App) execJS(js string) {
@@ -533,8 +576,8 @@ func (a *App) SaveSettings(settings map[string]interface{}) {
 }
 
 func (a *App) PauseProcessing() {
-	if a.controller != nil {
-		a.controller.Pause()
+	if ctrl := a.getController(); ctrl != nil {
+		ctrl.Pause()
 		settings := a.loadSettings()
 		lang, _ := settings["language"].(string)
 		a.changeStatusText(getMsg("paused", lang))
@@ -542,8 +585,8 @@ func (a *App) PauseProcessing() {
 }
 
 func (a *App) ResumeProcessing() {
-	if a.controller != nil {
-		a.controller.Resume()
+	if ctrl := a.getController(); ctrl != nil {
+		ctrl.Resume()
 		settings := a.loadSettings()
 		lang, _ := settings["language"].(string)
 		a.changeStatusText(getMsg("resuming", lang))
@@ -551,8 +594,8 @@ func (a *App) ResumeProcessing() {
 }
 
 func (a *App) StopProcessing() {
-	if a.controller != nil {
-		a.controller.Stop()
+	if ctrl := a.getController(); ctrl != nil {
+		ctrl.Stop()
 		settings := a.loadSettings()
 		lang, _ := settings["language"].(string)
 		a.changeStatusText(getMsg("stopped", lang))
@@ -566,13 +609,35 @@ func (a *App) OpenFileExplorer(path string) {
 	}
 	cleanPath := filepath.Clean(path)
 	fi, err := os.Stat(cleanPath)
-	if err == nil && !fi.IsDir() {
-		cmd := exec.Command("explorer", fmt.Sprintf("/select,%s", cleanPath))
-		_ = cmd.Start()
+	if err != nil {
 		return
 	}
-	cmd := exec.Command("explorer", cleanPath)
-	_ = cmd.Start()
+
+	switch runtime.GOOS {
+	case "windows":
+		if !fi.IsDir() {
+			cmd := exec.Command("explorer", fmt.Sprintf("/select,%s", cleanPath))
+			_ = cmd.Start()
+			return
+		}
+		cmd := exec.Command("explorer", cleanPath)
+		_ = cmd.Start()
+	case "darwin":
+		if !fi.IsDir() {
+			cmd := exec.Command("open", "-R", cleanPath)
+			_ = cmd.Start()
+			return
+		}
+		cmd := exec.Command("open", cleanPath)
+		_ = cmd.Start()
+	default: // linux, bsd
+		targetDir := cleanPath
+		if !fi.IsDir() {
+			targetDir = filepath.Dir(cleanPath)
+		}
+		cmd := exec.Command("xdg-open", targetDir)
+		_ = cmd.Start()
+	}
 }
 
 func (a *App) GetClipboardText() string {
@@ -658,14 +723,25 @@ func (a *App) InspectDirectory(path string) map[string]interface{} {
 		}
 	}
 
-	// Check subfolders
-	subfolders, err := archive.FastScanDir(cleanPath)
-	if err == nil && len(subfolders) > 0 {
+	// Check subfolders and archives without extracting them to disk
+	entries, err := os.ReadDir(cleanPath)
+	if err == nil && len(entries) > 0 {
 		validFolders := 0
-		for _, sf := range subfolders {
-			imgs, _ := sorting.GetAllImagesDirectory(sf)
-			if len(imgs) > 0 {
-				validFolders++
+		for _, entry := range entries {
+			fullPath := filepath.Join(cleanPath, entry.Name())
+			if entry.IsDir() {
+				imgs, _ := sorting.GetAllImagesDirectory(fullPath)
+				if len(imgs) > 0 {
+					validFolders++
+				}
+				continue
+			}
+			ext := strings.ToLower(filepath.Ext(entry.Name()))
+			if ext == ".zip" || ext == ".cbz" {
+				count, err := archive.CountImagesInArchive(fullPath)
+				if err == nil && count > 0 {
+					validFolders++
+				}
 			}
 		}
 		if validFolders > 0 {
@@ -692,7 +768,16 @@ func (a *App) Start(params map[string]interface{}) {
 		defer atomic.StoreInt32(&a.isBusy, 0)
 		defer archive.CleanupAllTempDirs()
 
-		a.controller = pipeline.NewController()
+		a.setLastOutput("")
+		a.setStartTime(time.Now())
+		a.setController(pipeline.NewController())
+
+		checkState := func() error {
+			if c := a.getController(); c != nil {
+				return c.CheckState()
+			}
+			return nil
+		}
 
 		settings := a.loadSettings()
 		lang, _ := settings["language"].(string)
@@ -702,7 +787,6 @@ func (a *App) Start(params map[string]interface{}) {
 
 		a.execJS("resetTimer(); startTimer(); if (typeof resetProgressUI === 'function') resetProgressUI();")
 		a.setButtonState("processing")
-		a.startTime = time.Now()
 
 		dirAddress, _ := params["directory"].(string)
 		dirAddress = strings.TrimSpace(dirAddress)
@@ -775,6 +859,10 @@ func (a *App) Start(params map[string]interface{}) {
 		saveNextSrc, _ := params["save_next_to_source"].(bool)
 		outputSuffix, _ := params["output_suffix"].(string)
 		outputSuffix = strings.TrimSpace(outputSuffix)
+		outputSuffix = strings.ReplaceAll(outputSuffix, "..", "")
+		outputSuffix = strings.ReplaceAll(outputSuffix, "/", "")
+		outputSuffix = strings.ReplaceAll(outputSuffix, "\\", "")
+		outputSuffix = strings.ReplaceAll(outputSuffix, ":", "")
 		if outputSuffix == "" {
 			outputSuffix = " [Stitched]"
 		} else if !strings.HasPrefix(outputSuffix, " ") {
@@ -835,6 +923,45 @@ func (a *App) Start(params map[string]interface{}) {
 		}
 		filenameDigits := int(getFloatOrInt(params["filename_digits"], 3))
 
+		// Bounds validation
+		if saveQualityVal < 1 {
+			saveQualityVal = 1
+		} else if saveQualityVal > 100 {
+			saveQualityVal = 100
+		}
+		if widthVal < 10 {
+			widthVal = 10
+		} else if widthVal > 30000 {
+			widthVal = 30000
+		}
+		if heightLimitVal < 100 {
+			heightLimitVal = 100
+		} else if heightLimitVal > 100000 {
+			heightLimitVal = 100000
+		}
+		if threadCount < 1 {
+			threadCount = 1
+		} else if threadCount > 64 {
+			threadCount = 64
+		}
+		switch strings.ToUpper(saveFormat) {
+		case "PNG", "WEBP", "PSD":
+			saveFormat = strings.ToUpper(saveFormat)
+		default:
+			saveFormat = "JPG"
+		}
+		switch strings.ToLower(wmEdge) {
+		case "left", "center":
+			wmEdge = strings.ToLower(wmEdge)
+		default:
+			wmEdge = "right"
+		}
+		if filenameDigits < 1 {
+			filenameDigits = 1
+		} else if filenameDigits > 10 {
+			filenameDigits = 10
+		}
+
 		// Detect mode: check if directory contains supported images directly or subfolders
 		directImages, _ := sorting.GetAllImagesDirectory(dirAddress)
 		isSingleMode := len(directImages) > 0
@@ -872,14 +999,15 @@ func (a *App) Start(params map[string]interface{}) {
 				a.updateStep("process")
 				if enhanceEngine == "fast" {
 					a.changeStatusOnly(getMsg("enhancing_fast_run", lang, len(directImages)))
-					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, a.controller.CheckState, func(pct, curr, total int) {
+					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, checkState, func(pct, curr, total int) {
 						a.changeProgress(float64(pct))
-						elapsed := time.Since(a.startTime).Seconds()
-						eta := calculateEta(a.startTime, float64(pct))
+						st := a.getStartTime()
+						elapsed := time.Since(st).Seconds()
+						eta := calculateEta(st, float64(pct))
 						a.changeProgressDetail(curr, total, getMsg("status_denoising", lang), formatDuration(elapsed), eta)
 					})
 					if err != nil {
-						if a.controller.CheckState() != nil {
+						if checkState() != nil {
 							a.changeStatusText(getMsg("stopped", lang))
 							a.updateStep("ready")
 							a.setButtonState("idle")
@@ -907,14 +1035,15 @@ func (a *App) Start(params map[string]interface{}) {
 						return
 					}
 					a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
-					enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", a.controller.CheckState, func(pct, curr, total int) {
+					enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", checkState, func(pct, curr, total int) {
 						a.changeProgress(float64(pct))
-						elapsed := time.Since(a.startTime).Seconds()
-						eta := calculateEta(a.startTime, float64(pct))
+						st := a.getStartTime()
+						elapsed := time.Since(st).Seconds()
+						eta := calculateEta(st, float64(pct))
 						a.changeProgressDetail(curr, total, getMsg("status_enhancing", lang), formatDuration(elapsed), eta)
 					})
 					if err != nil {
-						if a.controller.CheckState() != nil {
+						if checkState() != nil {
 							a.changeStatusText(getMsg("stopped", lang))
 							a.updateStep("ready")
 							a.setButtonState("idle")
@@ -959,11 +1088,12 @@ func (a *App) Start(params map[string]interface{}) {
 				WatermarkEdge:         wmEdge,
 				WatermarkWidthPercent: 0,
 				WatermarkMargin:       wmMargin,
-				Controller:            a.controller,
+				Controller:            a.getController(),
 				ProgressCallback: func(pct float64, curr, total int, item string) {
 					a.changeProgress(pct)
-					elapsed := time.Since(a.startTime).Seconds()
-					eta := calculateEta(a.startTime, pct)
+					st := a.getStartTime()
+					elapsed := time.Since(st).Seconds()
+					eta := calculateEta(st, pct)
 					displayItem := item
 					if displayItem == "" {
 						displayItem = filepath.Base(dirAddress)
@@ -986,7 +1116,7 @@ func (a *App) Start(params map[string]interface{}) {
 
 			resPath, err := pipeline.MergerImages(processFolder, opts)
 			if err != nil {
-				if a.controller.CheckState() != nil {
+				if checkState() != nil {
 					a.changeStatusText(getMsg("stopped", lang))
 					a.updateStep("ready")
 					a.setButtonState("idle")
@@ -994,9 +1124,14 @@ func (a *App) Start(params map[string]interface{}) {
 					return
 				}
 				a.showError(err.Error(), true)
+				a.changeStatusText(getMsg("error_unexpected", lang, err.Error()))
+				a.updateStep("ready")
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
 			} else {
 				a.updateStep("save")
-				a.lastOutput = resPath
+				a.setLastOutput(resPath)
 				a.showOpenFolderButton(resPath)
 				a.changeProgress(100)
 				a.updateStep("done")
@@ -1044,8 +1179,11 @@ func (a *App) Start(params map[string]interface{}) {
 				}
 			}
 
+			successCount := 0
+			failCount := 0
+
 			for idx, fld := range validFolders {
-				if err := a.controller.CheckState(); err != nil {
+				if checkState() != nil {
 					break
 				}
 
@@ -1057,15 +1195,16 @@ func (a *App) Start(params map[string]interface{}) {
 				if isEnhance {
 					a.updateStep("process")
 					if enhanceEngine == "fast" {
-						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, a.controller.CheckState, func(pct, curr, total int) {
+						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, checkState, func(pct, curr, total int) {
 							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
 							a.changeProgress(overallPct)
-							elapsed := time.Since(a.startTime).Seconds()
-							eta := calculateEta(a.startTime, overallPct)
+							st := a.getStartTime()
+							elapsed := time.Since(st).Seconds()
+							eta := calculateEta(st, overallPct)
 							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 						})
 						if err != nil {
-							if a.controller.CheckState() != nil {
+							if checkState() != nil {
 								break
 							}
 							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
@@ -1073,15 +1212,16 @@ func (a *App) Start(params map[string]interface{}) {
 							processFolder = enhancedDir
 						}
 					} else {
-						enhancedDir, err := enhancer.RunRealEsrganAI(aiExePath, fld, "", a.controller.CheckState, func(pct, curr, total int) {
+						enhancedDir, err := enhancer.RunRealEsrganAI(aiExePath, fld, "", checkState, func(pct, curr, total int) {
 							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
 							a.changeProgress(overallPct)
-							elapsed := time.Since(a.startTime).Seconds()
-							eta := calculateEta(a.startTime, overallPct)
+							st := a.getStartTime()
+							elapsed := time.Since(st).Seconds()
+							eta := calculateEta(st, overallPct)
 							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 						})
 						if err != nil {
-							if a.controller.CheckState() != nil {
+							if checkState() != nil {
 								break
 							}
 							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
@@ -1116,29 +1256,40 @@ func (a *App) Start(params map[string]interface{}) {
 					WatermarkEdge:         wmEdge,
 					WatermarkWidthPercent: 0,
 					WatermarkMargin:       wmMargin,
-					Controller:            a.controller,
+					Controller:            a.getController(),
 					ProgressCallback: func(pct float64, curr, total int, item string) {
 						overallPct := (float64(idx)/float64(totalFolders))*100.0 + (pct / float64(totalFolders))
 						a.changeProgress(overallPct)
-						elapsed := time.Since(a.startTime).Seconds()
-						eta := calculateEta(a.startTime, overallPct)
+						st := a.getStartTime()
+						elapsed := time.Since(st).Seconds()
+						eta := calculateEta(st, overallPct)
 						a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 					},
 				}
 
 				resPath, err := pipeline.MergerImages(processFolder, opts)
 				if err == nil {
-					a.lastOutput = resPath
+					a.setLastOutput(resPath)
+					successCount++
 				} else {
-					if a.controller.CheckState() != nil {
+					failCount++
+					if checkState() != nil {
 						break
 					}
 					a.showError(fmt.Sprintf("%s (%s): %s", getMsg("error_folder", lang), fldName, err.Error()), true)
 				}
 			}
 
-			if a.controller.CheckState() != nil {
+			if checkState() != nil {
 				a.changeStatusText(getMsg("stopped", lang))
+				a.updateStep("ready")
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
+			}
+
+			if successCount == 0 {
+				a.changeStatusText(getMsg("no_images_process", lang))
 				a.updateStep("ready")
 				a.setButtonState("idle")
 				a.execJS("stopTimer();")
@@ -1148,8 +1299,14 @@ func (a *App) Start(params map[string]interface{}) {
 			a.updateStep("save")
 			a.changeProgress(100)
 			a.updateStep("done")
-			a.changeStatusText(getMsg("idle_done", lang))
-			if a.lastOutput != "" {
+			if failCount > 0 {
+				a.changeStatusText(fmt.Sprintf("%s (%d/%d)", getMsg("idle_done", lang), successCount, totalFolders))
+			} else {
+				a.changeStatusText(getMsg("idle_done", lang))
+			}
+
+			lastOut := a.getLastOutput()
+			if lastOut != "" {
 				openTarget := outputBase
 				dateTarget := filepath.Join(outputBase, currentDate)
 				if fi, err := os.Stat(dateTarget); err == nil && fi.IsDir() {
@@ -1158,14 +1315,18 @@ func (a *App) Start(params map[string]interface{}) {
 				if fi, err := os.Stat(openTarget); err == nil && fi.IsDir() {
 					a.showOpenFolderButton(openTarget)
 				} else {
-					a.showOpenFolderButton(a.lastOutput)
+					a.showOpenFolderButton(lastOut)
 				}
 			}
 			playSound, _ := params["play_sound"].(bool)
 			if playSound {
 				a.playAudio("success.wav")
 			}
-			a.showSuccess(getMsg("idle_done", lang))
+			if failCount > 0 {
+				a.showError(fmt.Sprintf("%d/%d %s", failCount, totalFolders, getMsg("error_folder", lang)), true)
+			} else {
+				a.showSuccess(getMsg("idle_done", lang))
+			}
 			a.clearSourceDirectory()
 		}
 

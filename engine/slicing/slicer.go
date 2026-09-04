@@ -38,6 +38,7 @@ type SlicerOptions struct {
 	WatermarkEdge         string
 	WatermarkWidthPercent int
 	WatermarkMargin       int
+	CheckState            func() error
 }
 
 // Slicer segments a tall composite image into slices and packages them into folders/archives.
@@ -169,6 +170,17 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	taskChan := make(chan sliceTask, numSlices)
 	var completedCount int64
 	var progressMu sync.Mutex
+	var (
+		errOnce  sync.Once
+		firstErr error
+	)
+	setFirstErr := func(err error) {
+		if err != nil {
+			errOnce.Do(func() {
+				firstErr = err
+			})
+		}
+	}
 
 	var workerWg sync.WaitGroup
 	for w := 0; w < opts.MaxWorkers; w++ {
@@ -176,6 +188,13 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		go func() {
 			defer workerWg.Done()
 			for t := range taskChan {
+				if opts.CheckState != nil {
+					if err := opts.CheckState(); err != nil {
+						setFirstErr(err)
+						return
+					}
+				}
+
 				subRect := image.Rect(b.Min.X, b.Min.Y+t.start, b.Min.X+imgWidth, b.Min.Y+t.end)
 				var sliceImg image.Image
 				if sub, ok := img.(interface {
@@ -214,8 +233,9 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 				)
 				destFile := filepath.Join(savePath, filename)
 
+				var saveErr error
 				if isPsd {
-					_ = psd.SavePSDLayered(
+					saveErr = psd.SavePSDLayered(
 						sliceImg,
 						destFile,
 						opts.WatermarkEnabled,
@@ -226,7 +246,12 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 						opts.WatermarkMargin,
 					)
 				} else {
-					_ = imageio.SaveImage(sliceImg, destFile, opts.SaveFormat, opts.SaveQuality)
+					saveErr = imageio.SaveImage(sliceImg, destFile, opts.SaveFormat, opts.SaveQuality)
+				}
+
+				if saveErr != nil {
+					setFirstErr(fmt.Errorf("failed to save slice %s: %w", filename, saveErr))
+					continue
 				}
 
 				done := atomic.AddInt64(&completedCount, 1)
@@ -249,6 +274,15 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	}
 	close(taskChan)
 	workerWg.Wait()
+
+	if firstErr != nil {
+		return "", firstErr
+	}
+	if opts.CheckState != nil {
+		if err := opts.CheckState(); err != nil {
+			return "", err
+		}
+	}
 
 	// Handle archive outputs
 	finalResultPath := savePath

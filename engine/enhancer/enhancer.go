@@ -329,6 +329,17 @@ func RunFastEnhancement(
 	taskChan := make(chan string, total)
 	var completed int64
 	var progressMu sync.Mutex
+	var (
+		errOnce  sync.Once
+		firstErr error
+	)
+	setFirstErr := func(err error) {
+		if err != nil {
+			errOnce.Do(func() {
+				firstErr = err
+			})
+		}
+	}
 
 	var wg sync.WaitGroup
 	for i := 0; i < maxWorkers; i++ {
@@ -338,6 +349,7 @@ func RunFastEnhancement(
 			for srcPath := range taskChan {
 				if checkCanceled != nil {
 					if err := checkCanceled(); err != nil {
+						setFirstErr(err)
 						return
 					}
 				}
@@ -349,16 +361,23 @@ func RunFastEnhancement(
 				img, err := imageio.OpenImageRobust(srcPath)
 				if err != nil {
 					// Copy original on failure
-					data, _ := os.ReadFile(srcPath)
-					_ = os.WriteFile(dstPath, data, 0644)
+					if copyErr := copyFile(srcPath, dstPath); copyErr != nil {
+						setFirstErr(fmt.Errorf("failed to copy file %s: %w", srcPath, copyErr))
+						continue
+					}
 				} else {
 					h := img.Bounds().Dy()
 					if h < constants.MinEnhanceHeight {
-						data, _ := os.ReadFile(srcPath)
-						_ = os.WriteFile(dstPath, data, 0644)
+						if copyErr := copyFile(srcPath, dstPath); copyErr != nil {
+							setFirstErr(fmt.Errorf("failed to copy file %s: %w", srcPath, copyErr))
+							continue
+						}
 					} else if h <= constants.MaxEnhanceHeight {
 						enhanced := FastDenoiseImage(img)
-						_ = imageio.SaveImage(enhanced, dstPath, "JPG", 98)
+						if saveErr := imageio.SaveImage(enhanced, dstPath, "JPG", 98); saveErr != nil {
+							setFirstErr(fmt.Errorf("failed to save image %s: %w", dstPath, saveErr))
+							continue
+						}
 					} else {
 						// Split tall images
 						slicesCount := math.Ceil(float64(h) / float64(constants.MaxEnhanceHeight))
@@ -366,6 +385,7 @@ func RunFastEnhancement(
 						for j := 0; j < len(cuts)-1; j++ {
 							if checkCanceled != nil {
 								if err := checkCanceled(); err != nil {
+									setFirstErr(err)
 									return
 								}
 							}
@@ -382,7 +402,10 @@ func RunFastEnhancement(
 							}
 							enhancedChunk := FastDenoiseImage(chunk)
 							partDst := filepath.Join(outDir, fmt.Sprintf("%s__part_%04d.jpg", stem, j))
-							_ = imageio.SaveImage(enhancedChunk, partDst, "JPG", 98)
+							if saveErr := imageio.SaveImage(enhancedChunk, partDst, "JPG", 98); saveErr != nil {
+								setFirstErr(fmt.Errorf("failed to save part %s: %w", partDst, saveErr))
+								break
+							}
 						}
 					}
 				}
@@ -403,6 +426,10 @@ func RunFastEnhancement(
 	}
 	close(taskChan)
 	wg.Wait()
+
+	if firstErr != nil {
+		return "", firstErr
+	}
 
 	if checkCanceled != nil {
 		if err := checkCanceled(); err != nil {
@@ -470,35 +497,33 @@ func getSafeAsciiTempDir(prefix string) (string, error) {
 func FindRealEsrganExecutable(appDir string) string {
 	var searchDirs []string
 
-	// 1. Check directory of currently running executable and parents
+	// 1. User-specified appDir
+	if appDir != "" && appDir != "." {
+		searchDirs = append(searchDirs, appDir, filepath.Join(appDir, "up-model"))
+	}
+
+	// 2. Directory of currently running executable (standard release install)
 	if exe, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exe)
 		searchDirs = append(searchDirs,
 			exeDir,
-			filepath.Join(exeDir, ".."),
-			filepath.Join(exeDir, "..", ".."),
-			filepath.Join(exeDir, "..", "..", ".."),
+			filepath.Join(exeDir, "up-model"),
+			filepath.Join(exeDir, "..", "Resources", "up-model"),
 			filepath.Join(exeDir, "..", "Resources"),
 		)
 	}
 
-	// 2. Check current working directory and parent dirs
+	// 3. Current working directory and project root (dev & test mode)
 	if cwd, err := os.Getwd(); err == nil {
 		searchDirs = append(searchDirs,
 			cwd,
+			filepath.Join(cwd, "up-model"),
 			filepath.Join(cwd, "build", "bin"),
-			filepath.Join(cwd, ".."),
-			filepath.Join(cwd, "..", "build", "bin"),
+			filepath.Join(cwd, "build", "bin", "up-model"),
 			filepath.Join(cwd, "..", ".."),
-			filepath.Join(cwd, "..", "..", "build", "bin"),
+			filepath.Join(cwd, "..", "..", "up-model"),
 		)
 	}
-
-	// 3. User-specified appDir
-	if appDir != "" && appDir != "." {
-		searchDirs = append(searchDirs, appDir)
-	}
-	searchDirs = append(searchDirs, ".")
 
 	var binNames []string
 	switch runtime.GOOS {
@@ -520,12 +545,6 @@ func FindRealEsrganExecutable(appDir string) string {
 			if fi, err := os.Stat(p2); err == nil && !fi.IsDir() {
 				return p2
 			}
-		}
-	}
-
-	for _, name := range binNames {
-		if path, err := exec.LookPath(name); err == nil {
-			return path
 		}
 	}
 

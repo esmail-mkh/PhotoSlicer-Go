@@ -31,8 +31,14 @@ func DecodePSDComposite(r io.Reader) (image.Image, error) {
 	depth := int(binary.BigEndian.Uint16(header[22:24]))
 	colorMode := binary.BigEndian.Uint16(header[24:26])
 
-	if width <= 0 || height <= 0 {
-		return nil, fmt.Errorf("invalid PSD dimensions: %dx%d", width, height)
+	if width <= 0 || height <= 0 || width > 30000 || height > 30000 {
+		return nil, fmt.Errorf("invalid PSD dimensions: %dx%d (maximum supported: 30000x30000)", width, height)
+	}
+	if int64(width)*int64(height) > 100_000_000 {
+		return nil, fmt.Errorf("PSD image exceeds maximum allowed pixel count: %d pixels", int64(width)*int64(height))
+	}
+	if channels < 1 || channels > 56 {
+		return nil, fmt.Errorf("invalid PSD channel count: %d (expected 1 to 56)", channels)
 	}
 	if depth != 8 && depth != 16 {
 		return nil, fmt.Errorf("unsupported PSD bit depth: %d (only 8-bit and 16-bit supported)", depth)
@@ -40,6 +46,12 @@ func DecodePSDComposite(r io.Reader) (image.Image, error) {
 	// Color mode: 1 = Grayscale, 2 = Indexed, 3 = RGB, 4 = CMYK
 	if colorMode != 1 && colorMode != 2 && colorMode != 3 && colorMode != 4 {
 		return nil, fmt.Errorf("unsupported PSD color mode: %d", colorMode)
+	}
+	if colorMode == 3 && channels < 3 {
+		return nil, fmt.Errorf("insufficient channels for RGB mode: %d (expected at least 3)", channels)
+	}
+	if colorMode == 4 && channels < 4 {
+		return nil, fmt.Errorf("insufficient channels for CMYK mode: %d (expected at least 4)", channels)
 	}
 
 	// Helper to skip sections with 32-bit length prefix

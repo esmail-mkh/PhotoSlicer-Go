@@ -128,6 +128,18 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 		workers = 4
 	}
 
+	var (
+		errOnce  sync.Once
+		firstErr error
+	)
+	setFirstErr := func(err error) {
+		if err != nil {
+			errOnce.Do(func() {
+				firstErr = err
+			})
+		}
+	}
+
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
 		wg.Add(1)
@@ -136,12 +148,14 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 			for task := range taskChan {
 				if opts.Controller != nil {
 					if err := opts.Controller.CheckState(); err != nil {
+						setFirstErr(err)
 						return
 					}
 				}
 
 				img, err := imageio.OpenImageRobust(task.path)
 				if err != nil {
+					setFirstErr(fmt.Errorf("failed to open image %s: %w", task.path, err))
 					continue
 				}
 
@@ -177,8 +191,9 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 				)
 				destFile := filepath.Join(savePath, filename)
 
+				var saveErr error
 				if isPsd {
-					_ = psd.SavePSDLayered(
+					saveErr = psd.SavePSDLayered(
 						img,
 						destFile,
 						opts.WatermarkEnabled,
@@ -189,7 +204,12 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 						opts.WatermarkMargin,
 					)
 				} else {
-					_ = imageio.SaveImage(img, destFile, opts.SaveFormat, opts.SaveQuality)
+					saveErr = imageio.SaveImage(img, destFile, opts.SaveFormat, opts.SaveQuality)
+				}
+
+				if saveErr != nil {
+					setFirstErr(fmt.Errorf("failed to save image %s: %w", filename, saveErr))
+					continue
 				}
 
 				curr := atomic.AddInt64(&completed, 1)
@@ -208,6 +228,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	}
 	close(taskChan)
 	wg.Wait()
+
+	if firstErr != nil {
+		return "", firstErr
+	}
 
 	if opts.Controller != nil {
 		if err := opts.Controller.CheckState(); err != nil {
@@ -373,6 +397,12 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 		WatermarkEdge:         opts.WatermarkEdge,
 		WatermarkWidthPercent: opts.WatermarkWidthPercent,
 		WatermarkMargin:       opts.WatermarkMargin,
+		CheckState: func() error {
+			if opts.Controller != nil {
+				return opts.Controller.CheckState()
+			}
+			return nil
+		},
 	}
 
 	return slicing.Slicer(result, slicerOpts)

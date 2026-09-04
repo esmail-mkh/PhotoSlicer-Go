@@ -200,9 +200,9 @@ function Notification(options = {}) {
     const elTitle = elPopup.querySelector(titleTextSel);
     const elText = elPopup.querySelector(descSel);
     if (elTitle) {
-      elTitle.innerHTML = title || dataByType[type].defaultTitle;
+      elTitle.textContent = title || dataByType[type].defaultTitle;
     }
-    elText.innerHTML = message || dataByType[type].defaultMessage;
+    elText.textContent = message || dataByType[type].defaultMessage;
 
     if (type === 'dialog') {
       // set buttons click event

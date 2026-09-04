@@ -355,3 +355,37 @@ func TestOpenImageAndGetSizeAVIF(t *testing.T) {
 	}
 }
 
+func TestPSDValidation(t *testing.T) {
+	// Test corrupted PSD with channels = 0
+	var buf bytes.Buffer
+	buf.WriteString("8BPS")
+	buf.Write([]byte{0, 1})
+	buf.Write(make([]byte, 6))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(0)) // 0 channels
+	_ = binary.Write(&buf, binary.BigEndian, uint32(100))
+	_ = binary.Write(&buf, binary.BigEndian, uint32(100))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(8))
+	_ = binary.Write(&buf, binary.BigEndian, uint16(3))
+
+	_, err := DecodePSDComposite(&buf)
+	if err == nil {
+		t.Errorf("expected error for 0 channels, got nil")
+	}
+
+	// Test corrupted PSD with channels = 1 in RGB mode
+	var buf2 bytes.Buffer
+	buf2.WriteString("8BPS")
+	buf2.Write([]byte{0, 1})
+	buf2.Write(make([]byte, 6))
+	_ = binary.Write(&buf2, binary.BigEndian, uint16(1)) // only 1 channel for RGB mode
+	_ = binary.Write(&buf2, binary.BigEndian, uint32(100))
+	_ = binary.Write(&buf2, binary.BigEndian, uint32(100))
+	_ = binary.Write(&buf2, binary.BigEndian, uint16(8))
+	_ = binary.Write(&buf2, binary.BigEndian, uint16(3))
+
+	_, err2 := DecodePSDComposite(&buf2)
+	if err2 == nil {
+		t.Errorf("expected error for RGB mode with 1 channel, got nil")
+	}
+}
+

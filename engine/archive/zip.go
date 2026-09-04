@@ -81,6 +81,37 @@ func sanitizeArchiveComponent(component string) string {
 	return component
 }
 
+const (
+	MaxArchiveFiles         = 5000
+	MaxArchiveFileSizeBytes = 500 * 1024 * 1024      // 500 MB per file
+	MaxArchiveTotalBytes    = 2 * 1024 * 1024 * 1024 // 2 GB total uncompressed
+)
+
+// CountImagesInArchive inspects the ZIP/CBZ archive headers and counts valid images without extracting them to disk.
+func CountImagesInArchive(archivePath string) (int, error) {
+	r, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	count := 0
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		cleanName := filepath.ToSlash(f.Name)
+		if strings.Contains(cleanName, "__MACOSX") || strings.HasPrefix(filepath.Base(cleanName), ".") {
+			continue
+		}
+		ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(cleanName), "."))
+		if constants.SupportedExtensions[ext] {
+			count++
+		}
+	}
+	return count, nil
+}
+
 // ExtractImagesFromZip extracts supported images that are directly in the ZIP archive root.
 // Returns the path to the directory containing extracted images, or an error.
 func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error) {
@@ -97,8 +128,13 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error)
 	}
 
 	var extractedCount int
+	var totalExtractedBytes int64
 
 	for _, f := range r.File {
+		if extractedCount >= MaxArchiveFiles {
+			return "", fmt.Errorf("archive contains too many files (limit: %d)", MaxArchiveFiles)
+		}
+
 		if f.FileInfo().IsDir() {
 			continue
 		}
@@ -153,19 +189,34 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error)
 			continue
 		}
 
+		limitReader := io.LimitReader(rc, MaxArchiveFileSizeBytes+1)
+
 		dst, err := os.Create(destPath)
 		if err != nil {
 			rc.Close()
 			continue
 		}
 
-		_, err = io.Copy(dst, rc)
+		n, err := io.Copy(dst, limitReader)
 		dst.Close()
 		rc.Close()
 
-		if err == nil {
-			extractedCount++
+		if err != nil {
+			_ = os.Remove(destPath)
+			continue
 		}
+
+		if n > MaxArchiveFileSizeBytes {
+			_ = os.Remove(destPath)
+			return "", fmt.Errorf("file %s exceeds maximum allowed size (500 MB)", rawName)
+		}
+
+		totalExtractedBytes += n
+		if totalExtractedBytes > MaxArchiveTotalBytes {
+			return "", fmt.Errorf("total extracted archive size exceeds 2 GB limit")
+		}
+
+		extractedCount++
 	}
 
 	if extractedCount == 0 {

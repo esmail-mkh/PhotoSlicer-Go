@@ -402,6 +402,7 @@ function toggleLanguage() {
 
 function setLanguage(lang) {
     currentLang = lang;
+    document.documentElement.lang = lang;
     const texts = translations[lang];
     if (!texts) return;
 
@@ -2263,27 +2264,68 @@ function presetImport() {
     });
 }
 
+/* ---- Modal Focus Management ---- */
+function trapFocus(element) {
+    function handleTab(e) {
+        if (e.key !== 'Tab') return;
+        const focusableEls = element.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        if (focusableEls.length === 0) return;
+        const firstEl = focusableEls[0];
+        const lastEl = focusableEls[focusableEls.length - 1];
+        if (e.shiftKey) {
+            if (document.activeElement === firstEl) {
+                lastEl.focus();
+                e.preventDefault();
+            }
+        } else {
+            if (document.activeElement === lastEl) {
+                firstEl.focus();
+                e.preventDefault();
+            }
+        }
+    }
+    element.addEventListener('keydown', handleTab);
+    return () => element.removeEventListener('keydown', handleTab);
+}
+
+let presetsModalUntrap = null;
+let presetsModalPrevFocus = null;
+
 /* ---- Presets modal open/close ---- */
 function openPresetsModal() {
     const overlay = document.getElementById('presets-modal');
     if (!overlay) return;
+    presetsModalPrevFocus = document.activeElement;
     renderPresetMenu();
     overlay.dataset.open = 'true';
-    setTimeout(calculatePresetNameOverflows, 100);
+    presetsModalUntrap = trapFocus(overlay);
+    setTimeout(() => {
+        calculatePresetNameOverflows();
+        const firstBtn = overlay.querySelector('button, input');
+        if (firstBtn) firstBtn.focus();
+    }, 100);
 }
 
 function closePresetsModal() {
     const overlay = document.getElementById('presets-modal');
     if (!overlay) return;
     overlay.dataset.open = 'false';
+    if (presetsModalUntrap) {
+        presetsModalUntrap();
+        presetsModalUntrap = null;
+    }
     const em = document.getElementById('preset-export-menu');
     if (em) em.classList.remove('open');
+    if (presetsModalPrevFocus && typeof presetsModalPrevFocus.focus === 'function') {
+        presetsModalPrevFocus.focus();
+    }
 }
 
 /* ---- Modal (name input / confirm) ---- */
 function openPresetModal(opts) {
     const overlay = document.getElementById('preset-modal');
     if (!overlay) return;
+    const prevFocus = document.activeElement;
     const titleEl = document.getElementById('preset-modal-title');
     const msgEl = document.getElementById('preset-modal-message');
     const input = document.getElementById('preset-modal-input');
@@ -2301,6 +2343,8 @@ function openPresetModal(opts) {
     confirmBtn.textContent = texts.confirm || 'OK';
     cancelBtn.textContent = texts.cancel || 'Cancel';
 
+    let untrap = null;
+
     function close() {
         overlay.dataset.open = 'false';
         confirmBtn.onclick = null;
@@ -2309,6 +2353,8 @@ function openPresetModal(opts) {
         var closeBtn = document.getElementById('preset-modal-close');
         if (closeBtn) closeBtn.onclick = null;
         document.removeEventListener('keydown', onKey);
+        if (untrap) untrap();
+        if (prevFocus && typeof prevFocus.focus === 'function') prevFocus.focus();
     }
     function doConfirm() {
         const result = opts.onConfirm ? opts.onConfirm(isInput ? input.value : null) : true;
@@ -2327,7 +2373,12 @@ function openPresetModal(opts) {
     document.addEventListener('keydown', onKey);
 
     overlay.dataset.open = 'true';
-    if (isInput) setTimeout(() => { input.focus(); input.select(); }, 30);
+    untrap = trapFocus(overlay);
+    if (isInput) {
+        setTimeout(() => { input.focus(); input.select(); }, 30);
+    } else {
+        setTimeout(() => { confirmBtn.focus(); }, 30);
+    }
 }
 
 function initPresetsModal() {

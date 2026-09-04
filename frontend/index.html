@@ -48,16 +48,16 @@
                 <!-- Theme & Lang Selector -->
                 <div class="theme-toggles">
                     <!-- Language Switch -->
-                    <div class="lang-switch" onclick="toggleLanguage()" title="Switch Language">
+                    <div class="lang-switch" onclick="toggleLanguage()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleLanguage();}" role="button" tabindex="0" title="Switch Language" aria-label="Switch Language">
                         <span id="lang-icon">EN</span>
                     </div>
                     <!-- Theme Dots -->
-                    <div class="theme-dot dot-blue active" onclick="changeTheme('blue')" title="Cyber Blue"></div>
-                    <div class="theme-dot dot-purple" onclick="changeTheme('purple')" title="Electric Purple"></div>
-                    <div class="theme-dot dot-ruby" onclick="changeTheme('ruby')" title="Ruby Red"></div>
-                    <div class="theme-dot dot-sunset" onclick="changeTheme('sunset')" title="Sunset Orange"></div>
-                    <div class="theme-dot dot-gold" onclick="changeTheme('gold')" title="Luxury Gold"></div>
-                    <div class="theme-dot dot-emerald" onclick="changeTheme('emerald')" title="Neo Emerald"></div>
+                    <div class="theme-dot dot-blue active" onclick="changeTheme('blue')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('blue');}" role="button" tabindex="0" title="Cyber Blue" aria-label="Cyber Blue theme"></div>
+                    <div class="theme-dot dot-purple" onclick="changeTheme('purple')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('purple');}" role="button" tabindex="0" title="Electric Purple" aria-label="Electric Purple theme"></div>
+                    <div class="theme-dot dot-ruby" onclick="changeTheme('ruby')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('ruby');}" role="button" tabindex="0" title="Ruby Red" aria-label="Ruby Red theme"></div>
+                    <div class="theme-dot dot-sunset" onclick="changeTheme('sunset')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('sunset');}" role="button" tabindex="0" title="Sunset Orange" aria-label="Sunset Orange theme"></div>
+                    <div class="theme-dot dot-gold" onclick="changeTheme('gold')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('gold');}" role="button" tabindex="0" title="Luxury Gold" aria-label="Luxury Gold theme"></div>
+                    <div class="theme-dot dot-emerald" onclick="changeTheme('emerald')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('emerald');}" role="button" tabindex="0" title="Neo Emerald" aria-label="Neo Emerald theme"></div>
                 </div>
             </div>
 
