@@ -3,6 +3,8 @@ package sorting
 import (
 	"reflect"
 	"testing"
+
+	_ "photoslicer/engine/imageio"
 )
 
 func TestSortKeyImproved(t *testing.T) {
