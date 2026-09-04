@@ -30,6 +30,10 @@ export function ImportPresets() {
   return window['go']['main']['App']['ImportPresets']();
 }
 
+export function InspectDirectory(arg1) {
+  return window['go']['main']['App']['InspectDirectory'](arg1);
+}
+
 export function IsDirectory(arg1) {
   return window['go']['main']['App']['IsDirectory'](arg1);
 }

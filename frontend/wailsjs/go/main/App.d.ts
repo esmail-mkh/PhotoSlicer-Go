@@ -15,6 +15,8 @@ export function GetClipboardText():Promise<string>;
 
 export function ImportPresets():Promise<string>;
 
+export function InspectDirectory(arg1:string):Promise<Record<string, any>>;
+
 export function IsDirectory(arg1:string):Promise<boolean>;
 
 export function MinimizeWindow():Promise<void>;
