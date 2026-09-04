@@ -61,21 +61,38 @@ jobs:
         if: matrix.target_os == 'windows'
         run: wails build -clean
 
-      - name: Build Application (Linux & macOS)
-        if: matrix.target_os != 'windows'
+      - name: Build Application (Linux)
+        if: matrix.target_os == 'linux'
+        run: |
+          if pkg-config --exists webkit2gtk-4.0; then
+            wails build -clean
+          else
+            wails build -clean -tags webkit2_41
+          fi
+
+      - name: Build Application (macOS)
+        if: matrix.target_os == 'macos'
         run: wails build -clean
 
       - name: Package Windows Artifact
         if: matrix.target_os == 'windows'
         shell: powershell
         run: |
-          $tag = "${{ github.ref_name }}"
-          if ([string]::IsNullOrWhiteSpace($tag) -or $tag.StartsWith("refs/")) {
-            $tag = "${{ inputs.version_tag }}"
-          }
-          if ([string]::IsNullOrWhiteSpace($tag)) {
+          $refType = "${{ github.ref_type }}"
+          $refName = "${{ github.ref_name }}"
+          $inputTag = "${{ inputs.version_tag }}"
+
+          $tag = ""
+          if ($refType -eq "tag" -and -not [string]::IsNullOrWhiteSpace($refName)) {
+            $tag = $refName
+          } elseif (-not [string]::IsNullOrWhiteSpace($inputTag)) {
+            $tag = $inputTag
+          } else {
             $wailsJson = Get-Content "wails.json" -Raw | ConvertFrom-Json
             $tag = "v" + $wailsJson.info.productVersion
+          }
+          if (-not $tag.StartsWith("v") -and -not $tag.StartsWith("V")) {
+            $tag = "v" + $tag
           }
 
           $zipName = "PhotoSlicer-$tag-Windows.zip"
@@ -89,10 +106,19 @@ jobs:
       - name: Package Linux Artifact
         if: matrix.target_os == 'linux'
         run: |
-          TAG="${{ github.ref_name }}"
-          if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
-          if [ -z "$TAG" ]; then
+          REF_TYPE="${{ github.ref_type }}"
+          REF_NAME="${{ github.ref_name }}"
+          INPUT_TAG="${{ inputs.version_tag }}"
+
+          if [ "$REF_TYPE" = "tag" ] && [ -n "$REF_NAME" ]; then
+            TAG="$REF_NAME"
+          elif [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
             TAG="v$(jq -r '.info.productVersion' wails.json)"
+          fi
+          if [[ "$TAG" != v* ]] && [[ "$TAG" != V* ]]; then
+            TAG="v$TAG"
           fi
 
           ZIP_NAME="PhotoSlicer-$TAG-Linux.zip"
@@ -109,10 +135,19 @@ jobs:
       - name: Package macOS Artifact
         if: matrix.target_os == 'macos'
         run: |
-          TAG="${{ github.ref_name }}"
-          if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
-          if [ -z "$TAG" ]; then
+          REF_TYPE="${{ github.ref_type }}"
+          REF_NAME="${{ github.ref_name }}"
+          INPUT_TAG="${{ inputs.version_tag }}"
+
+          if [ "$REF_TYPE" = "tag" ] && [ -n "$REF_NAME" ]; then
+            TAG="$REF_NAME"
+          elif [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
             TAG="v$(jq -r '.info.productVersion' wails.json)"
+          fi
+          if [[ "$TAG" != v* ]] && [[ "$TAG" != V* ]]; then
+            TAG="v$TAG"
           fi
 
           ZIP_NAME="PhotoSlicer-$TAG-macOS.zip"
@@ -124,6 +159,11 @@ jobs:
           rm -f dist_pkg/up-model/realesrgan-ncnn-vulkan-ubuntu
           chmod -R +x dist_pkg/PhotoSlicer.app || true
           chmod +x dist_pkg/up-model/realesrgan-ncnn-vulkan-macos || true
+
+          # Embed up-model inside PhotoSlicer.app Resources for standalone execution in /Applications
+          mkdir -p dist_pkg/PhotoSlicer.app/Contents/Resources
+          cp -r dist_pkg/up-model dist_pkg/PhotoSlicer.app/Contents/Resources/
+
           ditto -c -k --keepParent dist_pkg "$ZIP_NAME"
 
       - name: Upload Build Artifact
@@ -134,7 +174,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    if: startsWith(github.ref, 'refs/tags/') || inputs.create_release
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -148,11 +188,21 @@ jobs:
 
       - name: Prepare Release Variables
         run: |
-          TAG="${{ github.ref_name }}"
-          if [ -z "$TAG" ] || [[ "$TAG" == refs/* ]]; then TAG="${{ inputs.version_tag }}"; fi
-          if [ -z "$TAG" ]; then
+          REF_TYPE="${{ github.ref_type }}"
+          REF_NAME="${{ github.ref_name }}"
+          INPUT_TAG="${{ inputs.version_tag }}"
+
+          if [ "$REF_TYPE" = "tag" ] && [ -n "$REF_NAME" ]; then
+            TAG="$REF_NAME"
+          elif [ -n "$INPUT_TAG" ]; then
+            TAG="$INPUT_TAG"
+          else
             TAG="v$(jq -r '.info.productVersion' wails.json)"
           fi
+          if [[ "$TAG" != v* ]] && [[ "$TAG" != V* ]]; then
+            TAG="v$TAG"
+          fi
+
           CLEAN_VER="${TAG#v}"
           CLEAN_VER="${CLEAN_VER#V}"
           echo "RELEASE_TAG=$TAG" >> $GITHUB_ENV

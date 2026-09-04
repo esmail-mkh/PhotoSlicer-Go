@@ -477,6 +477,7 @@ func FindRealEsrganExecutable(appDir string) string {
 			exeDir,
 			filepath.Join(exeDir, ".."),
 			filepath.Join(exeDir, "..", ".."),
+			filepath.Join(exeDir, "..", "..", ".."),
 			filepath.Join(exeDir, "..", "Resources"),
 		)
 	}
