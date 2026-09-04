@@ -50,6 +50,7 @@
         get_clipboard_text: () => window.go?.main?.App?.GetClipboardText(),
         isDirectory: (path) => window.go?.main?.App?.IsDirectory(path),
         folderName: (path) => window.go?.main?.App?.FolderName(path),
+        inspect_directory: (path) => window.go?.main?.App?.InspectDirectory(path),
         get_app_version: () => window.go?.main?.App?.GetAppVersion()
     };
 

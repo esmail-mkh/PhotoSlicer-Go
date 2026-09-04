@@ -1998,6 +1998,81 @@ input#save-location-input[readonly] {
 }
 
 /* ============================================
+   PRE-FLIGHT DIRECTORY INSPECTION BADGE
+   ============================================ */
+.dir-inspection-badge-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-top: 9px;
+    padding: 0 4px;
+}
+
+[dir="rtl"] .dir-inspection-badge-wrap {
+    justify-content: flex-start;
+}
+
+.dir-inspection-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 13px;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-primary, #f8fafc);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    animation: badgeSlideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    transition: all 0.25s ease;
+}
+
+@keyframes badgeSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dir-inspection-badge .badge-icon {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+.dir-inspection-badge.badge-single {
+    border-color: rgba(14, 165, 233, 0.4);
+    box-shadow: 0 4px 16px rgba(14, 165, 233, 0.15);
+    color: #e0f2fe;
+}
+
+.dir-inspection-badge.badge-batch {
+    border-color: rgba(168, 85, 247, 0.4);
+    box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
+    color: #f3e8ff;
+}
+
+.dir-inspection-badge.badge-archive {
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+    color: #d1fae5;
+}
+
+.dir-inspection-badge.badge-empty {
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 4px 16px rgba(239, 68, 68, 0.15);
+    color: #fee2e2;
+}
+
+/* ============================================
    SETTINGS GRID (Control Cards)
    ============================================ */
 .settings-grid {

@@ -447,6 +447,12 @@ function setLanguage(lang) {
     const startBtn = document.getElementById('start-button');
     const state = startBtn.dataset.state || 'idle';
     updateStartButtonText(state, lang);
+
+    // Refresh directory inspection badge text in the new language if path exists
+    const dirInput = document.getElementById('directory-input');
+    if (dirInput && dirInput.value.trim()) {
+        updateDirectoryInspection(dirInput.value.trim());
+    }
 }
 
 function updateStartButtonText(state, lang) {
@@ -512,6 +518,80 @@ function selectFolder() {
     });
 }
 
+let _inspectDebounce = null;
+async function updateDirectoryInspection(path) {
+    const wrap = document.getElementById('dir-inspection-badge-wrap');
+    const badge = document.getElementById('dir-inspection-badge');
+    const startBtn = document.getElementById('start-button');
+    if (!badge || !wrap) return;
+
+    if (!path || !path.trim()) {
+        wrap.style.display = 'none';
+        badge.className = 'dir-inspection-badge';
+        if (startBtn) startBtn.classList.remove('btn-ready');
+        return;
+    }
+
+    if (!window.pywebview?.api?.inspect_directory) return;
+
+    try {
+        const res = await window.pywebview.api.inspect_directory(path.trim());
+        if (!res) return;
+
+        const iconEl = document.getElementById('badge-icon');
+        const textEl = document.getElementById('badge-text');
+        const isFa = (currentLang === 'fa');
+
+        badge.className = 'dir-inspection-badge';
+
+        if (res.status === 'ok') {
+            if (res.mode === 'single') {
+                badge.classList.add('badge-single');
+                if (iconEl) iconEl.textContent = '🖼️';
+                if (textEl) textEl.textContent = isFa 
+                    ? `${res.item_count} تصویر معتبر (پوشه تکی)` 
+                    : `${res.item_count} valid images found (Single Folder)`;
+            } else if (res.mode === 'batch') {
+                badge.classList.add('badge-batch');
+                if (iconEl) iconEl.textContent = '📚';
+                if (textEl) textEl.textContent = isFa 
+                    ? `${res.item_count} چپتر شناسایی شد (پردازش گروهی)` 
+                    : `${res.item_count} chapters detected (Batch Mode)`;
+            } else if (res.mode === 'archive_zip' || res.mode === 'archive_cbz') {
+                badge.classList.add('badge-archive');
+                if (iconEl) iconEl.textContent = '📦';
+                const ext = res.mode === 'archive_cbz' ? 'CBZ' : 'ZIP';
+                if (textEl) textEl.textContent = isFa 
+                    ? `${res.item_count} تصویر در آرشیو ${ext}` 
+                    : `${res.item_count} images in ${ext} archive`;
+            }
+            wrap.style.display = 'flex';
+            if (startBtn) startBtn.classList.add('btn-ready');
+        } else if (res.status === 'empty') {
+            badge.classList.add('badge-empty');
+            if (iconEl) iconEl.textContent = '⚠️';
+            if (textEl) textEl.textContent = isFa 
+                ? 'هیچ تصویر یا زیرپوشه‌ای یافت نشد' 
+                : 'No supported images found in directory';
+            wrap.style.display = 'flex';
+            if (startBtn) startBtn.classList.remove('btn-ready');
+        } else if (res.status === 'not_found') {
+            badge.classList.add('badge-empty');
+            if (iconEl) iconEl.textContent = '🚫';
+            if (textEl) textEl.textContent = isFa 
+                ? 'مسیر مورد نظر یافت نشد' 
+                : 'Path does not exist';
+            wrap.style.display = 'flex';
+            if (startBtn) startBtn.classList.remove('btn-ready');
+        } else {
+            wrap.style.display = 'none';
+            if (startBtn) startBtn.classList.remove('btn-ready');
+        }
+    } catch (e) {
+        console.error('Inspect directory failed', e);
+    }
+}
+
 // Reflect whether the directory field has a value: toggles the filled state
 // (shows the clear button) and exposes the full path as a hover tooltip.
 function refreshDirectoryState() {
@@ -521,6 +601,11 @@ function refreshDirectoryState() {
     const hasValue = input.value.trim().length > 0;
     wrapper.classList.toggle('has-value', hasValue);
     input.title = hasValue ? input.value : '';
+
+    clearTimeout(_inspectDebounce);
+    _inspectDebounce = setTimeout(() => {
+        updateDirectoryInspection(input.value);
+    }, 60);
 }
 
 function clearDirectory(shouldFocus = true) {
