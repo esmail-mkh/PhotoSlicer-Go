@@ -4403,6 +4403,29 @@ body.workspace-processing .workspace-controls {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: center;
+}
+
+#pi-files,
+#pi-elapsed,
+#pi-eta {
+    direction: ltr !important;
+    unicode-bidi: isolate;
+    text-align: center;
+}
+
+#pi-current {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: center;
+}
+
+#pi-current[dir="rtl"] {
+    direction: rtl;
+}
+
+#pi-current[dir="ltr"] {
+    direction: ltr !important;
 }
 
 /* Step Indicator */

@@ -2211,7 +2211,8 @@ function updateProgressInfo(current, total, currentFile, elapsed, eta) {
 
     var texts = translations[currentLang] || {};
     var displayFile = currentFile;
-    if (currentFile && PROGRESS_STATUS_MAP[currentFile]) {
+    var isStatus = !!(currentFile && PROGRESS_STATUS_MAP[currentFile]);
+    if (isStatus) {
         displayFile = texts[PROGRESS_STATUS_MAP[currentFile]] || currentFile;
     }
 
@@ -2219,6 +2220,11 @@ function updateProgressInfo(current, total, currentFile, elapsed, eta) {
     if (currentEl) {
         currentEl.title = displayFile || '';
         currentEl.textContent = (displayFile && displayFile.length > 25) ? displayFile.slice(0, 22) + '...' : (displayFile || '-');
+        if (isStatus && currentLang === 'fa') {
+            currentEl.setAttribute('dir', 'rtl');
+        } else {
+            currentEl.setAttribute('dir', 'ltr');
+        }
     }
     var elapsedEl = document.getElementById('pi-elapsed');
     if (elapsedEl) elapsedEl.textContent = elapsed || '00:00:00';
@@ -2230,7 +2236,10 @@ function resetProgressInfo() {
     var filesEl = document.getElementById('pi-files');
     if (filesEl) filesEl.textContent = '0/0';
     var currentEl = document.getElementById('pi-current');
-    if (currentEl) currentEl.textContent = '-';
+    if (currentEl) {
+        currentEl.textContent = '-';
+        currentEl.setAttribute('dir', 'ltr');
+    }
     var elapsedEl = document.getElementById('pi-elapsed');
     if (elapsedEl) elapsedEl.textContent = '00:00:00';
     var etaEl = document.getElementById('pi-eta');
