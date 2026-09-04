@@ -357,7 +357,16 @@
   transform: translateY(-1px);
 }
 
-.notification-cancel::before { content: '✕'; }
+.notification-cancel svg,
+.notification-action svg {
+  display: block;
+  pointer-events: none;
+  transition: transform var(--transition-fast, 0.15s ease);
+}
+
+.notification-button:hover svg {
+  transform: scale(1.1);
+}
 
 .notification-action {
   color: #34d399;
@@ -371,8 +380,6 @@
   box-shadow: 0 6px 18px rgba(52, 211, 153, 0.4);
   transform: translateY(-1px);
 }
-
-.notification-action::before { content: '✓'; }
 
 .notification-button:active { transform: scale(0.96); }
 

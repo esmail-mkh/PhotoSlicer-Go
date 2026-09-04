@@ -975,6 +975,29 @@ body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb:hover {
     color: #fff;
 }
 
+.engine-badge-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    transition: var(--transition-fast);
+}
+
+.engine-badge-icon .engine-svg-fast {
+    color: #38bdf8;
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.35));
+}
+
+.engine-badge-icon .engine-svg-realesrgan {
+    color: #f97316;
+    filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.35));
+}
+
 /* RTL settings input fonts */
 [dir="rtl"] .text-control input[type="text"],
 [dir="rtl"] .text-control input[type="number"] {

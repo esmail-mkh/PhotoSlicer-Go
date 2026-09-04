@@ -17,8 +17,8 @@ const translations = {
         formatPsdDesc: "Photoshop layers",
         aiEnhance: "AI Enhance",
         enhanceEngine: "Quality Engine",
-        engineFast: "⚡ Fast Manhwa Line Clean (CPU)",
-        engineRealESRGAN: "🔥 Real-ESRGAN (GPU)",
+        engineFast: "Fast Manhwa Line Clean (CPU)",
+        engineRealESRGAN: "Real-ESRGAN (GPU)",
         noStitch: "No Stitch",
         inactiveNoStitch: "No Stitch",
         zip: "ZIP Archive",
@@ -212,8 +212,8 @@ const translations = {
         formatPsdDesc: "لایه‌های فتوشاپ",
         aiEnhance: "افزایش کیفیت هوشمند",
         enhanceEngine: "موتور افزایش کیفیت",
-        engineFast: "⚡ پاک‌سازی خطوط مانهوا (پردازنده - بدون تغییر رنگ)",
-        engineRealESRGAN: "🔥 مدل عمیق Real-ESRGAN (کارت گرافیک)",
+        engineFast: "پاک‌سازی خطوط مانهوا (پردازنده - بدون تغییر رنگ)",
+        engineRealESRGAN: "مدل عمیق Real-ESRGAN (کارت گرافیک)",
         noStitch: "بدون چسباندن (تغییر فرمت)",
         inactiveNoStitch: "بدون چسباندن",
         zip: "فشرده‌سازی ZIP",
@@ -476,6 +476,10 @@ function setLanguage(lang) {
     const dirInput = document.getElementById('directory-input');
     if (dirInput && dirInput.value.trim()) {
         updateDirectoryInspection(dirInput.value.trim());
+    }
+
+    if (typeof updateEngineIcon === 'function') {
+        updateEngineIcon();
     }
 
     if (typeof hideTooltipPopup === 'function') {
@@ -1549,7 +1553,22 @@ function updateTimer() {
     document.getElementById('timer').textContent = `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
 }
 
+function updateEngineIcon() {
+    const sel = document.getElementById('enhance-engine-select');
+    const badge = document.getElementById('engine-badge-icon');
+    if (!sel || !badge) return;
+    const isFa = (currentLang === 'fa');
+    if (sel.value === 'realesrgan') {
+        badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="engine-svg-realesrgan"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>';
+        badge.title = isFa ? 'مدل پردازش گرافیکی Real-ESRGAN' : 'Real-ESRGAN (GPU Engine)';
+    } else {
+        badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="engine-svg-fast"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
+        badge.title = isFa ? 'پردازش سریع خطوط با پردازنده' : 'Fast Clean (CPU Engine)';
+    }
+}
+
 function updateSettings() {
+    updateEngineIcon();
     if (isInitializing) return;
     const currentTheme = document.body.getAttribute('data-theme') || 'blue';
     const settings = {
@@ -2797,6 +2816,7 @@ window.addEventListener('DOMContentLoaded', function() {
     } else if (window.pywebview?.api?.get_app_version) {
         window.pywebview.api.get_app_version().then(applyAppVersion).catch(() => {});
     }
+    updateEngineIcon();
     handleResize();
     positionTabIndicator();
 });

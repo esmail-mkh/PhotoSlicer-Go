@@ -86,8 +86,8 @@ function Notification(options = {}) {
 
   const dialogButtons = () => {
     return `<div class="notification-buttons">
-    <span class="notification-button notification-cancel"></span>
-    <span class="notification-button notification-action"></span>
+    <span class="notification-button notification-cancel" aria-label="Cancel"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/></svg></span>
+    <span class="notification-button notification-action" aria-label="Confirm"><svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor"><path d="M13.485 1.929a1 1 0 0 1 .087 1.32l-.087.094L6.4 10.486 2.515 6.6a1 1 0 0 1 1.32-1.5l.094.086 3.178 3.179 6.385-6.386a1 1 0 0 1 1.414 0z"/></svg></span>
     </div>`;
   };
 

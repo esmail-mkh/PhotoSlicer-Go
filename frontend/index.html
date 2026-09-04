@@ -643,9 +643,10 @@
                             <span data-i18n="enhanceEngine">Quality Engine</span>
                         </span>
                         <div class="setting-control">
-                            <select id="enhance-engine-select" class="setting-select" onchange="updateSettings()">
-                                <option value="fast" data-i18n="engineFast">⚡ Fast Clean (CPU)</option>
-                                <option value="realesrgan" data-i18n="engineRealESRGAN">🔥 Real-ESRGAN (GPU)</option>
+                            <span class="engine-badge-icon" id="engine-badge-icon" aria-hidden="true"></span>
+                            <select id="enhance-engine-select" class="setting-select" onchange="updateSettings(); if (typeof updateEngineIcon === 'function') updateEngineIcon();">
+                                <option value="fast" data-i18n="engineFast">Fast Clean (CPU)</option>
+                                <option value="realesrgan" data-i18n="engineRealESRGAN">Real-ESRGAN (GPU)</option>
                             </select>
                         </div>
                     </div>
