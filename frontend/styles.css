@@ -2192,8 +2192,7 @@ input#save-location-input[readonly] {
 }
 
 .control-card.card-disabled .toggle-switch,
-.control-card.card-disabled .card-header label,
-.control-card.card-disabled .info-tooltip-btn {
+.control-card.card-disabled .card-header label {
     pointer-events: auto;
     cursor: pointer;
 }
@@ -3371,21 +3370,6 @@ select:focus {
    ============================================ */
 .format-selector {
     margin-top: 4px;
-}
-
-.format-selector-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 4px 6px 4px;
-}
-
-.format-selector-title {
-    font-size: 0.7rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    color: var(--text-tertiary);
 }
 
 .format-segments {
@@ -4744,39 +4728,6 @@ body.workspace-processing .progress-text {
 /* ============================================
    GLASSMORPHIC TOOLTIP SYSTEM
    ============================================ */
-.info-tooltip-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 15px;
-    height: 15px;
-    min-width: 15px;
-    min-height: 15px;
-    border-radius: 50%;
-    font-size: 0.65rem;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--text-muted, #94a3b8);
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    cursor: help;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    user-select: none;
-    z-index: 5;
-    outline: none;
-    margin: 0 2px;
-}
-
-.info-tooltip-btn:hover,
-.info-tooltip-btn:focus-visible {
-    color: #ffffff;
-    background: var(--theme-solid, #0ea5e9);
-    border-color: var(--theme-solid, #0ea5e9);
-    box-shadow: 0 0 10px var(--theme-glow, rgba(14, 165, 233, 0.5));
-    transform: scale(1.12);
-}
-
 .custom-tooltip-popup {
     position: fixed;
     z-index: 10000;

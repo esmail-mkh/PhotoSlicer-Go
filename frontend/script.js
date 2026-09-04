@@ -32,6 +32,9 @@ const translations = {
         tipAiEnhance: "Quality enhancement via Fast CPU denoiser or Real-ESRGAN GPU upscaler",
         tipNoStitch: "Process, resize, and watermark files individually without stitching into a tall strip",
         tipArchive: "Automatically bundle results into a ZIP archive, multi-page PDF, or CBZ comic book",
+        tipZip: "Compress output images into a single ZIP archive",
+        tipPdf: "Combine all sliced pages into a single multi-page PDF document",
+        tipCbz: "Create a comic book archive (CBZ) ready for e-readers",
         readyStatus: "Ready to Slice",
         // Presets
         noPreset: "No Preset",
@@ -224,6 +227,9 @@ const translations = {
         tipAiEnhance: "ارتقای هوشمند کیفیت با دو موتور: پردازنده سریع (CPU) یا هوش مصنوعی Real-ESRGAN (GPU)",
         tipNoStitch: "پردازش، ریسایز و واترمارک مجزای فایل‌ها بدون چسباندن آن‌ها در یک نوار بلند وب‌تون",
         tipArchive: "بسته‌بندی خودکار خروجی در قالب فایل فشرده، سند پی‌دی‌اف یا کتاب الکترونیک کمیک",
+        tipZip: "فشرده‌سازی خودکار تصاویر خروجی در یک فایل ZIP",
+        tipPdf: "ادغام تمام صفحات خروجی در یک سند PDF استاندارد",
+        tipCbz: "بسته‌بندی صفحات در قالب کتابچه کمیک (CBZ) مناسب نرم‌افزارهای کمیک‌خوان",
         readyStatus: "آماده برای شروع",
         // Presets
         noPreset: "بدون پریست",
@@ -1603,12 +1609,16 @@ function syncControlStates() {
    GLASSMORPHIC TOOLTIP SYSTEM
    ============================================ */
 let _tooltipPopupEl = null;
+let _tooltipTimer = null;
+let _activeTooltipEl = null;
 
 function hideTooltipPopup() {
+    clearTimeout(_tooltipTimer);
     if (_tooltipPopupEl) {
         _tooltipPopupEl.classList.remove('show');
         _tooltipPopupEl.setAttribute('aria-hidden', 'true');
     }
+    _activeTooltipEl = null;
 }
 
 function initTooltipSystem() {
@@ -1621,51 +1631,54 @@ function initTooltipSystem() {
         document.body.appendChild(_tooltipPopupEl);
     }
 
-    function showTooltip(btn) {
-        const key = btn.getAttribute('data-tooltip-key');
-        if (!key) return;
-        const texts = translations[currentLang] || {};
-        const text = texts[key];
-        if (!text) return;
+    function showTooltip(el) {
+        clearTimeout(_tooltipTimer);
+        _tooltipTimer = setTimeout(() => {
+            const key = el.getAttribute('data-tooltip-key');
+            if (!key) return;
+            const texts = translations[currentLang] || {};
+            const text = texts[key];
+            if (!text) return;
 
-        _tooltipPopupEl.textContent = text;
-        _tooltipPopupEl.setAttribute('aria-hidden', 'false');
-        _tooltipPopupEl.classList.add('show');
+            _tooltipPopupEl.textContent = text;
+            _tooltipPopupEl.setAttribute('aria-hidden', 'false');
+            _tooltipPopupEl.classList.add('show');
+            _activeTooltipEl = el;
 
-        const rect = btn.getBoundingClientRect();
-        const popupRect = _tooltipPopupEl.getBoundingClientRect();
-        const margin = 8;
+            const rect = el.getBoundingClientRect();
+            const popupRect = _tooltipPopupEl.getBoundingClientRect();
+            const margin = 8;
 
-        // Position vertically: prefer above, fallback to below
-        let top = rect.top - popupRect.height - margin;
-        if (top < 10) {
-            top = rect.bottom + margin;
-        }
+            // Position vertically: prefer above, fallback to below
+            let top = rect.top - popupRect.height - margin;
+            if (top < 10) {
+                top = rect.bottom + margin;
+            }
 
-        // Position horizontally: centered on trigger, clamped to viewport bounds
-        let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
-        if (left < 12) left = 12;
-        if (left + popupRect.width > window.innerWidth - 12) {
-            left = window.innerWidth - 12 - popupRect.width;
-        }
+            // Position horizontally: centered relative to target element, clamped to viewport
+            let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+            if (left < 14) left = 14;
+            if (left + popupRect.width > window.innerWidth - 14) {
+                left = window.innerWidth - 14 - popupRect.width;
+            }
 
-        _tooltipPopupEl.style.top = `${Math.round(top)}px`;
-        _tooltipPopupEl.style.left = `${Math.round(left)}px`;
+            _tooltipPopupEl.style.top = `${Math.round(top)}px`;
+            _tooltipPopupEl.style.left = `${Math.round(left)}px`;
+        }, 150);
     }
 
-    document.querySelectorAll('.info-tooltip-btn').forEach(btn => {
-        btn.addEventListener('mouseenter', () => showTooltip(btn));
-        btn.addEventListener('mouseleave', hideTooltipPopup);
-        btn.addEventListener('focus', () => showTooltip(btn));
-        btn.addEventListener('blur', hideTooltipPopup);
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
+    document.querySelectorAll('[data-tooltip-key]').forEach(el => {
+        el.addEventListener('mouseenter', () => showTooltip(el));
+        el.addEventListener('mouseleave', hideTooltipPopup);
     });
 
     window.addEventListener('scroll', hideTooltipPopup, { passive: true });
     window.addEventListener('resize', hideTooltipPopup, { passive: true });
+    window.addEventListener('mousedown', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'BUTTON')) {
+            hideTooltipPopup();
+        }
+    }, { passive: true });
 }
 
 (function startTooltips() {
