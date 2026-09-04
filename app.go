@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -597,6 +598,87 @@ func (a *App) IsDirectory(path string) bool {
 
 func (a *App) FolderName(path string) string {
 	return filepath.Base(path)
+}
+
+// InspectDirectory provides fast pre-flight analysis of a directory or archive file.
+func (a *App) InspectDirectory(path string) map[string]interface{} {
+	cleanPath := strings.TrimSpace(path)
+	if cleanPath == "" {
+		return map[string]interface{}{"status": "empty", "mode": "", "item_count": 0, "path": ""}
+	}
+
+	fi, err := os.Stat(cleanPath)
+	if err != nil {
+		return map[string]interface{}{"status": "not_found", "mode": "", "item_count": 0, "path": cleanPath}
+	}
+
+	if !fi.IsDir() {
+		extLower := strings.ToLower(filepath.Ext(cleanPath))
+		if extLower == ".zip" || extLower == ".cbz" {
+			r, err := zip.OpenReader(cleanPath)
+			if err != nil {
+				return map[string]interface{}{"status": "error", "mode": "", "item_count": 0, "path": cleanPath}
+			}
+			defer r.Close()
+
+			count := 0
+			for _, f := range r.File {
+				if f.FileInfo().IsDir() {
+					continue
+				}
+				cleanName := filepath.ToSlash(f.Name)
+				if strings.Contains(cleanName, "__MACOSX") || strings.HasPrefix(filepath.Base(cleanName), ".") {
+					continue
+				}
+				ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(cleanName), "."))
+				if constants.SupportedExtensions[ext] {
+					count++
+				}
+			}
+			mode := "archive_zip"
+			if extLower == ".cbz" {
+				mode = "archive_cbz"
+			}
+			if count == 0 {
+				return map[string]interface{}{"status": "empty", "mode": mode, "item_count": 0, "path": cleanPath}
+			}
+			return map[string]interface{}{"status": "ok", "mode": mode, "item_count": count, "path": cleanPath}
+		}
+		return map[string]interface{}{"status": "error", "mode": "", "item_count": 0, "path": cleanPath}
+	}
+
+	// It's a directory
+	directImages, _ := sorting.GetAllImagesDirectory(cleanPath)
+	if len(directImages) > 0 {
+		return map[string]interface{}{
+			"status":     "ok",
+			"mode":       "single",
+			"item_count": len(directImages),
+			"path":       cleanPath,
+		}
+	}
+
+	// Check subfolders
+	subfolders, err := archive.FastScanDir(cleanPath)
+	if err == nil && len(subfolders) > 0 {
+		validFolders := 0
+		for _, sf := range subfolders {
+			imgs, _ := sorting.GetAllImagesDirectory(sf)
+			if len(imgs) > 0 {
+				validFolders++
+			}
+		}
+		if validFolders > 0 {
+			return map[string]interface{}{
+				"status":     "ok",
+				"mode":       "batch",
+				"item_count": validFolders,
+				"path":       cleanPath,
+			}
+		}
+	}
+
+	return map[string]interface{}{"status": "empty", "mode": "single", "item_count": 0, "path": cleanPath}
 }
 
 // Start launches the main worker thread for single folder or batch slicing.
