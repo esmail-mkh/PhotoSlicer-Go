@@ -281,3 +281,11 @@ func TestCountImagesInArchive(t *testing.T) {
 		t.Errorf("expected 2 images, got %d", count)
 	}
 }
+
+func TestNotifyShellChange(t *testing.T) {
+	// Should not panic on empty string, non-existent path, or real directory
+	NotifyShellChange("")
+	NotifyShellChange(t.TempDir())
+	NotifyShellChange("non_existent_path_test")
+}
+

@@ -276,6 +276,8 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 
 	if archiveCreated {
 		_ = os.RemoveAll(savePath)
+		archive.NotifyShellChange(savePath)
+		archive.NotifyShellChange(finalResultPath)
 	}
 
 	return finalResultPath, nil

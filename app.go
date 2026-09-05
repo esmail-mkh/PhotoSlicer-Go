@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -613,31 +611,7 @@ func (a *App) OpenFileExplorer(path string) {
 		return
 	}
 
-	switch runtime.GOOS {
-	case "windows":
-		if !fi.IsDir() {
-			cmd := exec.Command("explorer", fmt.Sprintf("/select,%s", cleanPath))
-			_ = cmd.Start()
-			return
-		}
-		cmd := exec.Command("explorer", cleanPath)
-		_ = cmd.Start()
-	case "darwin":
-		if !fi.IsDir() {
-			cmd := exec.Command("open", "-R", cleanPath)
-			_ = cmd.Start()
-			return
-		}
-		cmd := exec.Command("open", cleanPath)
-		_ = cmd.Start()
-	default: // linux, bsd
-		targetDir := cleanPath
-		if !fi.IsDir() {
-			targetDir = filepath.Dir(cleanPath)
-		}
-		cmd := exec.Command("xdg-open", targetDir)
-		_ = cmd.Start()
-	}
+	openExplorerPlatform(cleanPath, fi.IsDir())
 }
 
 func (a *App) GetClipboardText() string {
@@ -1140,7 +1114,11 @@ func (a *App) Start(params map[string]interface{}) {
 				if playSound {
 					a.playAudio("success.wav")
 				}
-				a.showSuccess(getMsg("idle_done", lang))
+				successMsg := getMsg("idle_done", lang)
+				if resPath != "" {
+					successMsg = fmt.Sprintf("%s (%s)", successMsg, filepath.Base(resPath))
+				}
+				a.showSuccess(successMsg)
 				a.clearSourceDirectory()
 			}
 		} else {

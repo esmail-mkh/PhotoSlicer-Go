@@ -194,7 +194,12 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 	if err := writeStr(trailer); err != nil {
 		return err
 	}
-	return outFile.Close()
+	_ = outFile.Sync()
+	if err := outFile.Close(); err != nil {
+		return err
+	}
+	NotifyShellChange(outputPath)
+	return nil
 }
 
 func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {

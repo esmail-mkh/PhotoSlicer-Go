@@ -59,9 +59,12 @@ func CreateZip(outputPath string, files []string) error {
 	if err := w.Close(); err != nil {
 		return err
 	}
+	_ = zipFile.Sync()
 	if err := zipFile.Close(); err != nil {
 		return err
 	}
+
+	NotifyShellChange(outputPath)
 
 	return nil
 }

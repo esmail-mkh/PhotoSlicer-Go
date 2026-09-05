@@ -2884,6 +2884,7 @@ function showOpenFolderButton(path) {
     const btn = document.getElementById('mini-open-btn');
     if(btn) {
         btn.style.display = 'flex';
+        btn.title = path;
     }
 }
 

@@ -88,3 +88,11 @@ func TestSaveSettingsToDiskAtomic(t *testing.T) {
 		t.Errorf("expected width 1200, got %v", loaded["width"])
 	}
 }
+
+func TestOpenFileExplorer(t *testing.T) {
+	app := NewApp()
+	// Should return early safely with empty or non-existent path
+	app.OpenFileExplorer("")
+	app.OpenFileExplorer("non_existent_path_xyz")
+}
+
