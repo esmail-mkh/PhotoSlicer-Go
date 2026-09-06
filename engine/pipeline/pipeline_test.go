@@ -229,3 +229,55 @@ func TestPipelineMultiModeDateNesting(t *testing.T) {
 	}
 }
 
+func TestRevengeChapterNoShortSlices(t *testing.T) {
+	srcDir := `C:\Users\Alteen Rayane\Downloads\Telegram Desktop\Revenge of Reborn Villainess - Lua Comic`
+	if _, err := os.Stat(srcDir); os.IsNotExist(err) {
+		t.Skip("skipping test: chapter dir not found on this machine")
+	}
+
+	tempOut := t.TempDir()
+	opts := PipelineOptions{
+		Mode:            "single",
+		NewWidth:        800,
+		IsCustomWidth:   true,
+		SaveFormat:      "JPG",
+		SaveQuality:     95,
+		HeightLimit:     15000,
+		CurrentDate:     "2026-09-06",
+		OutputBase:      tempOut,
+		MaxWorkers:      4,
+		FilenamePattern: "[number]",
+		FilenameDigits:  3,
+	}
+
+	resPath, err := MergerImages(srcDir, opts)
+	if err != nil {
+		t.Fatalf("MergerImages failed: %v", err)
+	}
+
+	entries, err := os.ReadDir(resPath)
+	if err != nil {
+		t.Fatalf("Failed to read output dir: %v", err)
+	}
+
+	for _, e := range entries {
+		if strings.HasSuffix(strings.ToLower(e.Name()), ".jpg") {
+			p := filepath.Join(resPath, e.Name())
+			f, err := os.Open(p)
+			if err != nil {
+				t.Fatalf("failed to open output: %v", err)
+			}
+			cfg, err := jpeg.DecodeConfig(f)
+			f.Close()
+			if err != nil {
+				t.Fatalf("failed to decode config: %v", err)
+			}
+			t.Logf("Slice %s: %dx%d", e.Name(), cfg.Width, cfg.Height)
+			if cfg.Height < 1000 {
+				t.Errorf("Slice %s is unexpectedly short: %d pixels", e.Name(), cfg.Height)
+			}
+		}
+	}
+}
+
+

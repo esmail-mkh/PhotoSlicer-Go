@@ -107,46 +107,61 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	}
 
 	fmtLower := strings.ToLower(opts.SaveFormat)
+	hardMax := constants.JpegMaxDimension
 	if fmtLower == "webp" {
-		if targetMaxH > constants.WebPMaxDimension {
-			targetMaxH = constants.WebPMaxDimension
-		}
-	} else {
-		if targetMaxH > constants.JpegMaxDimension {
-			targetMaxH = constants.JpegMaxDimension
-		}
+		hardMax = constants.WebPMaxDimension
+	} else if fmtLower == "psd" {
+		hardMax = 30000
 	}
 
-	cutPoints = CapSliceGaps(cutPoints, targetMaxH)
+	if targetMaxH > hardMax {
+		targetMaxH = hardMax
+	}
 
-	// Filter tiny sub-5px slice gaps
+	// Allow up to 15% tolerance above targetMaxH for safe gutters found between panels,
+	// bounded by the format's hard maximum dimension limit.
+	gutterToleranceH := int(float64(targetMaxH) * 1.15)
+	if gutterToleranceH > hardMax {
+		gutterToleranceH = hardMax
+	}
+	if gutterToleranceH < targetMaxH {
+		gutterToleranceH = targetMaxH
+	}
+
+	cutPoints = CapSliceGapsWithTolerance(cutPoints, targetMaxH, gutterToleranceH)
+
+	// Filter tiny slice gaps (merge micro-slices under minSliceH into previous slice if within hardMax)
+	minSliceH := 500
+	if targetMaxH/10 < minSliceH {
+		minSliceH = targetMaxH / 10
+	}
+	if minSliceH < 50 {
+		minSliceH = 50
+	}
+	if imgHeight < minSliceH {
+		minSliceH = imgHeight
+	}
+
 	var filteredCuts []int
 	filteredCuts = append(filteredCuts, cutPoints[0])
 	for i := 1; i < len(cutPoints); i++ {
 		cp := cutPoints[i]
 		last := filteredCuts[len(filteredCuts)-1]
-		if cp-last >= 5 {
+		if cp-last >= minSliceH {
 			filteredCuts = append(filteredCuts, cp)
-		} else if i == len(cutPoints)-1 {
-			hardMax := constants.JpegMaxDimension
-			if fmtLower == "webp" {
-				hardMax = constants.WebPMaxDimension
-			}
-			if cp > hardMax {
-				if len(filteredCuts) >= 2 {
-					floor := filteredCuts[len(filteredCuts)-2] + 5
-					newPrev := cp - 5
-					if floor > newPrev {
-						newPrev = floor
-					}
-					filteredCuts[len(filteredCuts)-1] = newPrev
-					filteredCuts = append(filteredCuts, cp)
-				} else {
-					filteredCuts[len(filteredCuts)-1] = hardMax
-				}
-			} else {
+		} else if len(filteredCuts) >= 2 {
+			prevPrev := filteredCuts[len(filteredCuts)-2]
+			if cp-prevPrev <= hardMax {
+				// Merge micro-slice into previous slice
 				filteredCuts[len(filteredCuts)-1] = cp
+			} else {
+				// Combined height exceeds hardMax; divide span [prevPrev, cp] evenly into two slices
+				mid := prevPrev + (cp-prevPrev)/2
+				filteredCuts[len(filteredCuts)-1] = mid
+				filteredCuts = append(filteredCuts, cp)
 			}
+		} else {
+			filteredCuts = append(filteredCuts, cp)
 		}
 	}
 	cutPoints = filteredCuts

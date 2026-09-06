@@ -190,6 +190,16 @@ func FindSafeCutPoints(img image.Image, slicesCount float64) []int {
 			continue
 		}
 
+		// When scanning downwards past splitHeight, limit to 15% tolerance window
+		lastCut := sliceLocations[len(sliceLocations)-1]
+		maxDownward := lastCut + int(float64(splitHeight)*1.15)
+		if row >= maxDownward {
+			sliceLocations = append(sliceLocations, lastCut+splitHeight)
+			row = lastCut + splitHeight + splitHeight
+			moveUp = true
+			continue
+		}
+
 		row += scanStep
 	}
 
@@ -244,18 +254,37 @@ func FindSafeCutPoints(img image.Image, slicesCount float64) []int {
 }
 
 // CapSliceGaps ensures the distance between two consecutive cuts does not exceed maxHeight.
+// Gaps exceeding maxHeight are subdivided evenly into balanced slices.
 func CapSliceGaps(cutPoints []int, maxHeight int) []int {
+	return CapSliceGapsWithTolerance(cutPoints, maxHeight, maxHeight)
+}
+
+// CapSliceGapsWithTolerance allows gaps up to toleranceMaxHeight (e.g. for safe gutters between panels).
+// If a gap exceeds toleranceMaxHeight, it subdivides it into balanced slices <= maxHeight.
+func CapSliceGapsWithTolerance(cutPoints []int, maxHeight, toleranceMaxHeight int) []int {
 	if maxHeight <= 0 || len(cutPoints) == 0 {
 		return cutPoints
+	}
+	if toleranceMaxHeight < maxHeight {
+		toleranceMaxHeight = maxHeight
 	}
 
 	capped := []int{cutPoints[0]}
 	for i := 1; i < len(cutPoints); i++ {
 		cp := cutPoints[i]
 		prev := capped[len(capped)-1]
-		for cp-prev > maxHeight {
-			prev += maxHeight
-			capped = append(capped, prev)
+		gap := cp - prev
+		if gap <= toleranceMaxHeight {
+			capped = append(capped, cp)
+			continue
+		}
+
+		// Gap exceeds tolerance: divide gap evenly into balanced slices under maxHeight
+		k := int(math.Ceil(float64(gap) / float64(maxHeight)))
+		step := float64(gap) / float64(k)
+		for s := 1; s < k; s++ {
+			point := prev + int(math.Round(step*float64(s)))
+			capped = append(capped, point)
 		}
 		capped = append(capped, cp)
 	}

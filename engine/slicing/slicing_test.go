@@ -30,7 +30,16 @@ func TestSlicing(t *testing.T) {
 	t.Run("CapSliceGapsLimitsExcessiveHeights", func(t *testing.T) {
 		cuts := []int{0, 5000, 15000}
 		capped := CapSliceGaps(cuts, 4000)
-		expected := []int{0, 4000, 5000, 9000, 13000, 15000}
+		expected := []int{0, 2500, 5000, 8333, 11667, 15000}
+		if !reflect.DeepEqual(capped, expected) {
+			t.Errorf("Expected %v, got %v", expected, capped)
+		}
+	})
+
+	t.Run("CapSliceGapsWithTolerancePreservesSafeGutters", func(t *testing.T) {
+		cuts := []int{0, 15164}
+		capped := CapSliceGapsWithTolerance(cuts, 15000, 17250)
+		expected := []int{0, 15164}
 		if !reflect.DeepEqual(capped, expected) {
 			t.Errorf("Expected %v, got %v", expected, capped)
 		}
