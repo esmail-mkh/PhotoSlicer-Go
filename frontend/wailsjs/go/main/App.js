@@ -10,6 +10,10 @@ export function AutoDetectEnhanceEngine() {
   return window['go']['main']['App']['AutoDetectEnhanceEngine']();
 }
 
+export function CheckForUpdate() {
+  return window['go']['main']['App']['CheckForUpdate']();
+}
+
 export function CloseWindow() {
   return window['go']['main']['App']['CloseWindow']();
 }
@@ -52,6 +56,10 @@ export function MinimizeWindow() {
 
 export function OpenFileExplorer(arg1) {
   return window['go']['main']['App']['OpenFileExplorer'](arg1);
+}
+
+export function OpenURL(arg1) {
+  return window['go']['main']['App']['OpenURL'](arg1);
 }
 
 export function PauseProcessing() {

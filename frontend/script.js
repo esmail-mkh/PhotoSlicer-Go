@@ -196,7 +196,18 @@ const translations = {
         watermarkRight: "Right Edge",
         watermarkMargin: "Edge Margin",
         watermarkMarginUnit: "px",
-        watermarkPathPlaceholder: "Choose a transparent PNG file..."
+        watermarkPathPlaceholder: "Choose a transparent PNG file...",
+        // Updates
+        updateBadge: "Update",
+        updateAvailableTitle: "New version {0} available! Click to download from GitHub",
+        updateBannerText: "New version ({0}) available! Click to download",
+        updateLabel: "Update",
+        checkUpdates: "Check for Updates",
+        checkingUpdates: "Checking...",
+        upToDate: "Up to date",
+        updateFound: "New {0}",
+        updateOffline: "Offline",
+        themesTooltip: "Theme colors (hover to expand)"
     },
     fa: {
         appTitle: "فوتو اسلایسر",
@@ -395,7 +406,18 @@ const translations = {
         watermarkRight: "لبه راست",
         watermarkMargin: "فاصله از لبه",
         watermarkMarginUnit: "پیکسل",
-        watermarkPathPlaceholder: "یک فایل PNG شفاف انتخاب کنید..."
+        watermarkPathPlaceholder: "یک فایل PNG شفاف انتخاب کنید...",
+        // Updates
+        updateBadge: "بروزرسانی",
+        updateAvailableTitle: "نسخه جدید {0} در دسترس است! برای دانلود و مشاهده در گیتهاب کلیک کنید",
+        updateBannerText: "نسخه جدید ({0}) منتشر شد! برای دانلود کلیک کنید",
+        updateLabel: "بروزرسانی",
+        checkUpdates: "بررسی بروزرسانی",
+        checkingUpdates: "در حال بررسی...",
+        upToDate: "برنامه بروز است",
+        updateFound: "نسخه {0}",
+        updateOffline: "آفلاین",
+        themesTooltip: "رنگ‌های تم (برای انتخاب هاور کنید)"
     }
 };
 
@@ -504,6 +526,10 @@ function setLanguage(lang) {
         if (nameEl && (!cachedGPUInfo || !cachedGPUInfo.name)) {
             nameEl.textContent = texts.hardwareScan || (lang === 'fa' ? 'در حال بررسی...' : 'Scanning...');
         }
+    }
+
+    if (typeof renderUpdateUI === 'function') {
+        renderUpdateUI();
     }
 }
 
@@ -2889,7 +2915,31 @@ function setTheme(themeName) {
 
     // Update adaptive contrast color based on the preset's solid color
     setThemeContrast(PRESET_SOLIDS[themeName] || '#0ea5e9');
+    syncThemeTogglesGroup(themeName);
 }
+
+function syncThemeTogglesGroup(themeName) {
+    const wrapper = document.getElementById('theme-dots-wrapper');
+    if (!wrapper) return;
+    const currentTheme = themeName || document.body.getAttribute('data-theme') || 'blue';
+    const isGroup2 = (currentTheme === 'sunset' || currentTheme === 'gold' || currentTheme === 'emerald');
+    const g1 = wrapper.querySelector('.group-1');
+    const g2 = wrapper.querySelector('.group-2');
+    if (!g1 || !g2) return;
+
+    if (isGroup2) {
+        g1.classList.add('is-dropdown');
+        g1.classList.remove('is-header');
+        g2.classList.add('is-header');
+        g2.classList.remove('is-dropdown');
+    } else {
+        g2.classList.add('is-dropdown');
+        g2.classList.remove('is-header');
+        g1.classList.add('is-header');
+        g1.classList.remove('is-dropdown');
+    }
+}
+window.syncThemeTogglesGroup = syncThemeTogglesGroup;
 
 function changeTheme(themeName) {
     setTheme(themeName);
@@ -3011,12 +3061,25 @@ function handleResize() {
 function applyAppVersion(version) {
     const v = version || window.__APP_VERSION__;
     if (!v) return;
-    document.querySelectorAll('.version-badge, .about-version-badge').forEach(el => {
-        el.textContent = 'v' + v;
+    const vStr = 'v' + String(v).replace(/^v/, '');
+    
+    // Only update header version text if no update is currently active
+    if (!latestUpdateInfo || !latestUpdateInfo.available) {
+        const badgeText = document.getElementById('version-badge-text');
+        if (badgeText) {
+            badgeText.textContent = vStr;
+        } else {
+            const el = document.getElementById('app-version-badge') || document.querySelector('.version-badge');
+            if (el) el.textContent = vStr;
+        }
+    }
+
+    document.querySelectorAll('.about-version-badge').forEach(el => {
+        el.textContent = vStr;
     });
     const statVal = document.querySelector('.about-stat-value');
     if (statVal) {
-        statVal.textContent = v;
+        statVal.textContent = String(v).replace(/^v/, '');
     }
 }
 window.applyAppVersion = applyAppVersion;
@@ -3197,3 +3260,138 @@ function validateWatermarkSettings() {
 
     updateSettings();
 }
+
+/* ============================================
+   Update Checker UI & Handlers
+   ============================================ */
+let latestUpdateInfo = null;
+
+function onVersionBadgeClick() {
+    if (latestUpdateInfo && latestUpdateInfo.available) {
+        openUpdateUrl();
+    } else {
+        showTab('aboutUs');
+    }
+}
+window.onVersionBadgeClick = onVersionBadgeClick;
+
+function onUpdateAvailable(info) {
+    if (!info || !info.available) return;
+    latestUpdateInfo = info;
+    renderUpdateUI();
+}
+window.onUpdateAvailable = onUpdateAvailable;
+
+function renderUpdateUI() {
+    const versionBadge = document.getElementById('app-version-badge') || document.querySelector('.version-badge');
+    const badgeText = document.getElementById('version-badge-text');
+    const pulseRing = versionBadge?.querySelector('.update-pulse-ring');
+    const pulseDot = versionBadge?.querySelector('.update-pulse-dot');
+    const badgeIcon = versionBadge?.querySelector('.update-badge-icon');
+    const aboutUpdatePill = document.getElementById('about-update-pill');
+    const aboutUpdateStatus = document.getElementById('about-update-status');
+    const themeDotsWrapper = document.getElementById('theme-dots-wrapper');
+    const texts = translations[currentLang] || translations.fa;
+
+    if (!latestUpdateInfo || !latestUpdateInfo.available) {
+        document.body.classList.remove('has-update-active');
+        if (themeDotsWrapper) {
+            themeDotsWrapper.removeAttribute('title');
+        }
+        if (versionBadge) {
+            versionBadge.classList.remove('has-update');
+            versionBadge.title = texts.appTitle || 'PhotoSlicer';
+            versionBadge.onclick = onVersionBadgeClick;
+            if (pulseRing) pulseRing.style.display = 'none';
+            if (pulseDot) pulseDot.style.display = 'none';
+            if (badgeIcon) badgeIcon.style.display = 'none';
+            if (badgeText && window.__APP_VERSION__) {
+                badgeText.textContent = 'v' + String(window.__APP_VERSION__).replace(/^v/, '');
+            }
+        }
+        if (aboutUpdatePill) {
+            aboutUpdatePill.classList.remove('has-update');
+            aboutUpdatePill.title = texts.checkUpdates || 'Check for updates';
+            aboutUpdatePill.onclick = manualCheckForUpdates;
+        }
+        return;
+    }
+
+    document.body.classList.add('has-update-active');
+    syncThemeTogglesGroup();
+    if (themeDotsWrapper) {
+        themeDotsWrapper.title = texts.themesTooltip || 'Themes';
+    }
+
+    const versionStr = latestUpdateInfo.latest_version || '';
+    const tooltip = (texts.updateAvailableTitle || 'New version {0} available! Click to download').split('{0}').join(versionStr);
+
+    if (versionBadge) {
+        versionBadge.classList.add('has-update');
+        versionBadge.title = tooltip;
+        versionBadge.onclick = openUpdateUrl;
+        if (pulseRing) pulseRing.style.display = 'block';
+        if (pulseDot) pulseDot.style.display = 'inline-block';
+        if (badgeIcon) badgeIcon.style.display = 'inline-block';
+        if (badgeText) {
+            badgeText.textContent = versionStr ? (versionStr.startsWith('v') ? versionStr : 'v' + versionStr) : (texts.updateBadge || 'Update');
+        }
+    }
+
+    if (aboutUpdatePill) {
+        aboutUpdatePill.classList.add('has-update');
+        aboutUpdatePill.title = tooltip;
+        aboutUpdatePill.onclick = openUpdateUrl;
+    }
+    if (aboutUpdateStatus) {
+        aboutUpdateStatus.textContent = (texts.updateFound || 'New {0}').split('{0}').join(versionStr);
+    }
+}
+window.renderUpdateUI = renderUpdateUI;
+
+function openUpdateUrl() {
+    const url = latestUpdateInfo?.release_url || 'https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest';
+    if (window.pywebview?.api?.open_url) {
+        window.pywebview.api.open_url(url);
+    } else if (window.runtime?.BrowserOpenURL) {
+        window.runtime.BrowserOpenURL(url);
+    } else {
+        window.open(url, '_blank');
+    }
+}
+window.openUpdateUrl = openUpdateUrl;
+
+function manualCheckForUpdates() {
+    const aboutUpdateStatus = document.getElementById('about-update-status');
+    const texts = translations[currentLang] || translations.fa;
+    if (aboutUpdateStatus) {
+        aboutUpdateStatus.textContent = texts.checkingUpdates || 'Checking...';
+    }
+
+    if (!window.pywebview?.api?.check_for_update) {
+        setTimeout(() => {
+            if (aboutUpdateStatus) {
+                aboutUpdateStatus.textContent = texts.upToDate || 'Up to date';
+            }
+        }, 600);
+        return;
+    }
+
+    window.pywebview.api.check_for_update()
+        .then(function(info) {
+            if (info && info.available) {
+                onUpdateAvailable(info);
+            } else {
+                if (aboutUpdateStatus) {
+                    aboutUpdateStatus.textContent = texts.upToDate || 'Up to date';
+                }
+            }
+        })
+        .catch(function(err) {
+            console.warn('Update check failed or offline:', err);
+            if (aboutUpdateStatus) {
+                aboutUpdateStatus.textContent = texts.upToDate || 'Up to date';
+            }
+        });
+}
+window.manualCheckForUpdates = manualCheckForUpdates;

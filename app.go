@@ -18,6 +18,7 @@ import (
 	"photoslicer/engine/enhancer"
 	"photoslicer/engine/pipeline"
 	"photoslicer/engine/sorting"
+	"photoslicer/engine/updater"
 
 	"github.com/atotto/clipboard"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -537,6 +538,18 @@ func (a *App) AppReady() {
 		"has_exe":           enhancer.FindRealEsrganExecutable("") != "",
 	})
 	a.execJS(fmt.Sprintf(`if (typeof renderGPUInfo === 'function') renderGPUInfo(%s);`, string(gpuJSON)))
+
+	// Silently check for updates in background (non-blocking, only if online)
+	go func() {
+		time.Sleep(2 * time.Second)
+		info, err := updater.CheckForUpdate(constants.Version)
+		if err == nil && info != nil && info.Available {
+			infoJSON, mErr := json.Marshal(info)
+			if mErr == nil {
+				a.execJS(fmt.Sprintf(`if (typeof onUpdateAvailable === 'function') onUpdateAvailable(%s);`, string(infoJSON)))
+			}
+		}
+	}()
 }
 
 func (a *App) applySettingsToDOM(settings map[string]interface{}) {
@@ -785,6 +798,18 @@ func (a *App) GetClipboardText() string {
 		return ""
 	}
 	return text
+}
+
+// CheckForUpdate queries GitHub for any newer release version.
+func (a *App) CheckForUpdate() (*updater.UpdateInfo, error) {
+	return updater.CheckForUpdate(constants.Version)
+}
+
+// OpenURL opens the given URL in the system default browser.
+func (a *App) OpenURL(url string) {
+	if url != "" && a.ctx != nil {
+		wailsRuntime.BrowserOpenURL(a.ctx, url)
+	}
 }
 
 func (a *App) MinimizeWindow() {

@@ -288,4 +288,24 @@ func TestDefaultSettingsDynamicEnhanceEngine(t *testing.T) {
 	}
 }
 
+func TestCheckForUpdate(t *testing.T) {
+	app := NewApp()
+	// Test CheckForUpdate does not panic or crash
+	info, err := app.CheckForUpdate()
+	if err != nil {
+		t.Logf("CheckForUpdate returned error (likely offline/rate-limited): %v", err)
+	}
+	if info != nil {
+		if info.CurrentVersion == "" {
+			t.Error("expected CurrentVersion to be set")
+		}
+	}
+}
+
+func TestOpenURL(t *testing.T) {
+	app := NewApp()
+	// Verify OpenURL with empty string or non-nil context doesn't panic
+	app.OpenURL("")
+}
+
 

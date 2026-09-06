@@ -53,7 +53,15 @@
         inspect_directory: (path) => window.go?.main?.App?.InspectDirectory(path),
         get_app_version: () => window.go?.main?.App?.GetAppVersion(),
         auto_detect_enhance_engine: () => window.go?.main?.App?.AutoDetectEnhanceEngine(),
-        get_gpu_info: () => window.go?.main?.App?.GetGPUInfo()
+        get_gpu_info: () => window.go?.main?.App?.GetGPUInfo(),
+        check_for_update: () => window.go?.main?.App?.CheckForUpdate(),
+        open_url: (url) => {
+            if (window.go?.main?.App?.OpenURL) {
+                return window.go.main.App.OpenURL(url);
+            } else if (window.runtime?.BrowserOpenURL) {
+                window.runtime.BrowserOpenURL(url);
+            }
+        }
     };
 
     window.pywebview = { api: api };

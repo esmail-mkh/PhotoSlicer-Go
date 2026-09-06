@@ -28,7 +28,15 @@
                         </svg>
                     </div>
                     <span id="title-text" data-i18n="appTitle">PhotoSlicer</span>
-                    <span class="version-badge">v5.3</span>
+                    <button type="button" class="version-badge" id="app-version-badge" onclick="onVersionBadgeClick()" title="PhotoSlicer">
+                        <span class="update-pulse-ring" style="display: none;"></span>
+                        <span class="update-pulse-dot" style="display: none;"></span>
+                        <svg class="update-badge-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" style="display: none;" aria-hidden="true">
+                            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
+                            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
+                        </svg>
+                        <span id="version-badge-text">v5.3</span>
+                    </button>
 
                     <!-- Presets opener (workspace only) — opens the presets modal -->
                     <button type="button" class="preset-open-btn header-presets" id="preset-open" onclick="openPresetsModal()" data-i18n-title="presetsTitle" title="Presets">
@@ -52,12 +60,18 @@
                         <span id="lang-icon">EN</span>
                     </div>
                     <!-- Theme Dots -->
-                    <div class="theme-dot dot-blue active" onclick="changeTheme('blue')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('blue');}" role="button" tabindex="0" title="Cyber Blue" aria-label="Cyber Blue theme"></div>
-                    <div class="theme-dot dot-purple" onclick="changeTheme('purple')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('purple');}" role="button" tabindex="0" title="Electric Purple" aria-label="Electric Purple theme"></div>
-                    <div class="theme-dot dot-ruby" onclick="changeTheme('ruby')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('ruby');}" role="button" tabindex="0" title="Ruby Red" aria-label="Ruby Red theme"></div>
-                    <div class="theme-dot dot-sunset" onclick="changeTheme('sunset')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('sunset');}" role="button" tabindex="0" title="Sunset Orange" aria-label="Sunset Orange theme"></div>
-                    <div class="theme-dot dot-gold" onclick="changeTheme('gold')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('gold');}" role="button" tabindex="0" title="Luxury Gold" aria-label="Luxury Gold theme"></div>
-                    <div class="theme-dot dot-emerald" onclick="changeTheme('emerald')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('emerald');}" role="button" tabindex="0" title="Neo Emerald" aria-label="Neo Emerald theme"></div>
+                    <div class="theme-dots-wrapper" id="theme-dots-wrapper">
+                        <div class="theme-dots-group group-1 is-header">
+                            <div class="theme-dot dot-blue active" onclick="changeTheme('blue')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('blue');}" role="button" tabindex="0" title="Cyber Blue" aria-label="Cyber Blue theme"></div>
+                            <div class="theme-dot dot-purple" onclick="changeTheme('purple')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('purple');}" role="button" tabindex="0" title="Electric Purple" aria-label="Electric Purple theme"></div>
+                            <div class="theme-dot dot-ruby" onclick="changeTheme('ruby')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('ruby');}" role="button" tabindex="0" title="Ruby Red" aria-label="Ruby Red theme"></div>
+                        </div>
+                        <div class="theme-dots-group group-2 is-dropdown">
+                            <div class="theme-dot dot-sunset" onclick="changeTheme('sunset')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('sunset');}" role="button" tabindex="0" title="Sunset Orange" aria-label="Sunset Orange theme"></div>
+                            <div class="theme-dot dot-gold" onclick="changeTheme('gold')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('gold');}" role="button" tabindex="0" title="Luxury Gold" aria-label="Luxury Gold theme"></div>
+                            <div class="theme-dot dot-emerald" onclick="changeTheme('emerald')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeTheme('emerald');}" role="button" tabindex="0" title="Neo Emerald" aria-label="Neo Emerald theme"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -824,6 +838,10 @@
                         <div class="about-stat-pill">
                             <span class="about-stat-label" data-i18n="runtimeLabel">Engine</span>
                             <span class="about-stat-value">Go + Wails</span>
+                        </div>
+                        <div class="about-stat-pill" id="about-update-pill" onclick="manualCheckForUpdates()" style="cursor: pointer;" title="Check for updates">
+                            <span class="about-stat-label" data-i18n="updateLabel">Update</span>
+                            <span class="about-stat-value" id="about-update-status">Check</span>
                         </div>
                     </div>
 

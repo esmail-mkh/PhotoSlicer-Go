@@ -333,10 +333,10 @@ body::after {
 .header-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     min-width: 0;
     flex: 0 1 auto;            /* hug the brand + presets button; never grow into the toggles */
-    margin-inline-end: 12px;   /* guaranteed minimum gap before the toggles */
+    margin-inline-end: 8px;    /* guaranteed minimum gap before the toggles */
 }
 
 /* Toggles keep their size and are always pinned to the far end of the row */
@@ -494,19 +494,30 @@ body:not([data-tab="process"]) .header-presets {
     flex: none;
 }
 
-/* Version Badge */
+/* Version Badge (Header) */
 .version-badge {
-    font-size: 0.6rem;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    font-size: 0.62rem;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
     padding: 3px 10px;
     border-radius: 20px;
     color: var(--text-secondary);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    font-family: 'Poppins', sans-serif;
+    font-family: 'Poppins', 'Vazirmatn', sans-serif;
     font-weight: 600;
-    letter-spacing: 0.6px;
-    transition: var(--transition-fast);
+    letter-spacing: 0.5px;
+    transition: all 0.25s ease;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+    white-space: nowrap;
+    line-height: 1.2;
+    text-decoration: none;
 }
 
 .version-badge:hover {
@@ -514,6 +525,102 @@ body:not([data-tab="process"]) .header-presets {
     color: #fff;
     border-color: var(--theme-solid);
     box-shadow: 0 0 12px var(--theme-glow-soft), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Version Badge with Update Available */
+.version-badge.has-update {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(5, 150, 105, 0.3));
+    color: #34d399;
+    border-color: rgba(52, 211, 153, 0.55);
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    animation: updateBadgePulse 2.5s infinite ease-in-out;
+}
+
+.version-badge.has-update:hover {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(5, 150, 105, 0.45));
+    color: #ffffff;
+    border-color: #6ee7b7;
+    box-shadow: 0 0 18px rgba(16, 185, 129, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.version-badge.has-update:active {
+    transform: translateY(0) scale(0.97);
+}
+
+.version-badge .update-badge-icon {
+    width: 11px;
+    height: 11px;
+    color: #34d399;
+    flex-shrink: 0;
+    transition: color 0.2s ease;
+    animation: updateBounce 2s infinite ease-in-out;
+}
+
+.version-badge.has-update:hover .update-badge-icon {
+    color: #ffffff;
+}
+
+.version-badge .update-pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #34d399;
+    box-shadow: 0 0 6px #34d399;
+    flex-shrink: 0;
+}
+
+.version-badge .update-pulse-ring {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(52, 211, 153, 0.6);
+    opacity: 0.8;
+    animation: updateRingPulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+    pointer-events: none;
+    left: 8px;
+}
+
+[dir="rtl"] .version-badge .update-pulse-ring {
+    left: auto;
+    right: 8px;
+}
+
+@keyframes updateBadgePulse {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        border-color: rgba(52, 211, 153, 0.45);
+    }
+    50% {
+        box-shadow: 0 0 16px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        border-color: rgba(52, 211, 153, 0.8);
+    }
+}
+
+@keyframes updateRingPulse {
+    0% {
+        transform: scale(0.6);
+        opacity: 0.9;
+    }
+    70% {
+        transform: scale(2.2);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(2.4);
+        opacity: 0;
+    }
+}
+
+@keyframes updateBounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-1.5px);
+    }
 }
 
 /* Theme Toggles Bar */
@@ -619,6 +726,95 @@ body:not([data-tab="process"]) .header-presets {
 .dot-emerald { background: linear-gradient(135deg, #10b981, #059669); }
 .dot-ruby { background: linear-gradient(135deg, #f87171, #dc2626); }
 .dot-gold { background: linear-gradient(135deg, #facc15, #a16207); }
+
+/* Theme Dots Wrapper & Groups */
+.theme-dots-wrapper {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-dots-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ============================================
+   COMPACT THEME TOGGLES WHEN UPDATE IS ACTIVE
+   In collapsed state, shows 3 theme dots in the header.
+   On hover, the remaining 3 dots drop down as a floating
+   glass pill directly below, ensuring ZERO horizontal
+   expansion into the presets button.
+   ============================================ */
+body.has-update-active .theme-toggles {
+    position: relative;
+    padding: 5px 8px;
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+body.has-update-active .header-left {
+    gap: 6px;
+    margin-inline-end: 6px;
+}
+
+body.has-update-active #title-text {
+    font-size: 1.4rem;
+}
+
+/* Active 3-dot group remains in the header row */
+body.has-update-active .theme-dots-group.is-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Inactive 3-dot group becomes a floating dropdown beneath the header dots */
+body.has-update-active .theme-dots-group.is-dropdown {
+    position: absolute;
+    top: calc(100% + 5px);
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 8px;
+    background: linear-gradient(180deg, rgba(20, 26, 40, 0.96), rgba(15, 23, 42, 0.94));
+    border: 1px solid var(--glass-border-hover);
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 14px var(--theme-glow-soft);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px) scale(0.95);
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Hover bridge to keep dropdown open when cursor moves to it */
+body.has-update-active .theme-dots-group.is-dropdown::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 0;
+    right: 0;
+    height: 8px;
+}
+
+/* Reveal dropdown smoothly on hover */
+body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+
+/* RTL positioning: right edge becomes left edge */
+[dir="rtl"] body.has-update-active .theme-dots-group.is-dropdown {
+    right: auto;
+    left: 0;
+}
 
 /* ============================================
    TABS — Real Glassmorphism
@@ -764,33 +960,42 @@ body:not([data-tab="process"]) .header-presets {
 /* When the Settings tab is active, constrain the container height
    and make the tab content scrollable. Scoped via body[data-tab]
    so the Workspace tab's dropdown menus are unaffected. */
-body[data-tab="settings"] .container {
+body[data-tab="settings"] .container,
+body[data-tab="aboutUs"] .container {
     overflow: hidden;
 }
 
-body[data-tab="settings"] .tab-content.active {
+body[data-tab="settings"] .tab-content.active,
+body[data-tab="aboutUs"] .tab-content.active {
     overflow-y: auto;
     flex: 1;
     min-height: 0;
     padding-right: 4px;
+}
+
+body[data-tab="settings"] .tab-content.active {
     gap: 10px;
 }
 
-/* Themed scrollbar for the Settings tab */
-body[data-tab="settings"] .tab-content.active::-webkit-scrollbar {
+/* Themed scrollbar for Settings and About tabs */
+body[data-tab="settings"] .tab-content.active::-webkit-scrollbar,
+body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar {
     width: 5px;
 }
-body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-track {
+body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-track,
+body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-track {
     background: transparent;
     margin: 8px 0;
 }
-body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb {
+body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb,
+body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
     border-radius: 20px;
     border: 1px solid rgba(255,255,255,0.04);
     transition: background 0.3s ease;
 }
-body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb:hover {
+body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb:hover,
+body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, var(--theme-glow-soft), rgba(255,255,255,0.1));
     border-color: rgba(255,255,255,0.1);
 }
@@ -4382,6 +4587,25 @@ body.job-active .stop-button {
 .about-stat-value {
     color: var(--text-primary);
     font-weight: 700;
+}
+
+#about-update-pill {
+    user-select: none;
+    cursor: pointer;
+}
+
+#about-update-pill:active {
+    transform: scale(0.96);
+}
+
+#about-update-pill.has-update {
+    border-color: rgba(52, 211, 153, 0.5);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.3));
+    color: #34d399;
+}
+
+#about-update-pill.has-update .about-stat-value {
+    color: #34d399;
 }
 
 .about-stat-link {
