@@ -965,6 +965,10 @@ body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb:hover {
     outline: none;
     cursor: pointer;
     transition: var(--transition-fast);
+    width: 185px;
+    max-width: 100%;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .setting-select:focus {
     border-color: var(--theme-solid);
@@ -996,6 +1000,136 @@ body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb:hover {
 .engine-badge-icon .engine-svg-realesrgan {
     color: #f97316;
     filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.35));
+}
+
+.gpu-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    min-height: 38px;
+    gap: 8px;
+}
+
+[dir="rtl"] .gpu-setting-row {
+    direction: rtl;
+    padding: 6px 8px;
+}
+
+.gpu-info-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+    font-size: 0.74rem;
+    color: var(--text-secondary, #94a3b8);
+    overflow: hidden;
+    cursor: default;
+}
+
+[dir="rtl"] .gpu-info-label {
+    font-family: 'Vazirmatn', sans-serif !important;
+    direction: rtl;
+    text-align: right;
+}
+
+.gpu-info-label .gpu-icon {
+    width: 13px;
+    height: 13px;
+    color: #10b981;
+    flex-shrink: 0;
+}
+
+.gpu-info-label .gpu-label-prefix {
+    flex-shrink: 0;
+    font-weight: 500;
+    color: var(--text-tertiary, #64748b);
+}
+
+.gpu-info-label .gpu-name-text {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+    color: var(--text-primary, #f8fafc);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: ltr;
+    unicode-bidi: isolate;
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+.gpu-info-label .gpu-vram-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--text-tertiary, #94a3b8);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+    line-height: 1.2;
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+.gpu-info-label .gpu-vram-badge.capable {
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(56, 189, 248, 0.25);
+}
+
+.btn-detect-gpu {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 28px;
+    padding: 0 10px;
+    background: rgba(var(--accent-rgb, 56, 189, 248), 0.1);
+    border: 1px solid rgba(var(--accent-rgb, 56, 189, 248), 0.25);
+    border-radius: 6px;
+    color: var(--accent-color, #38bdf8);
+    font-family: 'Poppins', 'Vazirmatn', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+[dir="rtl"] .btn-detect-gpu {
+    font-family: 'Vazirmatn', sans-serif !important;
+    direction: rtl;
+    text-align: right;
+}
+
+[dir="rtl"] .btn-detect-gpu svg {
+    margin-left: 2px;
+}
+
+.btn-detect-gpu:hover {
+    background: rgba(var(--accent-rgb, 56, 189, 248), 0.2);
+    border-color: rgba(var(--accent-rgb, 56, 189, 248), 0.45);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(var(--accent-rgb, 56, 189, 248), 0.2);
+}
+
+.btn-detect-gpu:active {
+    transform: translateY(0);
+}
+
+.btn-detect-gpu.loading .detect-icon {
+    animation: gpuDetectSpin 0.8s linear infinite;
+}
+
+@keyframes gpuDetectSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 /* RTL settings input fonts */

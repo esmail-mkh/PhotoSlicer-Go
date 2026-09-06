@@ -51,7 +51,9 @@
         isDirectory: (path) => window.go?.main?.App?.IsDirectory(path),
         folderName: (path) => window.go?.main?.App?.FolderName(path),
         inspect_directory: (path) => window.go?.main?.App?.InspectDirectory(path),
-        get_app_version: () => window.go?.main?.App?.GetAppVersion()
+        get_app_version: () => window.go?.main?.App?.GetAppVersion(),
+        auto_detect_enhance_engine: () => window.go?.main?.App?.AutoDetectEnhanceEngine(),
+        get_gpu_info: () => window.go?.main?.App?.GetGPUInfo()
     };
 
     window.pywebview = { api: api };

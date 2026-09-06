@@ -17,8 +17,12 @@ const translations = {
         formatPsdDesc: "Photoshop layers",
         aiEnhance: "AI Enhance",
         enhanceEngine: "Quality Engine",
-        engineFast: "Fast Manhwa Line Clean (CPU)",
+        engineFast: "Fast Clean (CPU)",
         engineRealESRGAN: "Real-ESRGAN (GPU)",
+        detectedGpuLabel: "GPU:",
+        autoDetectGPU: "Auto Detect",
+        autoDetectGPUTooltip: "Automatically detect GPU and select the optimal quality engine",
+        hardwareScan: "Scanning...",
         noStitch: "No Stitch",
         inactiveNoStitch: "No Stitch",
         zip: "ZIP Archive",
@@ -212,8 +216,12 @@ const translations = {
         formatPsdDesc: "لایه‌های فتوشاپ",
         aiEnhance: "افزایش کیفیت هوشمند",
         enhanceEngine: "موتور افزایش کیفیت",
-        engineFast: "پاک‌سازی خطوط مانهوا (پردازنده - بدون تغییر رنگ)",
-        engineRealESRGAN: "مدل عمیق Real-ESRGAN (کارت گرافیک)",
+        engineFast: "Fast Clean (پردازنده)",
+        engineRealESRGAN: "Real-ESRGAN (گرافیک)",
+        detectedGpuLabel: "کارت گرافیک:",
+        autoDetectGPU: "تشخیص خودکار",
+        autoDetectGPUTooltip: "تشخیص خودکار کارت گرافیک و تنظیم بهینه‌ترین موتور افزایش کیفیت",
+        hardwareScan: "در حال بررسی...",
         noStitch: "بدون چسباندن (تغییر فرمت)",
         inactiveNoStitch: "بدون چسباندن",
         zip: "فشرده‌سازی ZIP",
@@ -393,6 +401,7 @@ const translations = {
 
 let currentLang = 'fa';
 let isInitializing = true;
+let cachedGPUInfo = null;
 
 function toggleLanguage() {
     const newLang = currentLang === 'en' ? 'fa' : 'en';
@@ -485,6 +494,16 @@ function setLanguage(lang) {
 
     if (typeof hideTooltipPopup === 'function') {
         hideTooltipPopup();
+    }
+
+    // Refresh detected GPU info in the newly active language
+    if (cachedGPUInfo && typeof renderGPUInfo === 'function') {
+        renderGPUInfo(cachedGPUInfo);
+    } else {
+        const nameEl = document.getElementById('gpu-name-text');
+        if (nameEl && (!cachedGPUInfo || !cachedGPUInfo.name)) {
+            nameEl.textContent = texts.hardwareScan || (lang === 'fa' ? 'در حال بررسی...' : 'Scanning...');
+        }
     }
 }
 
@@ -1567,6 +1586,147 @@ function updateEngineIcon() {
         badge.title = isFa ? 'پردازش سریع خطوط با پردازنده' : 'Fast Clean (CPU Engine)';
     }
 }
+
+function formatGPUModelName(rawName) {
+    if (!rawName) return '';
+    let name = rawName.trim();
+    // Remove trademark/registered symbols and corporate suffixes
+    name = name.replace(/\([RTMrtm]+\)/gi, '').trim();
+    name = name.replace(/\b(Corporation|Corp\.?|Inc\.?|Technologies|Co\.,?|Ltd\.?)\b/gi, '').trim();
+    // In NVIDIA cards, "GeForce" is redundant when RTX or GTX is present
+    if (/geforce/i.test(name)) {
+        name = name.replace(/\bgeforce\b\s*/i, '');
+    }
+    // Remove verbose laptop/desktop/edition suffixes that eat horizontal space
+    name = name.replace(/\s*(Laptop GPU|Laptop|Mobile|with Max-Q Design|Desktop Edition|Desktop)\b/gi, '');
+    // In Intel/AMD cards, remove generic "Graphics" word
+    name = name.replace(/\s+Graphics\b/gi, '');
+    // Collapse spaces
+    name = name.replace(/\s{2,}/g, ' ').trim();
+    return name;
+}
+
+function renderGPUInfo(info) {
+    if (!info || !info.name) return;
+    cachedGPUInfo = info;
+    const row = document.getElementById('gpu-info-row');
+    const label = document.getElementById('gpu-info-label');
+    const nameEl = document.getElementById('gpu-name-text');
+    const vramEl = document.getElementById('gpu-vram-badge');
+    const iconEl = row ? row.querySelector('.gpu-icon') : null;
+    if (!row || !nameEl) return;
+
+    const isFa = (currentLang === 'fa');
+    const cleanName = formatGPUModelName(info.name);
+    nameEl.textContent = cleanName;
+
+    // VRAM Badge
+    if (vramEl) {
+        if (info.dedicated_vram_mb > 0) {
+            let vramText = '';
+            if (info.dedicated_vram_mb >= 1024) {
+                const gb = (info.dedicated_vram_mb / 1024).toFixed(1).replace('.0', '');
+                vramText = `${gb}GB`;
+            } else {
+                vramText = `${info.dedicated_vram_mb}MB`;
+            }
+            vramEl.textContent = vramText;
+            vramEl.style.display = 'inline-block';
+            vramEl.classList.toggle('capable', !!info.is_capable);
+        } else {
+            vramEl.textContent = isFa ? 'اشتراکی' : 'Shared';
+            vramEl.style.display = 'inline-block';
+            vramEl.classList.remove('capable');
+        }
+    }
+
+    // Status icon color
+    if (iconEl) {
+        iconEl.style.color = info.is_capable ? '#10b981' : '#f59e0b';
+    }
+
+    // Detailed informative tooltip
+    if (label) {
+        const vramDesc = info.dedicated_vram_mb > 0 ? `${info.dedicated_vram_mb} MB VRAM` : (isFa ? 'حافظه اشتراکی' : 'Shared Memory');
+        if (isFa) {
+            label.title = info.is_capable
+                ? `${info.name} • ${vramDesc} • مناسب مدل Real-ESRGAN`
+                : `${info.name} • ${vramDesc} • پیشنهاد: Fast Clean (پردازنده)`;
+        } else {
+            label.title = info.is_capable
+                ? `${info.name} • ${vramDesc} • Optimal for Real-ESRGAN`
+                : `${info.name} • ${vramDesc} • Recommended: Fast Clean (CPU)`;
+        }
+    }
+
+    row.style.display = 'flex';
+}
+window.renderGPUInfo = renderGPUInfo;
+
+async function autoDetectGPU() {
+    const btn = document.getElementById('btn-detect-gpu');
+    if (btn) btn.classList.add('loading');
+
+    try {
+        let res = null;
+        if (window.pywebview?.api?.auto_detect_enhance_engine) {
+            res = await window.pywebview.api.auto_detect_enhance_engine();
+        } else if (window.go?.main?.App?.AutoDetectEnhanceEngine) {
+            res = await window.go.main.App.AutoDetectEnhanceEngine();
+        }
+
+        if (!res) {
+            if (typeof showError === 'function') showError(currentLang === 'fa' ? 'خطا در شناسایی کارت گرافیک.' : 'Failed to detect GPU.');
+            return;
+        }
+
+        // Apply detected engine to dropdown
+        const sel = document.getElementById('enhance-engine-select');
+        if (sel && res.engine) {
+            sel.value = res.engine;
+            updateEngineIcon();
+            if (typeof updateSettings === 'function') updateSettings();
+        }
+
+        // Render detected GPU badge
+        renderGPUInfo(res);
+
+        // Friendly toast notification with bidi isolates
+        const isFa = (currentLang === 'fa');
+        const vramStr = res.dedicated_vram_mb >= 1024
+            ? (res.dedicated_vram_mb / 1024).toFixed(1).replace('.0', '') + (isFa ? ' گیگابایت' : ' GB')
+            : res.dedicated_vram_mb + (isFa ? ' مگابایت' : ' MB');
+
+        const shortName = formatGPUModelName(res.name);
+        const gpuNameIso = `\u2066${shortName}\u2069`;
+        const vramIso = `\u2066${vramStr}\u2069`;
+
+        let msg = '';
+        if (res.is_capable && res.has_exe) {
+            msg = isFa
+                ? `کارت گرافیک شناسایی شد: ${gpuNameIso} (${vramIso}). موتور افزایش کیفیت به Real-ESRGAN تغییر یافت.`
+                : `Capable GPU detected: ${shortName} (${vramStr}). Engine set to Real-ESRGAN (GPU).`;
+        } else if (res.is_capable && !res.has_exe) {
+            msg = isFa
+                ? `کارت گرافیک (${gpuNameIso}) شناسایی شد، اما فایل هوش مصنوعی یافت نشد. موتور Fast Clean انتخاب شد.`
+                : `GPU detected (${shortName}), but Real-ESRGAN executable was not found. Fast Clean selected.`;
+        } else {
+            msg = isFa
+                ? `کارت گرافیک شناسایی شد: ${gpuNameIso} (${vramIso}). جهت پایداری، موتور Fast Clean (پردازنده) انتخاب شد.`
+                : `Hardware detected: ${shortName} (${vramStr}). Fast Clean (CPU) selected for optimal stability.`;
+        }
+
+        if (typeof showSuccess === 'function') {
+            showSuccess(msg);
+        }
+    } catch (err) {
+        console.error('autoDetectGPU error:', err);
+        if (typeof showError === 'function') showError(String(err));
+    } finally {
+        if (btn) btn.classList.remove('loading');
+    }
+}
+window.autoDetectGPU = autoDetectGPU;
 
 function updateSettings() {
     updateEngineIcon();

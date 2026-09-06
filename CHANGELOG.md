@@ -13,6 +13,7 @@
 * **🧠 سیستم واترمارک هوشمند و محتوا-محور:** الگوریتم پیشرفته تشخیص کادرهای طراحی و جلوگیری دقیق از تداخل واترمارک با حباب‌های گفتگو.
 * **📐 حفظ ابعاد اصلی تصویر در واترمارک:** رفع مشکل کوچک‌شدن ناخواسته تصویر و تثبیت رزولوشن دقیق هنگام درج واترمارک.
 * **💾 پایداری تنظیمات و رفع مواردی از انکودینگ:** ذخیره‌سازی پایدار انتخاب موتور بهبود کیفیت (Fast Clean / Real-ESRGAN)، حفظ گزینه‌های پریست‌ها و رفع مشکل کاراکترهای ناسازگار (Mojibake).
+* **🎮 تشخیص خودکار کارت گرافیک (GPU & VRAM):** شناسایی هوشمند سخت‌افزار گرافیکی سیستم در اولین اجرا و انتخاب خودکار مدل هوش مصنوعی Real-ESRGAN در صورت وجود کارت گرافیک قدرتمند (حداقل ۲ گیگابایت وی‌رم) یا Fast Clean در گرافیک‌های ضعیف/مجتمع، همراه با دکمه تشخیص خودکار در تنظیمات.
 * **⚡ بهینه‌سازی رابط کاربری و رفع خطاهای اسکریپت:** رفع باگ‌های جزئی در فایل‌های فرانت‌اند و بهبود روانی عملکرد برنامه.
 
 ---
@@ -144,6 +145,7 @@
 * **🧠 Content-Aware Smart Watermarking:** Advanced panel edge detection and intelligent speech bubble avoidance for pristine watermark placement.
 * **📐 Native Image Dimension Preservation:** Fixed unexpected image downscaling during watermarking, guaranteeing exact source resolution retention.
 * **💾 Robust Settings & Presets Persistence:** Reliable persistence of enhancement engine selection (Fast Clean / Real-ESRGAN), full preservation of preset options, and resolution of text encoding/mojibake issues.
+* **🎮 Automatic GPU & VRAM Detection:** Smart hardware detection on initial startup to automatically select Real-ESRGAN AI upscaling when a dedicated GPU (>= 2GB VRAM) is present, falling back to Fast Clean (CPU) on integrated graphics, with an on-demand Auto Detect button in Settings.
 * **⚡ Frontend Polish & Bug Fixes:** Eliminated minor script syntax issues and enhanced UI stability.
 
 ---

@@ -650,6 +650,22 @@
                             </select>
                         </div>
                     </div>
+                    <div class="setting-row gpu-setting-row" id="gpu-info-row">
+                        <span class="setting-label gpu-info-label" id="gpu-info-label">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="setting-icon gpu-icon"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                            <span class="gpu-label-prefix" data-i18n="detectedGpuLabel">GPU:</span>
+                            <bdi class="gpu-name-text" id="gpu-name-text">Scanning...</bdi>
+                            <span class="gpu-vram-badge" id="gpu-vram-badge" style="display:none;"></span>
+                        </span>
+                        <div class="setting-control">
+                            <button type="button" class="btn-detect-gpu" id="btn-detect-gpu" onclick="autoDetectGPU()" data-i18n-title="autoDetectGPUTooltip" title="Auto detect GPU and set optimal engine">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="detect-icon">
+                                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                </svg>
+                                <span data-i18n="autoDetectGPU">Auto Detect</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Watermark Settings -->

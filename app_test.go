@@ -248,4 +248,44 @@ func TestDoNotOverwriteValidBakWithEmptyPresets(t *testing.T) {
 	}
 }
 
+func TestGPUAutoDetectionAndIsolation(t *testing.T) {
+	app := NewApp()
+	tempFile := filepath.Join(t.TempDir(), "settings.json")
+	app.settingsPathOverride = tempFile
+
+	// 1. GetGPUInfo
+	info := app.GetGPUInfo()
+	if info == nil {
+		t.Fatal("expected non-nil GPUInfo map")
+	}
+	if _, ok := info["name"]; !ok {
+		t.Error("expected name key in GPUInfo")
+	}
+
+	// 2. AutoDetectEnhanceEngine with isolated settings
+	res := app.AutoDetectEnhanceEngine()
+	engine, ok := res["engine"].(string)
+	if !ok || (engine != "realesrgan" && engine != "fast") {
+		t.Errorf("expected engine to be 'realesrgan' or 'fast', got %v", res["engine"])
+	}
+
+	// 3. Verify settings saved in isolated temp file
+	loaded := app.loadSettings()
+	if loaded["enhance_engine"] != engine {
+		t.Errorf("expected enhance_engine to be saved as %s, got %v", engine, loaded["enhance_engine"])
+	}
+	if loaded["gpu_detected"] != true {
+		t.Errorf("expected gpu_detected to be true, got %v", loaded["gpu_detected"])
+	}
+}
+
+func TestDefaultSettingsDynamicEnhanceEngine(t *testing.T) {
+	app := NewApp()
+	defaults := app.defaultSettings()
+	engine, ok := defaults["enhance_engine"].(string)
+	if !ok || (engine != "realesrgan" && engine != "fast") {
+		t.Errorf("expected default enhance_engine to be 'realesrgan' or 'fast', got %v", defaults["enhance_engine"])
+	}
+}
+
 

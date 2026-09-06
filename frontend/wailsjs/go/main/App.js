@@ -6,6 +6,10 @@ export function AppReady() {
   return window['go']['main']['App']['AppReady']();
 }
 
+export function AutoDetectEnhanceEngine() {
+  return window['go']['main']['App']['AutoDetectEnhanceEngine']();
+}
+
 export function CloseWindow() {
   return window['go']['main']['App']['CloseWindow']();
 }
@@ -24,6 +28,10 @@ export function GetAppVersion() {
 
 export function GetClipboardText() {
   return window['go']['main']['App']['GetClipboardText']();
+}
+
+export function GetGPUInfo() {
+  return window['go']['main']['App']['GetGPUInfo']();
 }
 
 export function ImportPresets() {

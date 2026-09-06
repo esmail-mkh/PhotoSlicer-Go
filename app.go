@@ -243,6 +243,7 @@ func (a *App) GetAppVersion() string {
 }
 
 func (a *App) defaultSettings() map[string]interface{} {
+	initialEngine, gpuInfo := enhancer.GetOptimalEnhanceEngine()
 	return map[string]interface{}{
 		"custom_width_checked": true,
 		"width":                800,
@@ -253,7 +254,10 @@ func (a *App) defaultSettings() map[string]interface{} {
 		"pdf_checked":          false,
 		"cbz_checked":          false,
 		"enhance_checked":      false,
-		"enhance_engine":       "fast",
+		"enhance_engine":       initialEngine,
+		"gpu_detected":         gpuInfo.Name != "",
+		"detected_gpu":         gpuInfo.Name,
+		"detected_vram_mb":     gpuInfo.DedicatedVRAMMB,
 		"no_stitch_checked":    false,
 		"selected_tab":         "process",
 		"theme":                "blue",
@@ -522,6 +526,17 @@ func (a *App) AppReady() {
 	wailsRuntime.WindowSetTitle(a.ctx, getMsg("app_window_title", lang))
 	a.changeStatusText(getMsg("ready", lang))
 	a.applySettingsToDOM(settings)
+
+	// Inject detected GPU hardware info into DOM
+	gpu := enhancer.DetectPrimaryGPU()
+	gpuJSON, _ := json.Marshal(map[string]interface{}{
+		"name":              gpu.Name,
+		"vendor":            gpu.Vendor,
+		"dedicated_vram_mb": gpu.DedicatedVRAMMB,
+		"is_capable":        gpu.IsCapable,
+		"has_exe":           enhancer.FindRealEsrganExecutable("") != "",
+	})
+	a.execJS(fmt.Sprintf(`if (typeof renderGPUInfo === 'function') renderGPUInfo(%s);`, string(gpuJSON)))
 }
 
 func (a *App) applySettingsToDOM(settings map[string]interface{}) {
@@ -598,6 +613,7 @@ func (a *App) applySettingsToDOM(settings map[string]interface{}) {
 			// Re-affirm select values after setLanguage to prevent any browser option translation reset
 			setVal('enhance-engine-select', s.enhance_engine || 'fast');
 			setVal('watermark-edge', s.watermark_edge || 'right');
+			if (typeof updateEngineIcon === 'function') updateEngineIcon();
 
 			if (typeof refreshSaveLocationState === 'function') refreshSaveLocationState();
 			if (typeof toggleWatermarkOptions === 'function') toggleWatermarkOptions();
@@ -681,6 +697,44 @@ func (a *App) SaveSettings(settings map[string]interface{}) {
 	a.saveSettingsToDisk(settings)
 	if lang, ok := settings["language"].(string); ok && lang != "" {
 		wailsRuntime.WindowSetTitle(a.ctx, getMsg("app_window_title", lang))
+	}
+}
+
+// GetGPUInfo returns detected graphics hardware details.
+func (a *App) GetGPUInfo() map[string]interface{} {
+	info := enhancer.DetectPrimaryGPU()
+	hasExe := enhancer.FindRealEsrganExecutable("") != ""
+	return map[string]interface{}{
+		"name":              info.Name,
+		"vendor":            info.Vendor,
+		"dedicated_vram_mb": info.DedicatedVRAMMB,
+		"is_software":       info.IsSoftware,
+		"is_capable":        info.IsCapable,
+		"has_exe":           hasExe,
+	}
+}
+
+// AutoDetectEnhanceEngine scans the GPU hardware, sets the optimal enhance engine,
+// updates settings on disk, and returns the result with hardware details.
+func (a *App) AutoDetectEnhanceEngine() map[string]interface{} {
+	engine, info := enhancer.GetOptimalEnhanceEngine()
+	hasExe := enhancer.FindRealEsrganExecutable("") != ""
+
+	a.saveSettingsToDisk(map[string]interface{}{
+		"enhance_engine":   engine,
+		"gpu_detected":     true,
+		"detected_gpu":     info.Name,
+		"detected_vram_mb": info.DedicatedVRAMMB,
+	})
+
+	return map[string]interface{}{
+		"engine":            engine,
+		"name":              info.Name,
+		"vendor":            info.Vendor,
+		"dedicated_vram_mb": info.DedicatedVRAMMB,
+		"is_software":       info.IsSoftware,
+		"is_capable":        info.IsCapable,
+		"has_exe":           hasExe,
 	}
 }
 
