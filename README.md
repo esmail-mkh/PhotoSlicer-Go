@@ -123,6 +123,14 @@ Download the latest release archive from [Releases](https://github.com/esmail-mk
 | 🍎 **macOS (x64/ARM)** | `PhotoSlicer-v<Version>-macOS.zip` | `PhotoSlicer.app` |
 
 > ℹ️ Each package comes bundled with the `up-model/` directory containing AI models.
+>
+> 🍎 **Note for macOS users (Fixing "damaged and can't be opened" error):**  
+> Due to Apple's Gatekeeper security policy on unsigned apps downloaded via Telegram or web browsers, macOS may block the app with a misleading message: `"PhotoSlicer is damaged and can't be opened"`. To run it, run this command once in Terminal:
+> ```bash
+> xattr -cr /path/to/PhotoSlicer.app
+> ```
+> *(Tip: Type `xattr -cr ` with a space, drag-and-drop `PhotoSlicer.app` into Terminal, and press Enter)*  
+> Alternatively, go to **System Settings > Privacy & Security** and click **Open Anyway**.
 
 ---
 

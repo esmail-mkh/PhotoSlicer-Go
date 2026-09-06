@@ -199,6 +199,9 @@ jobs:
           mkdir -p "dist_pkg/$APP_NAME/Contents/Resources"
           cp -r dist_pkg/up-model "dist_pkg/$APP_NAME/Contents/Resources/"
 
+          # Re-sign the entire app bundle after injecting up-model to ensure code signature integrity
+          codesign --force --deep -s - "dist_pkg/$APP_NAME"
+
           ditto -c -k --keepParent dist_pkg "$ZIP_NAME"
 
       - name: Upload Build Artifact
