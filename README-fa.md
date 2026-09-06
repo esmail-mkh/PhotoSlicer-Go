@@ -117,9 +117,9 @@
 
 جدیدترین نسخه را مستقیماً از [صفحه دانلود Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest) دریافت کنید:
 
-| سیستم عامل | نام پکیج دانلودی | فایل اجرایی داخل پکیج |
+| سیستم‌عامل | نام پکیج | فایل اجرایی داخل پکیج |
 |:---|:---|:---|
-| 🪟 **ویندوز (Windows x64)** | `PhotoSlicer-v<Version>-Windows.zip` | `PhotoSlicer.exe` |
+| 🪟 **ویندوز (Windows x64)** | `PhotoSlicer-v<Version>-Windows.zip` | `PhotoSlicer v<Version>.exe` |
 | 🐧 **لینوکس (Linux x64)** | `PhotoSlicer-v<Version>-Linux.zip` | `./PhotoSlicer` |
 | 🍎 **مک (macOS x64/ARM)** | `PhotoSlicer-v<Version>-macOS.zip` | `PhotoSlicer.app` |
 

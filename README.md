@@ -118,7 +118,7 @@ Download the latest release archive from [Releases](https://github.com/esmail-mk
 
 | Operating System | Package Name | Executable Inside |
 |:---|:---|:---|
-| 🪟 **Windows (x64)** | `PhotoSlicer-v<Version>-Windows.zip` | `PhotoSlicer.exe` |
+| 🪟 **Windows (x64)** | `PhotoSlicer-v<Version>-Windows.zip` | `PhotoSlicer v<Version>.exe` |
 | 🐧 **Linux (x64)** | `PhotoSlicer-v<Version>-Linux.zip` | `./PhotoSlicer` |
 | 🍎 **macOS (x64/ARM)** | `PhotoSlicer-v<Version>-macOS.zip` | `PhotoSlicer.app` |
 

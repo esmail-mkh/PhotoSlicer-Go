@@ -1,5 +1,7 @@
 package constants
 
+//go:generate go run ../../scripts/sync_version.go
+
 import (
 	"os"
 	"path/filepath"
