@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -75,6 +76,9 @@ func TestInspectDirectory(t *testing.T) {
 
 func TestSaveSettingsToDiskAtomic(t *testing.T) {
 	app := NewApp()
+	tempFile := filepath.Join(t.TempDir(), "settings.json")
+	app.settingsPathOverride = tempFile
+
 	settings := map[string]interface{}{
 		"language": "en",
 		"width":    float64(1200),
@@ -95,4 +99,153 @@ func TestOpenFileExplorer(t *testing.T) {
 	app.OpenFileExplorer("")
 	app.OpenFileExplorer("non_existent_path_xyz")
 }
+
+func TestAutoRecoverMissingSettingsFileFromBak(t *testing.T) {
+	tempDir := t.TempDir()
+	app := NewApp()
+	settingsFile := filepath.Join(tempDir, "settings.json")
+	bakFile := settingsFile + ".bak"
+	app.settingsPathOverride = settingsFile
+
+	bakContent := `{
+		"language": "fa",
+		"width": 800,
+		"custom_theme_color": "#ff0011",
+		"presets": [
+			{"name": "Preset 1", "values": {"width": 800}}
+		]
+	}`
+	if err := os.WriteFile(bakFile, []byte(bakContent), 0644); err != nil {
+		t.Fatalf("failed to write bak file: %v", err)
+	}
+
+	loaded := app.loadSettings()
+	if loaded["width"] != float64(800) {
+		t.Errorf("expected width 800 recovered from bak, got %v", loaded["width"])
+	}
+	if loaded["custom_theme_color"] != "#ff0011" {
+		t.Errorf("expected theme color #ff0011, got %v", loaded["custom_theme_color"])
+	}
+	presets, ok := loaded["presets"].([]interface{})
+	if !ok || len(presets) != 1 {
+		t.Fatalf("expected 1 preset recovered from bak, got %v", presets)
+	}
+
+	// Verify that settings.json was recreated on disk
+	if _, err := os.Stat(settingsFile); os.IsNotExist(err) {
+		t.Errorf("expected settings.json to be recreated from bak, but not found")
+	}
+}
+
+func TestAutoRecoverCorruptedJSONFromBak(t *testing.T) {
+	tempDir := t.TempDir()
+	app := NewApp()
+	settingsFile := filepath.Join(tempDir, "settings.json")
+	bakFile := settingsFile + ".bak"
+	app.settingsPathOverride = settingsFile
+
+	// Corrupted primary file
+	if err := os.WriteFile(settingsFile, []byte("{not valid json..."), 0644); err != nil {
+		t.Fatalf("failed to write corrupt settings file: %v", err)
+	}
+
+	bakContent := `{
+		"language": "fa",
+		"width": 850,
+		"presets": [
+			{"name": "Preset Recovered", "values": {"width": 850}}
+		]
+	}`
+	if err := os.WriteFile(bakFile, []byte(bakContent), 0644); err != nil {
+		t.Fatalf("failed to write bak file: %v", err)
+	}
+
+	loaded := app.loadSettings()
+	if loaded["width"] != float64(850) {
+		t.Errorf("expected width 850 recovered from bak, got %v", loaded["width"])
+	}
+	presets, ok := loaded["presets"].([]interface{})
+	if !ok || len(presets) != 1 {
+		t.Fatalf("expected preset recovered from bak, got %v", presets)
+	}
+}
+
+func TestAutoRecoverEmptyPresetsFromBak(t *testing.T) {
+	tempDir := t.TempDir()
+	app := NewApp()
+	settingsFile := filepath.Join(tempDir, "settings.json")
+	bakFile := settingsFile + ".bak"
+	app.settingsPathOverride = settingsFile
+
+	// Primary has empty presets (wiped)
+	primaryContent := `{
+		"language": "fa",
+		"width": 800,
+		"presets": []
+	}`
+	if err := os.WriteFile(settingsFile, []byte(primaryContent), 0644); err != nil {
+		t.Fatalf("failed to write primary settings file: %v", err)
+	}
+
+	bakContent := `{
+		"language": "fa",
+		"width": 800,
+		"custom_theme_color": "#ff0011",
+		"watermark_path": "logo.png",
+		"watermark_enabled": true,
+		"presets": [
+			{"name": "Persian Preset", "values": {"width": 800}}
+		]
+	}`
+	if err := os.WriteFile(bakFile, []byte(bakContent), 0644); err != nil {
+		t.Fatalf("failed to write bak file: %v", err)
+	}
+
+	loaded := app.loadSettings()
+	presets, ok := loaded["presets"].([]interface{})
+	if !ok || len(presets) != 1 {
+		t.Fatalf("expected presets restored from bak, got %v", presets)
+	}
+	if loaded["custom_theme_color"] != "#ff0011" {
+		t.Errorf("expected theme color restored, got %v", loaded["custom_theme_color"])
+	}
+	if loaded["watermark_path"] != "logo.png" {
+		t.Errorf("expected watermark_path restored, got %v", loaded["watermark_path"])
+	}
+}
+
+func TestDoNotOverwriteValidBakWithEmptyPresets(t *testing.T) {
+	tempDir := t.TempDir()
+	app := NewApp()
+	settingsFile := filepath.Join(tempDir, "settings.json")
+	bakFile := settingsFile + ".bak"
+	app.settingsPathOverride = settingsFile
+
+	// Create valid backup
+	bakContent := `{
+		"language": "fa",
+		"presets": [
+			{"name": "Protected Preset", "values": {"width": 800}}
+		]
+	}`
+	if err := os.WriteFile(bakFile, []byte(bakContent), 0644); err != nil {
+		t.Fatalf("failed to write bak file: %v", err)
+	}
+
+	// Try saving settings with empty presets
+	app.saveSettingsToDisk(map[string]interface{}{
+		"width":   float64(900),
+		"presets": []interface{}{},
+	})
+
+	// Check that backup file was NOT overwritten with empty presets
+	bakData, err := os.ReadFile(bakFile)
+	if err != nil {
+		t.Fatalf("failed to read bak file: %v", err)
+	}
+	if !strings.Contains(string(bakData), "Protected Preset") {
+		t.Errorf("expected backup to retain 'Protected Preset', but it was wiped: %s", string(bakData))
+	}
+}
+
 

@@ -141,15 +141,46 @@ func calculateEta(startTime time.Time, currentPercent float64) string {
 }
 
 type App struct {
-	ctx        context.Context
-	settingsMu sync.Mutex
-	settings   map[string]interface{}
-	stateMu    sync.RWMutex
-	controller *pipeline.Controller
-	isBusy     int32
-	startTime  time.Time
-	lastOutput string
+	ctx                  context.Context
+	settingsMu           sync.Mutex
+	settings             map[string]interface{}
+	settingsPathOverride string
+	stateMu              sync.RWMutex
+	controller           *pipeline.Controller
+	isBusy               int32
+	startTime            time.Time
+	lastOutput           string
 }
+
+func (a *App) getSettingsFilePath() string {
+	if a.settingsPathOverride != "" {
+		return a.settingsPathOverride
+	}
+	return constants.GetSettingsFile()
+}
+
+func (a *App) getSettingsBakFilePath() string {
+	return a.getSettingsFilePath() + ".bak"
+}
+
+func hasValidPresets(m map[string]interface{}) bool {
+	if m == nil {
+		return false
+	}
+	presets, ok := m["presets"].([]interface{})
+	if !ok || len(presets) == 0 {
+		return false
+	}
+	for _, p := range presets {
+		if pMap, ok := p.(map[string]interface{}); ok {
+			if _, hasName := pMap["name"]; hasName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 
 func (a *App) getController() *pipeline.Controller {
 	a.stateMu.RLock()
@@ -251,17 +282,67 @@ func (a *App) loadSettings() map[string]interface{} {
 	defer a.settingsMu.Unlock()
 
 	defaults := a.defaultSettings()
-	filePath := constants.GetSettingsFile()
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		a.settings = defaults
-		return a.settings
+	filePath := a.getSettingsFilePath()
+	bakPath := a.getSettingsBakFilePath()
+
+	readJSONMap := func(p string) (map[string]interface{}, error) {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		var m map[string]interface{}
+		if err := json.Unmarshal(data, &m); err != nil {
+			return nil, err
+		}
+		return m, nil
 	}
 
-	var loaded map[string]interface{}
-	if err := json.Unmarshal(data, &loaded); err != nil {
-		a.settings = defaults
-		return a.settings
+	loaded, errPrimary := readJSONMap(filePath)
+	bakLoaded, errBak := readJSONMap(bakPath)
+
+	restoredFromBak := false
+
+	if errPrimary != nil {
+		// Primary is missing or corrupted: recover from backup if available
+		if errBak == nil && bakLoaded != nil {
+			loaded = bakLoaded
+			restoredFromBak = true
+		} else {
+			loaded = defaults
+		}
+	} else {
+		// Primary exists. Check if primary had presets wiped/empty while backup has valid presets
+		if !hasValidPresets(loaded) && hasValidPresets(bakLoaded) {
+			loaded["presets"] = bakLoaded["presets"]
+			if defP, ok := bakLoaded["default_preset"]; ok && defP != nil {
+				loaded["default_preset"] = defP
+			}
+			if val, ok := bakLoaded["custom_theme_color"].(string); ok && val != "" {
+				cur, _ := loaded["custom_theme_color"].(string)
+				if cur == "" {
+					loaded["custom_theme_color"] = val
+				}
+			}
+			if val, ok := bakLoaded["theme"].(string); ok && val != "" {
+				cur, _ := loaded["theme"].(string)
+				if cur == "" || cur == "blue" {
+					loaded["theme"] = val
+				}
+			}
+			if val, ok := bakLoaded["watermark_path"].(string); ok && val != "" {
+				cur, _ := loaded["watermark_path"].(string)
+				if cur == "" {
+					loaded["watermark_path"] = val
+					if wmEnabled, ok := bakLoaded["watermark_enabled"].(bool); ok {
+						loaded["watermark_enabled"] = wmEnabled
+					}
+					if wmEdge, ok := bakLoaded["watermark_edge"].(string); ok {
+						loaded["watermark_edge"] = wmEdge
+					}
+				}
+			}
+			restoredFromBak = true
+		}
 	}
 
 	for k, v := range defaults {
@@ -270,10 +351,31 @@ func (a *App) loadSettings() map[string]interface{} {
 		}
 	}
 
-	if sanitizeSettingsPresets(loaded) {
+	sanitized := sanitizeSettingsPresets(loaded)
+
+	// Heal primary settings file on disk if restored from backup or sanitized
+	if restoredFromBak || sanitized {
+		dir := filepath.Dir(filePath)
+		_ = os.MkdirAll(dir, 0755)
 		bytes, err := json.MarshalIndent(loaded, "", "    ")
 		if err == nil {
-			_ = os.WriteFile(filePath, bytes, 0644)
+			tmpFile := fmt.Sprintf("%s.%d.tmp", filePath, time.Now().UnixNano())
+			if err := os.WriteFile(tmpFile, bytes, 0644); err == nil {
+				_ = os.Rename(tmpFile, filePath)
+			}
+		}
+	}
+
+	// Create backup if primary has valid presets and backup does not exist yet
+	if hasValidPresets(loaded) && errBak != nil {
+		dir := filepath.Dir(bakPath)
+		_ = os.MkdirAll(dir, 0755)
+		bytes, err := json.MarshalIndent(loaded, "", "    ")
+		if err == nil {
+			tmpBak := fmt.Sprintf("%s.%d.tmp", bakPath, time.Now().UnixNano())
+			if err := os.WriteFile(tmpBak, bytes, 0644); err == nil {
+				_ = os.Rename(tmpBak, bakPath)
+			}
 		}
 	}
 
@@ -285,14 +387,14 @@ func (a *App) saveSettingsToDisk(settings map[string]interface{}) {
 	a.settingsMu.Lock()
 	defer a.settingsMu.Unlock()
 
-	dir := constants.GetSettingsDir()
+	filePath := a.getSettingsFilePath()
+	bakPath := a.getSettingsBakFilePath()
+	dir := filepath.Dir(filePath)
 	_ = os.MkdirAll(dir, 0755)
 
-	filePath := constants.GetSettingsFile()
-
-	// Retain presets if not provided
-	if _, ok := settings["presets"]; !ok {
-		if existing, ok := a.settings["presets"]; ok {
+	// Retain presets if not provided or empty when existing has valid presets
+	if pNew, ok := settings["presets"]; !ok || !hasValidPresets(map[string]interface{}{"presets": pNew}) {
+		if existing, ok := a.settings["presets"]; ok && hasValidPresets(map[string]interface{}{"presets": existing}) {
 			settings["presets"] = existing
 		}
 	}
@@ -310,6 +412,15 @@ func (a *App) saveSettingsToDisk(settings map[string]interface{}) {
 		return
 	}
 	_ = os.Rename(tmpFile, filePath)
+
+	// Update .bak ONLY IF current settings contain valid presets.
+	// Never overwrite a good backup with empty/wiped presets!
+	if hasValidPresets(a.settings) {
+		tmpBak := fmt.Sprintf("%s.%d.tmp", bakPath, time.Now().UnixNano())
+		if err := os.WriteFile(tmpBak, bytes, 0644); err == nil {
+			_ = os.Rename(tmpBak, bakPath)
+		}
+	}
 }
 
 func (a *App) execJS(js string) {
