@@ -295,7 +295,7 @@ func SortKeyImproved(files []string) []string {
 }
 
 // GetAllImagesDirectory finds and returns naturally-sorted file paths of all supported images in a directory.
-// Supports JPG, JPEG, PNG, WEBP, AVIF, and PSD formats, ignoring files starting with dot.
+// Supports JPG, JPEG, JFIF, PNG, WEBP, AVIF, and PSD formats, ignoring files starting with dot.
 func GetAllImagesDirectory(imagesPath string) ([]string, error) {
 	entries, err := os.ReadDir(imagesPath)
 	if err != nil {

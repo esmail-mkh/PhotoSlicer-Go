@@ -51,7 +51,7 @@ It automates the entire webtoon production workflow: seamless vertical stitching
   * ⚡ **Fast Clean (CPU):** Instant built-in denoising and smoothing running efficiently across all CPU cores.
   * 🔥 **Real-ESRGAN (GPU):** State-of-the-art AI upscaler powered by NCNN Vulkan to upscale and clarify low-resolution artwork.
   * 🎮 **Automatic Hardware Detection:** Scans dedicated GPU & VRAM on startup to automatically select Real-ESRGAN for capable systems (>= 2GB VRAM), with an on-demand Auto Detect button in Settings.
-* **Format Mastery:** Supports input from **JPG, PNG, WEBP, AVIF,** and layered **PSD** files.
+* **Format Mastery:** Supports input from **JPG, JFIF, PNG, WEBP, AVIF,** and layered **PSD** files.
 * **Multi-Mode Processing:**
   * **Single Mode:** Point to a folder of images to process a single chapter.
   * **Batch Mode:** Point to a parent directory containing multiple chapter folders; PhotoSlicer processes each chapter sequentially with full progress tracking.

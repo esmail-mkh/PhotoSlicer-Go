@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -277,6 +278,53 @@ func TestRevengeChapterNoShortSlices(t *testing.T) {
 				t.Errorf("Slice %s is unexpectedly short: %d pixels", e.Name(), cfg.Height)
 			}
 		}
+	}
+}
+
+func TestPipelineJfifInput(t *testing.T) {
+	tempSrc := t.TempDir()
+	tempOut := t.TempDir()
+
+	for i := 1; i <= 2; i++ {
+		img := image.NewRGBA(image.Rect(0, 0, 150, 200))
+		col := color.RGBA{R: uint8(i * 60), G: 100, B: 150, A: 255}
+		draw.Draw(img, img.Bounds(), image.NewUniform(col), image.Point{}, draw.Src)
+		p := filepath.Join(tempSrc, fmt.Sprintf("page_%02d.jfif", i))
+		f, err := os.Create(p)
+		if err != nil {
+			t.Fatalf("Failed to create jfif image: %v", err)
+		}
+		if err := jpeg.Encode(f, img, &jpeg.Options{Quality: 90}); err != nil {
+			f.Close()
+			t.Fatalf("Failed to encode jfif image: %v", err)
+		}
+		f.Close()
+	}
+
+	opts := PipelineOptions{
+		Mode:            "single",
+		NewWidth:        150,
+		SaveFormat:      "JPG",
+		SaveQuality:     90,
+		HeightLimit:     250,
+		CurrentDate:     "2026-09-07",
+		OutputBase:      tempOut,
+		MaxWorkers:      2,
+		FilenamePattern: "[number]",
+		FilenameDigits:  2,
+	}
+
+	resPath, err := MergerImages(tempSrc, opts)
+	if err != nil {
+		t.Fatalf("MergerImages failed with jfif input: %v", err)
+	}
+
+	files, err := os.ReadDir(resPath)
+	if err != nil {
+		t.Fatalf("Failed to read output dir: %v", err)
+	}
+	if len(files) < 2 {
+		t.Errorf("Expected at least 2 slices, got %d", len(files))
 	}
 }
 

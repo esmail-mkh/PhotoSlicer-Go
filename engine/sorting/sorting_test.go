@@ -1,6 +1,8 @@
 package sorting
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -112,4 +114,28 @@ func TestSortKeyImproved(t *testing.T) {
 			t.Errorf("Expected '0', got %c (ok: %v)", r, ok)
 		}
 	})
+}
+
+func TestGetAllImagesDirectoryWithJFIF(t *testing.T) {
+	tempDir := t.TempDir()
+	jfifFile := filepath.Join(tempDir, "01.jfif")
+	jpgFile := filepath.Join(tempDir, "02.jpg")
+	txtFile := filepath.Join(tempDir, "readme.txt")
+
+	_ = os.WriteFile(jfifFile, []byte("fake"), 0644)
+	_ = os.WriteFile(jpgFile, []byte("fake"), 0644)
+	_ = os.WriteFile(txtFile, []byte("ignore"), 0644)
+
+	imgs, err := GetAllImagesDirectory(tempDir)
+	if err != nil {
+		t.Fatalf("GetAllImagesDirectory failed: %v", err)
+	}
+
+	if len(imgs) != 2 {
+		t.Fatalf("expected 2 images (jfif and jpg), got %d: %v", len(imgs), imgs)
+	}
+
+	if imgs[0] != jfifFile || imgs[1] != jpgFile {
+		t.Errorf("unexpected image list order: %v", imgs)
+	}
 }

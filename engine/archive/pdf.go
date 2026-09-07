@@ -206,7 +206,7 @@ func loadImageAsJpegBytes(path string) ([]byte, int, int, string, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 
 	// Fast path for JPEG
-	if ext == ".jpg" || ext == ".jpeg" {
+	if ext == ".jpg" || ext == ".jpeg" || ext == ".jfif" {
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, 0, 0, "", err

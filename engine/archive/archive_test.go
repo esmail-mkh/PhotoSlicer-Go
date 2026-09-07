@@ -265,10 +265,12 @@ func TestCountImagesInArchive(t *testing.T) {
 	_, _ = f1.Write(imgBytes)
 	f2, _ := w.Create("002.png")
 	_, _ = f2.Write(imgBytes)
-	f3, _ := w.Create("notes.txt")
-	_, _ = f3.Write([]byte("not an image"))
-	f4, _ := w.Create("__MACOSX/._001.jpg")
-	_, _ = f4.Write([]byte("metadata"))
+	f3, _ := w.Create("003.jfif")
+	_, _ = f3.Write(imgBytes)
+	f4, _ := w.Create("notes.txt")
+	_, _ = f4.Write([]byte("not an image"))
+	f5, _ := w.Create("__MACOSX/._001.jpg")
+	_, _ = f5.Write([]byte("metadata"))
 
 	_ = w.Close()
 	_ = zFile.Close()
@@ -277,8 +279,8 @@ func TestCountImagesInArchive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CountImagesInArchive failed: %v", err)
 	}
-	if count != 2 {
-		t.Errorf("expected 2 images, got %d", count)
+	if count != 3 {
+		t.Errorf("expected 3 images, got %d", count)
 	}
 }
 

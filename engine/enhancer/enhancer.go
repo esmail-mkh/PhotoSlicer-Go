@@ -631,6 +631,11 @@ func RunRealEsrganAI(
 				if err := copyFile(srcPath, filepath.Join(stageIn, stagedInName)); err != nil {
 					_ = imageio.SaveImage(img, filepath.Join(stageIn, stagedInName), "PNG", 100)
 				}
+			} else if ext == ".jfif" {
+				stagedInName = fmt.Sprintf("task_%05d.jpg", taskIdx)
+				if err := copyFile(srcPath, filepath.Join(stageIn, stagedInName)); err != nil {
+					_ = imageio.SaveImage(img, filepath.Join(stageIn, stagedInName), "JPG", 100)
+				}
 			} else {
 				stagedInName = fmt.Sprintf("task_%05d.png", taskIdx)
 				_ = imageio.SaveImage(img, filepath.Join(stageIn, stagedInName), "PNG", 100)

@@ -21,6 +21,7 @@ const (
 var SupportedExtensions = map[string]bool{
 	"jpg":  true,
 	"jpeg": true,
+	"jfif": true,
 	"png":  true,
 	"webp": true,
 	"avif": true,

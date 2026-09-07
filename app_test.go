@@ -72,6 +72,15 @@ func TestInspectDirectory(t *testing.T) {
 	if res["status"] != "ok" || res["mode"] != "batch" || res["item_count"] != 1 {
 		t.Errorf("expected ok batch 1 for folder with archive chapters, got %v", res)
 	}
+
+	// 6. Single folder with .jfif image
+	jfifDir := t.TempDir()
+	jfifImg := filepath.Join(jfifDir, "01.jfif")
+	_ = os.WriteFile(jfifImg, []byte("fake"), 0644)
+	res = app.InspectDirectory(jfifDir)
+	if res["status"] != "ok" || res["mode"] != "single" || res["item_count"] != 1 {
+		t.Errorf("expected ok single 1 for jfif folder, got %v", res)
+	}
 }
 
 func TestSaveSettingsToDiskAtomic(t *testing.T) {

@@ -82,6 +82,11 @@ func TestOpenImageRobustFormats(t *testing.T) {
 		t.Fatalf("failed to create jpg: %v", err)
 	}
 
+	jfifPath := filepath.Join(tempDir, "test.jfif")
+	if err := createTestJpeg(jfifPath, 115, 85); err != nil {
+		t.Fatalf("failed to create jfif: %v", err)
+	}
+
 	webpPath := filepath.Join(tempDir, "test.webp")
 	if err := createTestWebp(webpPath, 90, 110); err != nil {
 		t.Fatalf("failed to create webp: %v", err)
@@ -101,6 +106,7 @@ func TestOpenImageRobustFormats(t *testing.T) {
 	}{
 		{"PNG", pngPath, 100, 150},
 		{"JPEG", jpgPath, 120, 80},
+		{"JFIF", jfifPath, 115, 85},
 		{"WEBP", webpPath, 90, 110},
 		{"PSD", psdPath, 70, 95},
 	}
