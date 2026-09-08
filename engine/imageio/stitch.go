@@ -3,8 +3,6 @@ package imageio
 import (
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
 	"math"
 	"sync"
 )
@@ -28,7 +26,7 @@ type resizeTask struct {
 // GetConcatVOptimized stitches images vertically into a single tall canvas.
 // 1. Concurrently inspects dimensions.
 // 2. Concurrently decodes and resizes images in worker goroutines.
-// 3. Pastes normalized buffers sequentially onto a white canvas.
+// 3. Pastes normalized buffers into their precomputed, non-overlapping slots.
 func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, maxWorkers int) (*image.RGBA, error) {
 	if len(imagePaths) == 0 {
 		return nil, fmt.Errorf("no images provided for stitching")
@@ -108,13 +106,13 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 		return nil, fmt.Errorf("stitched image exceeds memory limit (%d pixels, height %dpx); please use No-Stitch mode or reduce width", totalPixels, totalHeight)
 	}
 
-	// Create composite canvas with white background
+	// Every successful task below overwrites its complete, non-overlapping slot.
+	// Start with zeroed memory and only paint a failed slot white; this avoids a
+	// full-canvas initialization pass for the normal case.
 	canvas := image.NewRGBA(image.Rect(0, 0, targetWidth, totalHeight))
-	draw.Draw(canvas, canvas.Bounds(), image.NewUniform(color.White), image.Point{}, draw.Src)
 
 	// --- Pass 2: Concurrent Resize & Direct Memory-Optimized Blit ---
 	tasksChan := make(chan resizeTask, len(validIndices))
-	var canvasMu sync.Mutex
 	var workerWg sync.WaitGroup
 
 	for w := 0; w < maxWorkers; w++ {
@@ -124,14 +122,12 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 			for task := range tasksChan {
 				srcImg, err := OpenImageRobust(task.path)
 				if err != nil {
+					fillRGBARegionWhite(canvas, task.yOffset, task.targetW, task.targetH)
 					continue
 				}
 
 				resized := ResizeBicubic(srcImg, task.targetW, task.targetH)
-				canvasMu.Lock()
-				dstRect := image.Rect(0, task.yOffset, targetWidth, task.yOffset+resized.Bounds().Dy())
-				draw.Draw(canvas, dstRect, resized, resized.Bounds().Min, draw.Src)
-				canvasMu.Unlock()
+				copyRGBARegion(canvas, resized, task.yOffset)
 			}
 		}()
 	}
@@ -149,4 +145,31 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 	workerWg.Wait()
 
 	return canvas, nil
+}
+
+// copyRGBARegion copies a resized image into its precomputed vertical slot.
+// Slots are contiguous and non-overlapping, so a row copy is sufficient and
+// avoids the generic draw path and lock overhead in the hot stitching loop.
+func copyRGBARegion(dst, src *image.RGBA, dstY int) {
+	srcBounds := src.Bounds()
+	width := srcBounds.Dx()
+	height := srcBounds.Dy()
+	for y := 0; y < height; y++ {
+		srcOffset := src.PixOffset(srcBounds.Min.X, srcBounds.Min.Y+y)
+		dstOffset := dst.PixOffset(0, dstY+y)
+		copy(dst.Pix[dstOffset:dstOffset+width*4], src.Pix[srcOffset:srcOffset+width*4])
+	}
+}
+
+func fillRGBARegionWhite(dst *image.RGBA, dstY, width, height int) {
+	for y := 0; y < height; y++ {
+		offset := dst.PixOffset(dst.Bounds().Min.X, dstY+y)
+		row := dst.Pix[offset : offset+width*4]
+		for x := 0; x < len(row); x += 4 {
+			row[x] = 0xff
+			row[x+1] = 0xff
+			row[x+2] = 0xff
+			row[x+3] = 0xff
+		}
+	}
 }

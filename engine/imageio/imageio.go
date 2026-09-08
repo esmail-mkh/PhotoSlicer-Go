@@ -1,12 +1,13 @@
 package imageio
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"image/jpeg"
+	stdjpeg "image/jpeg"
 	"image/png"
 	"io"
 	"os"
@@ -18,6 +19,8 @@ import (
 	"github.com/chai2010/webp"
 	"github.com/disintegration/imaging"
 	"github.com/gen2brain/avif"
+	jpegfast "github.com/gen2brain/jpeg"
+	"golang.org/x/sys/cpu"
 )
 
 // OpenImageRobust robustly decodes an image from disk.
@@ -46,6 +49,17 @@ func OpenImageRobust(path string) (image.Image, error) {
 	if ext == ".avif" {
 		img, err := avif.Decode(f)
 		if err == nil {
+			return img, nil
+		}
+		_, _ = f.Seek(0, 0)
+	}
+	if ext == ".jpg" || ext == ".jpeg" || ext == ".jfif" {
+		img, err := decodeJPEG(f)
+		if err == nil {
+			return img, nil
+		}
+		_, _ = f.Seek(0, 0)
+		if img, err := stdjpeg.Decode(f); err == nil {
 			return img, nil
 		}
 		_, _ = f.Seek(0, 0)
@@ -81,6 +95,17 @@ func GetImageSizeFast(path string) (int, int, error) {
 	if ext == ".avif" {
 		cfg, err := avif.DecodeConfig(f)
 		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
+			return cfg.Width, cfg.Height, nil
+		}
+		_, _ = f.Seek(0, 0)
+	}
+	if ext == ".jpg" || ext == ".jpeg" || ext == ".jfif" {
+		cfg, err := decodeJPEGConfig(f)
+		if err == nil && cfg.Width > 0 && cfg.Height > 0 {
+			return cfg.Width, cfg.Height, nil
+		}
+		_, _ = f.Seek(0, 0)
+		if cfg, err := stdjpeg.DecodeConfig(f); err == nil && cfg.Width > 0 && cfg.Height > 0 {
 			return cfg.Width, cfg.Height, nil
 		}
 		_, _ = f.Seek(0, 0)
@@ -134,14 +159,60 @@ func FlattenToRGB(img image.Image) *image.RGBA {
 	return dst
 }
 
+// IsOpaqueRGBA reports whether img is an RGBA image whose visible pixels all
+// have an opaque alpha channel. It is intentionally limited to *image.RGBA so
+// callers can safely use the specialized JPEG encoder path below.
+func IsOpaqueRGBA(img image.Image) bool {
+	rgba, ok := img.(*image.RGBA)
+	if !ok {
+		return false
+	}
+
+	b := rgba.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		offset := rgba.PixOffset(b.Min.X, y)
+		row := rgba.Pix[offset : offset+b.Dx()*4]
+		for alpha := 3; alpha < len(row); alpha += 4 {
+			if row[alpha] != 0xff {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // SaveImage saves the image in the requested format (JPG, PNG, WEBP) with the specified quality.
 func SaveImage(img image.Image, outputPath string, format string, quality int) error {
+	return saveEncodedFile(outputPath, func(w io.Writer) error {
+		return EncodeImage(w, img, format, quality)
+	})
+}
+
+// SaveOpaqueJPEG writes an already-opaque image without making a flattened
+// copy. It is used by the slicer after it has established that the complete
+// composite is opaque, so every slice is opaque as well.
+func SaveOpaqueJPEG(img image.Image, outputPath string, quality int) error {
+	if quality <= 0 {
+		quality = 95
+	}
+	return saveEncodedFile(outputPath, func(w io.Writer) error {
+		return encodeOpaqueJPEG(w, img, quality)
+	})
+}
+
+func saveEncodedFile(outputPath string, encode func(io.Writer) error) error {
 	f, err := os.Create(outputPath)
 	if err != nil {
 		return err
 	}
 
-	if err := EncodeImage(f, img, format, quality); err != nil {
+	buffered := bufio.NewWriterSize(f, 64*1024)
+	if err := encode(buffered); err != nil {
+		_ = f.Close()
+		_ = os.Remove(outputPath)
+		return err
+	}
+	if err := buffered.Flush(); err != nil {
 		_ = f.Close()
 		_ = os.Remove(outputPath)
 		return err
@@ -151,6 +222,61 @@ func SaveImage(img image.Image, outputPath string, format string, quality int) e
 		return err
 	}
 	return nil
+}
+
+func encodeOpaqueJPEG(w io.Writer, img image.Image, quality int) error {
+	if cpu.X86.HasAVX2 {
+		return jpegfast.Encode(w, img, &jpegfast.Options{Quality: quality})
+	}
+	return stdjpeg.Encode(w, img, &stdjpeg.Options{Quality: quality})
+}
+
+func decodeJPEG(r io.Reader) (image.Image, error) {
+	if cpu.X86.HasAVX2 {
+		return jpegfast.Decode(r)
+	}
+	return stdjpeg.Decode(r)
+}
+
+func decodeJPEGConfig(r io.Reader) (image.Config, error) {
+	if cpu.X86.HasAVX2 {
+		return jpegfast.DecodeConfig(r)
+	}
+	return stdjpeg.DecodeConfig(r)
+}
+
+func isKnownOpaqueImage(img image.Image) bool {
+	switch typed := img.(type) {
+	case *image.YCbCr, *image.Gray, *image.Gray16:
+		return true
+	case *image.RGBA:
+		return IsOpaqueRGBA(typed)
+	case *image.NRGBA:
+		b := typed.Bounds()
+		for y := b.Min.Y; y < b.Max.Y; y++ {
+			offset := typed.PixOffset(b.Min.X, y)
+			row := typed.Pix[offset : offset+b.Dx()*4]
+			for alpha := 3; alpha < len(row); alpha += 4 {
+				if row[alpha] != 0xff {
+					return false
+				}
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// opaqueNRGBAToRGBA reuses the pixel buffer because NRGBA and RGBA have the
+// same byte layout. The caller must have established that every alpha byte is
+// 255; only then are their premultiplied-alpha semantics equivalent.
+func opaqueNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
+	return &image.RGBA{
+		Pix:    src.Pix,
+		Stride: src.Stride,
+		Rect:   src.Rect,
+	}
 }
 
 func EncodeImage(w io.Writer, img image.Image, format string, quality int) error {
@@ -175,7 +301,7 @@ func EncodeImage(w io.Writer, img image.Image, format string, quality int) error
 		}
 		// JPEG cannot store alpha; flatten onto white if not already opaque
 		rgb := FlattenToRGB(img)
-		return jpeg.Encode(w, rgb, &jpeg.Options{Quality: quality})
+		return stdjpeg.Encode(w, rgb, &stdjpeg.Options{Quality: quality})
 	}
 }
 
@@ -189,5 +315,10 @@ func ResizeBicubic(img image.Image, targetWidth, targetHeight int) *image.RGBA {
 		return FlattenToRGB(img)
 	}
 	resized := imaging.Resize(img, targetWidth, targetHeight, imaging.CatmullRom)
+	if isKnownOpaqueImage(img) {
+		// imaging.Resize returns an opaque *image.NRGBA for opaque inputs. Reuse
+		// that buffer instead of allocating and compositing a second full image.
+		return opaqueNRGBAToRGBA(resized)
+	}
 	return FlattenToRGB(resized)
 }

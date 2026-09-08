@@ -38,6 +38,9 @@ type SlicerOptions struct {
 	WatermarkEdge         string
 	WatermarkWidthPercent int
 	WatermarkMargin       int
+	// ImageKnownOpaque lets the pipeline skip a full alpha scan after it has
+	// already guaranteed an opaque composite.
+	ImageKnownOpaque bool
 	CheckState            func() error
 }
 
@@ -107,6 +110,9 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	}
 
 	fmtLower := strings.ToLower(opts.SaveFormat)
+	useOpaqueJPEG := !opts.WatermarkEnabled &&
+		(fmtLower == "jpg" || fmtLower == "jpeg") &&
+		(opts.ImageKnownOpaque || imageio.IsOpaqueRGBA(img))
 	hardMax := constants.JpegMaxDimension
 	if fmtLower == "webp" {
 		hardMax = constants.WebPMaxDimension
@@ -260,6 +266,8 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 						opts.WatermarkWidthPercent,
 						opts.WatermarkMargin,
 					)
+				} else if useOpaqueJPEG {
+					saveErr = imageio.SaveOpaqueJPEG(sliceImg, destFile, opts.SaveQuality)
 				} else {
 					saveErr = imageio.SaveImage(sliceImg, destFile, opts.SaveFormat, opts.SaveQuality)
 				}

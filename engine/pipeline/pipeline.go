@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -89,6 +90,7 @@ type PipelineOptions struct {
 	WebpFallbackCallback  func()
 	OutputBase            string
 	MaxWorkers            int
+	AutoTuneWorkers       bool
 	FilenamePattern       string
 	FilenameDigits        int
 	WatermarkEnabled      bool
@@ -306,6 +308,9 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 			}
 		}
 	}
+	if opts.AutoTuneWorkers {
+		opts.MaxWorkers = tunedWorkerCount(opts.MaxWorkers)
+	}
 
 	// Determine output save path
 	baseFolder := opts.OutputBase
@@ -399,6 +404,7 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 		WatermarkEdge:         opts.WatermarkEdge,
 		WatermarkWidthPercent: opts.WatermarkWidthPercent,
 		WatermarkMargin:       opts.WatermarkMargin,
+		ImageKnownOpaque:      true,
 		CheckState: func() error {
 			if opts.Controller != nil {
 				return opts.Controller.CheckState()
@@ -408,4 +414,25 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 	}
 
 	return slicing.Slicer(result, slicerOpts)
+}
+
+// tunedWorkerCount compensates for the resize library's own per-image
+// parallelism. Four outer workers underutilize this class of CPU because the
+// work queue can drain while each resize is switching between its internal
+// horizontal/vertical passes. The output, ordering, and algorithms are
+// unchanged; only the number of independent in-flight image tasks is tuned.
+func tunedWorkerCount(configured int) int {
+	if configured <= 0 {
+		configured = 4
+	}
+	if configured == 4 {
+		procs := runtime.GOMAXPROCS(0)
+		if procs >= 8 {
+			if procs > 12 {
+				return 12
+			}
+			return procs
+		}
+	}
+	return configured
 }
