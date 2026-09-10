@@ -597,11 +597,20 @@ function selectFolder() {
 }
 
 let _inspectDebounce = null;
+let _dirReady = false;
+
+function setDirReady(ready) {
+    _dirReady = !!ready;
+    const startBtn = document.getElementById('start-button');
+    if (!startBtn) return;
+    const state = startBtn.dataset.state || 'idle';
+    startBtn.classList.toggle('btn-ready', _dirReady && (state === 'idle' || state === 'paused'));
+}
+
 async function updateDirectoryInspection(path) {
     const badge = document.getElementById('dir-inspection-badge');
     const input = document.getElementById('directory-input');
     const wrapper = input ? input.closest('.folder-wrapper') : document.getElementById('folder-wrapper');
-    const startBtn = document.getElementById('start-button');
     if (!badge) return;
 
     if (!path || !path.trim()) {
@@ -609,7 +618,7 @@ async function updateDirectoryInspection(path) {
         badge.className = 'dir-inspection-badge';
         badge.removeAttribute('data-tooltip-text');
         if (wrapper) wrapper.classList.remove('has-inspection');
-        if (startBtn) startBtn.classList.remove('btn-ready');
+        setDirReady(false);
         return;
     }
 
@@ -654,7 +663,7 @@ async function updateDirectoryInspection(path) {
             }
             badge.style.display = 'inline-flex';
             if (wrapper) wrapper.classList.add('has-inspection');
-            if (startBtn) startBtn.classList.add('btn-ready');
+            setDirReady(true);
         } else if (res.status === 'empty') {
             badge.classList.add('badge-empty');
             if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
@@ -665,7 +674,7 @@ async function updateDirectoryInspection(path) {
             badge.setAttribute('data-tooltip-text', desc);
             badge.style.display = 'inline-flex';
             if (wrapper) wrapper.classList.add('has-inspection');
-            if (startBtn) startBtn.classList.remove('btn-ready');
+            setDirReady(false);
         } else if (res.status === 'not_found') {
             badge.classList.add('badge-empty');
             if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>';
@@ -676,15 +685,16 @@ async function updateDirectoryInspection(path) {
             badge.setAttribute('data-tooltip-text', desc);
             badge.style.display = 'inline-flex';
             if (wrapper) wrapper.classList.add('has-inspection');
-            if (startBtn) startBtn.classList.remove('btn-ready');
+            setDirReady(false);
         } else {
             badge.style.display = 'none';
             badge.removeAttribute('data-tooltip-text');
             if (wrapper) wrapper.classList.remove('has-inspection');
-            if (startBtn) startBtn.classList.remove('btn-ready');
+            setDirReady(false);
         }
     } catch (e) {
         console.error('Inspect directory failed', e);
+        setDirReady(false);
     }
 }
 
@@ -706,6 +716,7 @@ function refreshDirectoryState() {
             badge.removeAttribute('data-tooltip-text');
         }
         wrapper.classList.remove('has-inspection');
+        setDirReady(false);
     }
 
     clearTimeout(_inspectDebounce);
@@ -2623,9 +2634,11 @@ function handleProcessClick() {
         start(); 
     } else if (state === 'processing') {
         pywebview.api.pause_processing();
+        stopTimer();
         setButtonState('paused'); 
     } else if (state === 'paused') {
         pywebview.api.resume_processing();
+        startTimer();
         setButtonState('processing');
     }
 }
@@ -2641,6 +2654,7 @@ function stopProcessing() {
 
 function setButtonState(state) {
     startButton.dataset.state = state;
+    startButton.classList.toggle('btn-ready', (state === 'idle' || state === 'paused') && _dirReady);
     // Drive idle-pausing of the progress-bar animations (see styles.css)
     document.body.classList.toggle('is-processing', state === 'processing' || state === 'busy');
     // Show the Stop button for any active job (processing / paused / busy)
