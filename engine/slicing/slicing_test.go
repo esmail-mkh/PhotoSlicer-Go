@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -141,4 +142,75 @@ func TestSlicing(t *testing.T) {
 			t.Fatalf("expected output slices from SubImage, got none")
 		}
 	})
+}
+
+func TestReserveOutputDir(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "Chapter 1")
+
+	first, err := ReserveOutputDir(base)
+	if err != nil {
+		t.Fatalf("first reservation failed: %v", err)
+	}
+	if first != base {
+		t.Fatalf("expected %q, got %q", base, first)
+	}
+	if fi, err := os.Stat(first); err != nil || !fi.IsDir() {
+		t.Fatalf("reserved directory was not created: %v", err)
+	}
+
+	second, err := ReserveOutputDir(base)
+	if err != nil {
+		t.Fatalf("second reservation failed: %v", err)
+	}
+	if second != base+" (1)" {
+		t.Fatalf("expected %q, got %q", base+" (1)", second)
+	}
+
+	archiveStem := filepath.Join(t.TempDir(), "Chapter 2")
+	if err := os.WriteFile(archiveStem+".zip", []byte("existing"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	third, err := ReserveOutputDir(archiveStem)
+	if err != nil {
+		t.Fatalf("archive stem reservation failed: %v", err)
+	}
+	if third != archiveStem+" (1)" {
+		t.Fatalf("expected to skip existing .zip stem, got %q", third)
+	}
+}
+
+func TestReserveOutputDirConcurrent(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "Run")
+	const workers = 16
+
+	results := make(chan string, workers)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			p, err := ReserveOutputDir(base)
+			if err != nil {
+				t.Errorf("reservation failed: %v", err)
+				return
+			}
+			results <- p
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	seen := make(map[string]bool)
+	for p := range results {
+		if seen[p] {
+			t.Errorf("duplicate reserved path: %s", p)
+		}
+		seen[p] = true
+		if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
+			t.Errorf("reserved path missing on disk: %s", p)
+		}
+	}
+	if len(seen) != workers {
+		t.Errorf("expected %d unique paths, got %d", workers, len(seen))
+	}
 }

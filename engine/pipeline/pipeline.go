@@ -103,7 +103,8 @@ type PipelineOptions struct {
 }
 
 func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions) (string, error) {
-	if err := os.MkdirAll(savePath, 0755); err != nil {
+	savePath, err := slicing.ReserveOutputDir(savePath)
+	if err != nil {
 		return "", err
 	}
 
@@ -330,23 +331,6 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 		savePath = filepath.Join(baseFolder, opts.CurrentDate, folderName)
 	}
 
-	originalSavePath := savePath
-	counter := 0
-	for {
-		zipPath := savePath + ".zip"
-		cbzPath := savePath + ".cbz"
-		pdfPath := savePath + ".pdf"
-		_, errDir := os.Stat(savePath)
-		_, errZip := os.Stat(zipPath)
-		_, errCbz := os.Stat(cbzPath)
-		_, errPdf := os.Stat(pdfPath)
-
-		if os.IsNotExist(errDir) && os.IsNotExist(errZip) && os.IsNotExist(errCbz) && os.IsNotExist(errPdf) {
-			break
-		}
-		counter++
-		savePath = fmt.Sprintf("%s (%d)", originalSavePath, counter)
-	}
 	// PSD format cannot be embedded in PDF; fallback to JPG if PDF is requested
 	if opts.IsPdf && strings.ToUpper(opts.SaveFormat) == "PSD" {
 		opts.SaveFormat = "JPG"

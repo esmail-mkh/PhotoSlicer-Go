@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -328,4 +329,55 @@ func TestPipelineJfifInput(t *testing.T) {
 	}
 }
 
+func TestMergerImagesConcurrentRunsUseDistinctDirs(t *testing.T) {
+	srcA := t.TempDir()
+	srcB := t.TempDir()
+	tempOut := t.TempDir()
+	_ = createTestImages(t, srcA, 2, 40, 200)
+	_ = createTestImages(t, srcB, 2, 40, 200)
 
+	opts := PipelineOptions{
+		Mode:            "multi",
+		NewWidth:        40,
+		SaveFormat:      "JPG",
+		SaveQuality:     90,
+		HeightLimit:     120,
+		CurrentDate:     "2026-09-10 12-00-00",
+		SaveDirectory:   "Chapter 1",
+		OutputBase:      tempOut,
+		MaxWorkers:      1,
+		FilenamePattern: "[number]",
+		FilenameDigits:  2,
+	}
+
+	results := make(chan string, 2)
+	var wg sync.WaitGroup
+	for _, src := range []string{srcA, srcB} {
+		wg.Add(1)
+		go func(src string) {
+			defer wg.Done()
+			res, err := MergerImages(src, opts)
+			if err != nil {
+				t.Errorf("MergerImages failed: %v", err)
+				return
+			}
+			results <- res
+		}(src)
+	}
+	wg.Wait()
+	close(results)
+
+	seen := make(map[string]bool)
+	for p := range results {
+		if seen[p] {
+			t.Errorf("concurrent runs resolved to the same output: %s", p)
+		}
+		seen[p] = true
+		if fi, err := os.Stat(p); err != nil || !fi.IsDir() {
+			t.Errorf("output directory missing on disk: %s", p)
+		}
+	}
+	if len(seen) != 2 {
+		t.Errorf("expected 2 distinct output directories, got %d", len(seen))
+	}
+}

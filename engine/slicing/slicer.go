@@ -44,6 +44,39 @@ type SlicerOptions struct {
 	CheckState            func() error
 }
 
+// ReserveOutputDir atomically creates the first free output directory derived
+// from original, skipping existing folders and .zip/.cbz/.pdf archives that
+// share the same stem. Retrying on os.IsExist makes the claim safe even when
+// concurrent runs target the same name.
+func ReserveOutputDir(original string) (string, error) {
+	if err := os.MkdirAll(filepath.Dir(original), 0755); err != nil {
+		return "", err
+	}
+	for counter := 0; ; counter++ {
+		candidate := original
+		if counter > 0 {
+			candidate = fmt.Sprintf("%s (%d)", original, counter)
+		}
+		if outputPathTaken(candidate) {
+			continue
+		}
+		if err := os.Mkdir(candidate, 0755); err == nil {
+			return candidate, nil
+		} else if !os.IsExist(err) {
+			return "", err
+		}
+	}
+}
+
+func outputPathTaken(stem string) bool {
+	for _, p := range []string{stem, stem + ".zip", stem + ".cbz", stem + ".pdf"} {
+		if _, err := os.Stat(p); err == nil || !os.IsNotExist(err) {
+			return true
+		}
+	}
+	return false
+}
+
 // Slicer segments a tall composite image into slices and packages them into folders/archives.
 func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	if opts.OutputBase == "" {
@@ -71,26 +104,8 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		savePath = filepath.Join(opts.OutputBase, opts.CurrentDate, folderName)
 	}
 
-	// Avoid duplicate folder/archive names
-	originalSavePath := savePath
-	counter := 0
-	for {
-		zipPath := savePath + ".zip"
-		cbzPath := savePath + ".cbz"
-		pdfPath := savePath + ".pdf"
-		_, errDir := os.Stat(savePath)
-		_, errZip := os.Stat(zipPath)
-		_, errCbz := os.Stat(cbzPath)
-		_, errPdf := os.Stat(pdfPath)
-
-		if os.IsNotExist(errDir) && os.IsNotExist(errZip) && os.IsNotExist(errCbz) && os.IsNotExist(errPdf) {
-			break
-		}
-		counter++
-		savePath = fmt.Sprintf("%s (%d)", originalSavePath, counter)
-	}
-
-	if err := os.MkdirAll(savePath, 0755); err != nil {
+	savePath, err := ReserveOutputDir(savePath)
+	if err != nil {
 		return "", err
 	}
 
