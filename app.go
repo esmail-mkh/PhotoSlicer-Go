@@ -1150,7 +1150,7 @@ func (a *App) Start(params map[string]interface{}) {
 		}
 		_ = os.MkdirAll(outputBase, 0755)
 
-		currentDate := time.Now().Format("2006-01-02")
+		currentDate := time.Now().Format("2006-01-02 15-04-05")
 
 		if isSingleMode {
 			a.changeProgress(0)
