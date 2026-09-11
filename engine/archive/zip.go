@@ -18,6 +18,9 @@ import (
 var invalidArchiveChars = regexp.MustCompile(`[\x00-\x1f\\/:*?"<>|]`)
 
 func CreateZip(outputPath string, files []string) error {
+	if len(files) == 0 {
+		return fmt.Errorf("no files provided for archive")
+	}
 	zipFile, err := os.Create(outputPath)
 	if err != nil {
 		return err
@@ -29,13 +32,16 @@ func CreateZip(outputPath string, files []string) error {
 
 	for _, file := range files {
 		fi, err := os.Stat(file)
-		if err != nil || fi.IsDir() {
-			continue
+		if err != nil {
+			return fmt.Errorf("cannot stat archive input %s: %w", file, err)
+		}
+		if fi.IsDir() {
+			return fmt.Errorf("archive input is a directory: %s", file)
 		}
 
 		header, err := zip.FileInfoHeader(fi)
 		if err != nil {
-			continue
+			return err
 		}
 		header.Name = filepath.Base(file)
 		header.Method = zip.Deflate
@@ -47,7 +53,7 @@ func CreateZip(outputPath string, files []string) error {
 
 		f, err := os.Open(file)
 		if err != nil {
-			continue
+			return fmt.Errorf("cannot open archive input %s: %w", file, err)
 		}
 		_, err = io.Copy(writer, f)
 		f.Close()
@@ -59,7 +65,9 @@ func CreateZip(outputPath string, files []string) error {
 	if err := w.Close(); err != nil {
 		return err
 	}
-	_ = zipFile.Sync()
+	if err := zipFile.Sync(); err != nil {
+		return err
+	}
 	if err := zipFile.Close(); err != nil {
 		return err
 	}

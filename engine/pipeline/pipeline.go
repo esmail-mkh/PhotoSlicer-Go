@@ -248,8 +248,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 
 	if opts.IsZip {
 		zipPath := filepath.Join(filepath.Dir(savePath), baseName+".zip")
-		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
-		files = sorting.SortKeyImproved(files)
+		files, err := archive.ListOutputFiles(savePath)
+		if err != nil {
+			return "", err
+		}
 		if err := archive.CreateZip(zipPath, files); err != nil {
 			return "", fmt.Errorf("failed to create zip archive: %w", err)
 		}
@@ -258,8 +260,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	}
 	if opts.IsCbz {
 		cbzPath := filepath.Join(filepath.Dir(savePath), baseName+".cbz")
-		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
-		files = sorting.SortKeyImproved(files)
+		files, err := archive.ListOutputFiles(savePath)
+		if err != nil {
+			return "", err
+		}
 		if err := archive.CreateCbz(cbzPath, files); err != nil {
 			return "", fmt.Errorf("failed to create cbz archive: %w", err)
 		}
@@ -268,8 +272,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	}
 	if opts.IsPdf {
 		pdfPath := filepath.Join(filepath.Dir(savePath), baseName+".pdf")
-		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
-		files = sorting.SortKeyImproved(files)
+		files, err := archive.ListOutputFiles(savePath)
+		if err != nil {
+			return "", err
+		}
 		if err := archive.CreatePdfFromImages(pdfPath, files); err != nil {
 			return "", fmt.Errorf("failed to create pdf archive: %w", err)
 		}

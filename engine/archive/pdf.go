@@ -194,7 +194,9 @@ func CreatePdfFromImages(outputPath string, imagePaths []string) error {
 	if err := writeStr(trailer); err != nil {
 		return err
 	}
-	_ = outFile.Sync()
+	if err := outFile.Sync(); err != nil {
+		return err
+	}
 	if err := outFile.Close(); err != nil {
 		return err
 	}

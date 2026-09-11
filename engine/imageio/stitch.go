@@ -22,7 +22,6 @@ type resizeTask struct {
 	yOffset int
 }
 
-
 // GetConcatVOptimized stitches images vertically into a single tall canvas.
 // 1. Concurrently inspects dimensions.
 // 2. Concurrently decodes and resizes images in worker goroutines.
@@ -55,6 +54,14 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 		}(i, p)
 	}
 	wg.Wait()
+	for i, dr := range dimResults {
+		if dr.err != nil {
+			return nil, fmt.Errorf("failed to read image dimensions %s: %w", imagePaths[i], dr.err)
+		}
+		if dr.w <= 0 || dr.h <= 0 {
+			return nil, fmt.Errorf("invalid image dimensions for %s", imagePaths[i])
+		}
+	}
 
 	maxW := 0
 	for _, dr := range dimResults {
@@ -106,14 +113,15 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 		return nil, fmt.Errorf("stitched image exceeds memory limit (%d pixels, height %dpx); please use No-Stitch mode or reduce width", totalPixels, totalHeight)
 	}
 
-	// Every successful task below overwrites its complete, non-overlapping slot.
-	// Start with zeroed memory and only paint a failed slot white; this avoids a
-	// full-canvas initialization pass for the normal case.
+	// Each task overwrites its complete, non-overlapping slot. A failed task
+	// causes the whole operation to return an error instead of a partial image.
 	canvas := image.NewRGBA(image.Rect(0, 0, targetWidth, totalHeight))
 
 	// --- Pass 2: Concurrent Resize & Direct Memory-Optimized Blit ---
 	tasksChan := make(chan resizeTask, len(validIndices))
 	var workerWg sync.WaitGroup
+	var errOnce sync.Once
+	var firstErr error
 
 	for w := 0; w < maxWorkers; w++ {
 		workerWg.Add(1)
@@ -122,7 +130,9 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 			for task := range tasksChan {
 				srcImg, err := OpenImageRobust(task.path)
 				if err != nil {
-					fillRGBARegionWhite(canvas, task.yOffset, task.targetW, task.targetH)
+					errOnce.Do(func() {
+						firstErr = fmt.Errorf("failed to decode image %s: %w", task.path, err)
+					})
 					continue
 				}
 
@@ -143,6 +153,9 @@ func GetConcatVOptimized(imagePaths []string, newWidth int, isCustomWidth bool, 
 	}
 	close(tasksChan)
 	workerWg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
 
 	return canvas, nil
 }
@@ -158,18 +171,5 @@ func copyRGBARegion(dst, src *image.RGBA, dstY int) {
 		srcOffset := src.PixOffset(srcBounds.Min.X, srcBounds.Min.Y+y)
 		dstOffset := dst.PixOffset(0, dstY+y)
 		copy(dst.Pix[dstOffset:dstOffset+width*4], src.Pix[srcOffset:srcOffset+width*4])
-	}
-}
-
-func fillRGBARegionWhite(dst *image.RGBA, dstY, width, height int) {
-	for y := 0; y < height; y++ {
-		offset := dst.PixOffset(dst.Bounds().Min.X, dstY+y)
-		row := dst.Pix[offset : offset+width*4]
-		for x := 0; x < len(row); x += 4 {
-			row[x] = 0xff
-			row[x+1] = 0xff
-			row[x+2] = 0xff
-			row[x+3] = 0xff
-		}
 	}
 }

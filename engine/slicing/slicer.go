@@ -13,7 +13,6 @@ import (
 	"photoslicer/engine/constants"
 	"photoslicer/engine/imageio"
 	"photoslicer/engine/psd"
-	"photoslicer/engine/sorting"
 	"photoslicer/engine/watermark"
 )
 
@@ -41,7 +40,7 @@ type SlicerOptions struct {
 	// ImageKnownOpaque lets the pipeline skip a full alpha scan after it has
 	// already guaranteed an opaque composite.
 	ImageKnownOpaque bool
-	CheckState            func() error
+	CheckState       func() error
 }
 
 // ReserveOutputDir atomically creates the first free output directory derived
@@ -329,8 +328,10 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 
 	if opts.IsZip {
 		zipPath := filepath.Join(filepath.Dir(savePath), baseName+".zip")
-		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
-		files = sorting.SortKeyImproved(files)
+		files, err := archive.ListOutputFiles(savePath)
+		if err != nil {
+			return "", err
+		}
 		if err := archive.CreateZip(zipPath, files); err != nil {
 			return "", fmt.Errorf("failed to create zip archive: %w", err)
 		}
@@ -339,8 +340,10 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	}
 	if opts.IsCbz {
 		cbzPath := filepath.Join(filepath.Dir(savePath), baseName+".cbz")
-		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
-		files = sorting.SortKeyImproved(files)
+		files, err := archive.ListOutputFiles(savePath)
+		if err != nil {
+			return "", err
+		}
 		if err := archive.CreateCbz(cbzPath, files); err != nil {
 			return "", fmt.Errorf("failed to create cbz archive: %w", err)
 		}
@@ -349,8 +352,10 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 	}
 	if opts.IsPdf {
 		pdfPath := filepath.Join(filepath.Dir(savePath), baseName+".pdf")
-		files, _ := filepath.Glob(filepath.Join(savePath, "*"))
-		files = sorting.SortKeyImproved(files)
+		files, err := archive.ListOutputFiles(savePath)
+		if err != nil {
+			return "", err
+		}
 		if err := archive.CreatePdfFromImages(pdfPath, files); err != nil {
 			return "", fmt.Errorf("failed to create pdf archive: %w", err)
 		}

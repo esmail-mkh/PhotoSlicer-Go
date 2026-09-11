@@ -27,77 +27,77 @@ import (
 var translations = map[string]map[string]string{
 	"en": {
 		"ready":                  "Ready to Slice",
-		"app_window_title":      "PhotoSlicer v" + constants.Version,
-		"paused":                "Paused...",
-		"resuming":              "Resuming...",
-		"idle_done":             "Done! Idle.",
-		"error_folder":          "Please select a directory first.",
-		"error_no_images":       "No images or subfolders found.",
-		"error_valid_dir":       "Select Valid Directory!",
-		"preparing":             "Preparing: %s...",
-		"processing_single":     "Processing single folder...",
-		"processing_multi":      "Processing %s - %d/%d...",
-		"enhancer_missing":      "Enhancer not found! Ensure 'realesrgan-ncnn-vulkan.exe' is in the 'up-model' folder.",
-		"enhancing_load":        "Loading %d images to AI...",
-		"enhancing_run":         "Enhancing %d images...",
-		"enhancing_fast_run":    "Denoising %d images (Fast CPU)...",
-		"enhancing_done":        "Enhancement complete.",
-		"enhancing_fail":        "Enhancement failed or skipped.",
-		"error_pre_process":     "Error during image pre-processing: %s",
-		"error_batch":           "Error during batch enhancement: %s",
-		"skip_folder":           "Skipping %s (enhancement failed).",
-		"no_images_process":     "No images found to process.",
-		"no_subfolders":         "No subfolders with images found!",
-		"open_folder_err":       "Could not open folder: %s",
-		"path_not_exist":        "Folder path does not exist.",
-		"stopping":              "Stopping...",
-		"stopped":               "Stopped by user.",
+		"app_window_title":       "PhotoSlicer v" + constants.Version,
+		"paused":                 "Paused...",
+		"resuming":               "Resuming...",
+		"idle_done":              "Done! Idle.",
+		"error_folder":           "Please select a directory first.",
+		"error_no_images":        "No images or subfolders found.",
+		"error_valid_dir":        "Select Valid Directory!",
+		"preparing":              "Preparing: %s...",
+		"processing_single":      "Processing single folder...",
+		"processing_multi":       "Processing %s - %d/%d...",
+		"enhancer_missing":       "Enhancer not found! Ensure 'realesrgan-ncnn-vulkan.exe' is in the 'up-model' folder.",
+		"enhancing_load":         "Loading %d images to AI...",
+		"enhancing_run":          "Enhancing %d images...",
+		"enhancing_fast_run":     "Denoising %d images (Fast CPU)...",
+		"enhancing_done":         "Enhancement complete.",
+		"enhancing_fail":         "Enhancement failed or skipped.",
+		"error_pre_process":      "Error during image pre-processing: %s",
+		"error_batch":            "Error during batch enhancement: %s",
+		"skip_folder":            "Skipping %s (enhancement failed).",
+		"no_images_process":      "No images found to process.",
+		"no_subfolders":          "No subfolders with images found!",
+		"open_folder_err":        "Could not open folder: %s",
+		"path_not_exist":         "Folder path does not exist.",
+		"stopping":               "Stopping...",
+		"stopped":                "Stopped by user.",
 		"webp_nostitch_fallback": "An image is larger than WebP's limit — stitching normally instead.",
-		"error_invalid_input":   "Please enter valid numbers for width, height, and quality.",
-		"error_watermark_path":  "Please select a valid PNG watermark image.",
-		"error_unexpected":      "An unexpected error occurred: %s",
-		"status_enhancing":      "AI Enhancing...",
-		"status_denoising":      "Denoising...",
-		"status_slicing":        "Slicing...",
-		"status_stitching":      "Stitching...",
-		"status_processing":     "Processing...",
+		"error_invalid_input":    "Please enter valid numbers for width, height, and quality.",
+		"error_watermark_path":   "Please select a valid PNG watermark image.",
+		"error_unexpected":       "An unexpected error occurred: %s",
+		"status_enhancing":       "AI Enhancing...",
+		"status_denoising":       "Denoising...",
+		"status_slicing":         "Slicing...",
+		"status_stitching":       "Stitching...",
+		"status_processing":      "Processing...",
 	},
 	"fa": {
 		"ready":                  "آماده برای شروع",
-		"app_window_title":      "فوتو اسلایسر - نسخه " + constants.Version,
-		"paused":                "توقف...",
-		"resuming":              "در حال ادامه...",
-		"idle_done":             "تمام شد! آماده.",
-		"error_folder":          "لطفا ابتدا یک پوشه انتخاب کنید.",
-		"error_no_images":       "هیچ تصویر یا زیرپوشه‌ای یافت نشد.",
-		"error_valid_dir":       "پوشه معتبر انتخاب کنید!",
-		"preparing":             "آماده‌سازی: %s...",
-		"processing_single":     "پردازش پوشه تکی...",
-		"processing_multi":      "پردازش %s - %d/%d...",
-		"enhancer_missing":      "فایل هوش مصنوعی یافت نشد! مطمئن شوید 'realesrgan-ncnn-vulkan.exe' در پوشه 'up-model' است.",
-		"enhancing_load":        "بارگذاری %d تصویر در هوش مصنوعی...",
-		"enhancing_run":         "افزایش کیفیت %d تصویر...",
-		"enhancing_fast_run":    "نویزگیری سریع %d تصویر (پردازنده)...",
-		"enhancing_done":        "افزایش کیفیت تکمیل شد.",
-		"enhancing_fail":        "افزایش کیفیت شکست خورد.",
-		"error_pre_process":     "خطا در پیش‌پردازش تصاویر: %s",
-		"error_batch":           "خطا در افزایش کیفیت گروهی: %s",
-		"skip_folder":           "رد کردن %s (خطا در AI).",
-		"no_images_process":     "تصویری برای پردازش یافت نشد.",
-		"no_subfolders":         "هیچ زیرپوشه‌ای یافت نشد!",
-		"open_folder_err":       "خطا در باز کردن پوشه: %s",
-		"path_not_exist":        "مسیر پوشه وجود ندارد.",
-		"stopping":              "در حال توقف...",
-		"stopped":               "توسط کاربر متوقف شد.",
+		"app_window_title":       "فوتو اسلایسر - نسخه " + constants.Version,
+		"paused":                 "توقف...",
+		"resuming":               "در حال ادامه...",
+		"idle_done":              "تمام شد! آماده.",
+		"error_folder":           "لطفا ابتدا یک پوشه انتخاب کنید.",
+		"error_no_images":        "هیچ تصویر یا زیرپوشه‌ای یافت نشد.",
+		"error_valid_dir":        "پوشه معتبر انتخاب کنید!",
+		"preparing":              "آماده‌سازی: %s...",
+		"processing_single":      "پردازش پوشه تکی...",
+		"processing_multi":       "پردازش %s - %d/%d...",
+		"enhancer_missing":       "فایل هوش مصنوعی یافت نشد! مطمئن شوید 'realesrgan-ncnn-vulkan.exe' در پوشه 'up-model' است.",
+		"enhancing_load":         "بارگذاری %d تصویر در هوش مصنوعی...",
+		"enhancing_run":          "افزایش کیفیت %d تصویر...",
+		"enhancing_fast_run":     "نویزگیری سریع %d تصویر (پردازنده)...",
+		"enhancing_done":         "افزایش کیفیت تکمیل شد.",
+		"enhancing_fail":         "افزایش کیفیت شکست خورد.",
+		"error_pre_process":      "خطا در پیش‌پردازش تصاویر: %s",
+		"error_batch":            "خطا در افزایش کیفیت گروهی: %s",
+		"skip_folder":            "رد کردن %s (خطا در AI).",
+		"no_images_process":      "تصویری برای پردازش یافت نشد.",
+		"no_subfolders":          "هیچ زیرپوشه‌ای یافت نشد!",
+		"open_folder_err":        "خطا در باز کردن پوشه: %s",
+		"path_not_exist":         "مسیر پوشه وجود ندارد.",
+		"stopping":               "در حال توقف...",
+		"stopped":                "توسط کاربر متوقف شد.",
 		"webp_nostitch_fallback": "یک تصویر بزرگ‌تر از حد مجاز WebP است؛ به‌جای حالت بدون چسباندن، به‌صورت عادی چسبانده می‌شود.",
-		"error_invalid_input":   "لطفاً برای عرض، ارتفاع و کیفیت عددهای معتبر وارد کنید.",
-		"error_watermark_path":  "لطفاً یک تصویر واترمارک PNG معتبر انتخاب کنید.",
-		"error_unexpected":      "خطای غیرمنتظره‌ای رخ داد: %s",
-		"status_enhancing":      "افزایش کیفیت...",
-		"status_denoising":      "نویزگیری...",
-		"status_slicing":        "برش...",
-		"status_stitching":      "چسباندن...",
-		"status_processing":     "در حال پردازش...",
+		"error_invalid_input":    "لطفاً برای عرض، ارتفاع و کیفیت عددهای معتبر وارد کنید.",
+		"error_watermark_path":   "لطفاً یک تصویر واترمارک PNG معتبر انتخاب کنید.",
+		"error_unexpected":       "خطای غیرمنتظره‌ای رخ داد: %s",
+		"status_enhancing":       "افزایش کیفیت...",
+		"status_denoising":       "نویزگیری...",
+		"status_slicing":         "برش...",
+		"status_stitching":       "چسباندن...",
+		"status_processing":      "در حال پردازش...",
 	},
 }
 
@@ -181,7 +181,6 @@ func hasValidPresets(m map[string]interface{}) bool {
 	}
 	return false
 }
-
 
 func (a *App) getController() *pipeline.Controller {
 	a.stateMu.RLock()
@@ -299,6 +298,9 @@ func (a *App) loadSettings() map[string]interface{} {
 		if err := json.Unmarshal(data, &m); err != nil {
 			return nil, err
 		}
+		if m == nil {
+			return nil, fmt.Errorf("settings must be a JSON object")
+		}
 		return m, nil
 	}
 
@@ -385,12 +387,33 @@ func (a *App) loadSettings() map[string]interface{} {
 	}
 
 	a.settings = loaded
-	return a.settings
+	return cloneSettingsValue(a.settings).(map[string]interface{})
+}
+
+// Copy nested JSON values so callers never share mutable settings state.
+func cloneSettingsValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		copy := make(map[string]interface{}, len(v))
+		for key, item := range v {
+			copy[key] = cloneSettingsValue(item)
+		}
+		return copy
+	case []interface{}:
+		copy := make([]interface{}, len(v))
+		for i, item := range v {
+			copy[i] = cloneSettingsValue(item)
+		}
+		return copy
+	default:
+		return value
+	}
 }
 
 func (a *App) saveSettingsToDisk(settings map[string]interface{}) {
 	a.settingsMu.Lock()
 	defer a.settingsMu.Unlock()
+	settings = cloneSettingsValue(settings).(map[string]interface{})
 
 	filePath := a.getSettingsFilePath()
 	bakPath := a.getSettingsBakFilePath()

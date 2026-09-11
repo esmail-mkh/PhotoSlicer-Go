@@ -80,41 +80,39 @@ func detectGPUViaDXGI() (GPUInfo, error) {
 		return GPUInfo{}, err
 	}
 
-	var factory uintptr
+	var factory *struct{ VTable *[13]uintptr }
 	r1, _, err := procCreateDXGIFactory1.Call(
 		uintptr(unsafe.Pointer(&iidIDXGIFactory1)),
 		uintptr(unsafe.Pointer(&factory)),
 	)
-	if r1 != 0 || factory == 0 {
+	if r1 != 0 || factory == nil {
 		return GPUInfo{}, err
 	}
 
-	factoryVtblPtr := *(*uintptr)(unsafe.Pointer(factory))
-	factoryVtbl := (*[32]uintptr)(unsafe.Pointer(factoryVtblPtr))
+	factoryVtbl := factory.VTable
 	releaseFactory := factoryVtbl[2]
 	enumAdapters1 := factoryVtbl[12]
 
 	defer func() {
-		syscall.SyscallN(releaseFactory, factory)
+		syscall.SyscallN(releaseFactory, uintptr(unsafe.Pointer(factory)))
 	}()
 
 	var best GPUInfo
 	highestVRAM := -1
 
 	for i := uintptr(0); ; i++ {
-		var adapter uintptr
-		res, _, _ := syscall.SyscallN(enumAdapters1, factory, i, uintptr(unsafe.Pointer(&adapter)))
-		if res != 0 || adapter == 0 {
+		var adapter *struct{ VTable *[11]uintptr }
+		res, _, _ := syscall.SyscallN(enumAdapters1, uintptr(unsafe.Pointer(factory)), i, uintptr(unsafe.Pointer(&adapter)))
+		if res != 0 || adapter == nil {
 			break
 		}
 
-		adapterVtblPtr := *(*uintptr)(unsafe.Pointer(adapter))
-		adapterVtbl := (*[32]uintptr)(unsafe.Pointer(adapterVtblPtr))
+		adapterVtbl := adapter.VTable
 		releaseAdapter := adapterVtbl[2]
 		getDesc1 := adapterVtbl[10]
 
 		var desc dxgiAdapterDesc1
-		resDesc, _, _ := syscall.SyscallN(getDesc1, adapter, uintptr(unsafe.Pointer(&desc)))
+		resDesc, _, _ := syscall.SyscallN(getDesc1, uintptr(unsafe.Pointer(adapter)), uintptr(unsafe.Pointer(&desc)))
 		if resDesc == 0 {
 			name := strings.TrimSpace(syscall.UTF16ToString(desc.Description[:]))
 			vramMB := int(desc.DedicatedVideoMemory / (1024 * 1024))
@@ -136,7 +134,7 @@ func detectGPUViaDXGI() (GPUInfo, error) {
 				best = info
 			}
 		}
-		syscall.SyscallN(releaseAdapter, adapter)
+		syscall.SyscallN(releaseAdapter, uintptr(unsafe.Pointer(adapter)))
 	}
 
 	return best, nil
