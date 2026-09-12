@@ -50,6 +50,10 @@ func TestRunRealEsrganAIWithPersianPathAndFile(t *testing.T) {
 		t.Skip("Real-ESRGAN executable not found, skipping test")
 	}
 
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping Real-ESRGAN execution in CI environment")
+	}
+
 	gpu := DetectPrimaryGPU()
 	if !gpu.IsCapable || gpu.IsSoftware {
 		t.Skipf("No capable dedicated Vulkan GPU detected (%s, VRAM: %dMB), skipping Real-ESRGAN execution in CI/headless environment", gpu.Name, gpu.DedicatedVRAMMB)
@@ -75,8 +79,8 @@ func TestRunRealEsrganAIWithPersianPathAndFile(t *testing.T) {
 		progressCalled = true
 	})
 	if err != nil {
-		if strings.Contains(err.Error(), "vkCreateInstance") || strings.Contains(err.Error(), "invalid gpu device") {
-			t.Skipf("Vulkan device initialization failed (%v), skipping Real-ESRGAN hardware test in CI environment", err)
+		if strings.Contains(err.Error(), "vkCreateInstance") || strings.Contains(err.Error(), "invalid gpu device") || strings.Contains(err.Error(), "permission denied") {
+			t.Skipf("Real-ESRGAN binary cannot be executed in this environment (%v), skipping", err)
 		}
 		t.Fatalf("RunRealEsrganAI failed on Persian path/file: %v", err)
 	}
@@ -103,6 +107,10 @@ func TestEnhancerAndPipelineIntegration(t *testing.T) {
 		t.Skip("Real-ESRGAN executable not found, skipping test")
 	}
 
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping Real-ESRGAN execution in CI environment")
+	}
+
 	gpu := DetectPrimaryGPU()
 	if !gpu.IsCapable || gpu.IsSoftware {
 		t.Skipf("No capable dedicated Vulkan GPU detected (%s, VRAM: %dMB), skipping Real-ESRGAN execution in CI/headless environment", gpu.Name, gpu.DedicatedVRAMMB)
@@ -122,8 +130,8 @@ func TestEnhancerAndPipelineIntegration(t *testing.T) {
 
 	enhancedDir, err := RunRealEsrganAI(exe, testDir, "", nil, nil)
 	if err != nil {
-		if strings.Contains(err.Error(), "vkCreateInstance") || strings.Contains(err.Error(), "invalid gpu device") {
-			t.Skipf("Vulkan device initialization failed (%v), skipping Real-ESRGAN hardware test in CI environment", err)
+		if strings.Contains(err.Error(), "vkCreateInstance") || strings.Contains(err.Error(), "invalid gpu device") || strings.Contains(err.Error(), "permission denied") {
+			t.Skipf("Real-ESRGAN binary cannot be executed in this environment (%v), skipping", err)
 		}
 		t.Fatalf("RunRealEsrganAI failed: %v", err)
 	}

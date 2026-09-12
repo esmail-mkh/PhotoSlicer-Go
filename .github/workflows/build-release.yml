@@ -60,6 +60,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev pkg-config build-essential || sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev pkg-config build-essential
 
+      - name: Make AI Binaries Executable (Linux & macOS)
+        if: matrix.target_os != 'windows'
+        run: chmod +x up-model/realesrgan-ncnn-vulkan* || true
+
       - name: Run Go Vet
         run: go vet ./...
 

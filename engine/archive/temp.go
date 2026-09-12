@@ -43,9 +43,9 @@ func SafeRmtreeTemp(targetPath string) bool {
 	}
 	absTarget, err = filepath.EvalSymlinks(absTarget)
 	if err != nil {
-		// If symlink evaluation fails because it already doesn't exist, we can't/don't need to delete
+		// If symlink evaluation fails because it already doesn't exist, return false
 		if os.IsNotExist(err) {
-			return true
+			return false
 		}
 		absTarget, _ = filepath.Abs(targetPath)
 	}
@@ -105,10 +105,14 @@ func SafeRmtreeTemp(targetPath string) bool {
 		return false
 	}
 
-	// Windows read-only removal helper
+	// Read-only removal helper: ensure directories remain executable (0755) while files are writable (0666)
 	_ = filepath.Walk(absTarget, func(path string, info os.FileInfo, err error) error {
 		if err == nil && info != nil {
-			_ = os.Chmod(path, 0666)
+			if info.IsDir() {
+				_ = os.Chmod(path, 0755)
+			} else {
+				_ = os.Chmod(path, 0666)
+			}
 		}
 		return nil
 	})

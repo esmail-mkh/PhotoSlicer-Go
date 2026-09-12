@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -221,8 +222,10 @@ func TestSafeRmtreeTemp(t *testing.T) {
 	if SafeRmtreeTemp(os.TempDir()) {
 		t.Errorf("SafeRmtreeTemp should NEVER delete system temp directory!")
 	}
-	if SafeRmtreeTemp("C:\\") {
-		t.Errorf("SafeRmtreeTemp should NEVER delete C:\\ root!")
+	if runtime.GOOS == "windows" {
+		if SafeRmtreeTemp("C:\\") {
+			t.Errorf("SafeRmtreeTemp should NEVER delete C:\\ root!")
+		}
 	}
 	if SafeRmtreeTemp("/") {
 		t.Errorf("SafeRmtreeTemp should NEVER delete root /!")
