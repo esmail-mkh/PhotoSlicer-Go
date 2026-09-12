@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"photoslicer/engine/pipeline"
@@ -49,6 +50,11 @@ func TestRunRealEsrganAIWithPersianPathAndFile(t *testing.T) {
 		t.Skip("Real-ESRGAN executable not found, skipping test")
 	}
 
+	gpu := DetectPrimaryGPU()
+	if !gpu.IsCapable || gpu.IsSoftware {
+		t.Skipf("No capable dedicated Vulkan GPU detected (%s, VRAM: %dMB), skipping Real-ESRGAN execution in CI/headless environment", gpu.Name, gpu.DedicatedVRAMMB)
+	}
+
 	// Create a test input folder with Persian name and a Persian file name
 	testDir, err := os.MkdirTemp("", "تست_پوشه_فارسی_")
 	if err != nil {
@@ -69,6 +75,9 @@ func TestRunRealEsrganAIWithPersianPathAndFile(t *testing.T) {
 		progressCalled = true
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "vkCreateInstance") || strings.Contains(err.Error(), "invalid gpu device") {
+			t.Skipf("Vulkan device initialization failed (%v), skipping Real-ESRGAN hardware test in CI environment", err)
+		}
 		t.Fatalf("RunRealEsrganAI failed on Persian path/file: %v", err)
 	}
 	defer os.RemoveAll(outDir)
@@ -94,6 +103,11 @@ func TestEnhancerAndPipelineIntegration(t *testing.T) {
 		t.Skip("Real-ESRGAN executable not found, skipping test")
 	}
 
+	gpu := DetectPrimaryGPU()
+	if !gpu.IsCapable || gpu.IsSoftware {
+		t.Skipf("No capable dedicated Vulkan GPU detected (%s, VRAM: %dMB), skipping Real-ESRGAN execution in CI/headless environment", gpu.Name, gpu.DedicatedVRAMMB)
+	}
+
 	testDir, err := os.MkdirTemp("", "پوشه_ورودی_")
 	if err != nil {
 		t.Fatalf("failed to create Persian test dir: %v", err)
@@ -108,6 +122,9 @@ func TestEnhancerAndPipelineIntegration(t *testing.T) {
 
 	enhancedDir, err := RunRealEsrganAI(exe, testDir, "", nil, nil)
 	if err != nil {
+		if strings.Contains(err.Error(), "vkCreateInstance") || strings.Contains(err.Error(), "invalid gpu device") {
+			t.Skipf("Vulkan device initialization failed (%v), skipping Real-ESRGAN hardware test in CI environment", err)
+		}
 		t.Fatalf("RunRealEsrganAI failed: %v", err)
 	}
 	defer os.RemoveAll(enhancedDir)
