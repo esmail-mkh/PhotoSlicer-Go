@@ -64,7 +64,15 @@ jobs:
         run: go vet ./...
 
       - name: Run Unit Tests
-        run: go test -v -race ./...
+        env:
+          CGO_ENABLED: '1'
+        shell: bash
+        run: |
+          if [ "${{ matrix.target_os }}" = "windows" ]; then
+            go test -v -race -ldflags="-linkmode=external" ./...
+          else
+            go test -v -race ./...
+          fi
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
