@@ -267,15 +267,21 @@ jobs:
 
             <div dir="rtl">
 
-            # 🚀 فوتو اسلایسر نسخه ${{ env.CLEAN_VERSION }} (Go + Wails v2)
+            # 🚀 فوتو اسلایسر نسخه ${{ env.CLEAN_VERSION }}
 
-            **نسخه ${{ env.CLEAN_VERSION }} با بازنویسی کامل در Go و فریم‌ورک Wails v2 منتشر شد!**
-            پکیج‌های بومی و مستقل سیستم‌عامل‌های **Windows**, **Linux** و **macOS** با سرعت و بهینگی فوق‌العاده بالا آماده دانلود هستند.
+            **نسخه ${{ env.CLEAN_VERSION }} با پشتیبانی از ورودی PDF، سیستم بررسی خودکار آپدیت، شتاب‌بخشی چشمگیر به پردازش و چسباندن تصاویر، پشتیبانی از فرمت JFIF و بهینه‌سازی‌های جامع منتشر شد!**
+            پکیج‌های بومی و مستقل سیستم‌عامل‌های **Windows**, **Linux** و **macOS** با سرعت و پایداری بالا آماده دانلود هستند.
 
-            ### 🌟 ویژگی‌ها و بهبودها (نسخه ${{ env.CLEAN_VERSION }})
-            * **⚡ سرعت مضاعف:** پردازش و انکودینگ تصاویر با عملکرد چندنخی Native در Go.
-            * **💎 حجم بسیار اندک و بهینه:** فایل اجرایی مستقل بدون نیاز به پایتون یا رانتایم‌های سنگین.
-            * **🛡️ پشتیبانی از تمام پلتفرم‌ها:** بیلد اختصاصی و بهینه‌سازی شده برای ویندوز، لینوکس و مک.
+            ### 🌟 ویژگی‌ها و بهبودهای جدید (نسخه ${{ env.CLEAN_VERSION }})
+            * **📄 پشتیبانی کامل از ورودی PDF (Single & Batch):** انتخاب و پردازش مستقیم فایل‌های PDF برای استخراج تصاویر یا رندر باکیفیت صفحات در هر دو حالت تکی و دسته‌ای.
+            * **⚡ شتاب‌بخشی چشمگیر به چسباندن تصاویر:** بازنویسی و موازی‌سازی کپی بافرها جهت مونتاژ بلادرنگ و فوق‌سریع بوم تصاویر بلند وب‌تون و مانهوا با حداقل مصرف رم.
+            * **🔄 بررسی خودکار آپدیت:** بررسی نسخه جدید در پس‌زمینه از گیت‌هاب با بج درخشان در هدر، پالت ۳-نقطه‌ای جمع‌وجور تم‌ها و وضعیت نسخه در About Us.
+            * **🖼️ پشتیبانی از فرمت تصویر JFIF:** اضافه شدن کامل پسوند `.jfif` به موتور ورودی، اسکن پوشه، آرشیوها و مسیر سریع تولید PDF.
+            * **🎮 تشخیص خودکار کارت گرافیک و VRAM:** اسکن مستقیم DXGI سخت‌افزار و انتخاب هوشمند خودکار بین Real-ESRGAN و Fast Clean با دکمه Auto Detect.
+            * **🛡️ بازیابی خودکار و محافظت از پریست‌ها:** خودترمیمی و بازگردانی خودکار تنظیمات از فایل پشتیبان و جلوگیری از رونویسی با پریست‌های خالی.
+            * **✂️ الگوریتم برش متعادل و حذف برش‌های ریز:** تلورانس تا ۱۵٪ برای حاشیه‌های امن پنل‌ها، تقسیم مساوی فاصله‌های بزرگ و افزایش حداقل ارتفاع برش به ۵۰۰ پیکسل.
+            * **💾 امنیت دیسک و هماهنگی با اکسپلورر:** نام‌گذاری زمان‌دار خروجی‌ها با تاریخ و ساعت، تخلیه بافر به دیسک (`Sync`)، رفرش خودکار فایل اکسپلورر با `SHChangeNotify` و حل مشکل مسیرهای فاصله‌دار.
+            * **⏱️ پایداری رابط کاربری:** فریز دقیق تایمر پردازش در وضعیت Pause، همگام‌سازی انیمیشن پالس کلید شروع و ممیزی کامل امنیتی.
 
             ---
 
@@ -290,15 +296,21 @@ jobs:
 
             ---
 
-            # 🚀 PhotoSlicer v${{ env.CLEAN_VERSION }} (Go + Wails v2)
+            # 🚀 PhotoSlicer v${{ env.CLEAN_VERSION }}
 
-            **Version ${{ env.CLEAN_VERSION }} is here, completely rewritten in Go and Wails v2!**
+            **Version ${{ env.CLEAN_VERSION }} brings native PDF input support, an automatic update checker, blazing fast image stitching, JFIF support, and comprehensive system stability!**
             Blazing fast native standalone builds for **Windows**, **Linux**, and **macOS** are ready.
 
             ### 🌟 What's New (v${{ env.CLEAN_VERSION }})
-            * **⚡ Ultimate Performance:** Native multi-threaded Go pipeline for 2x faster encoding and 3.4x faster natural sorting.
-            * **💎 Ultra Lightweight:** Pure standalone binary (~15MB), zero Python dependency.
-            * **🛡️ Full Cross-Platform Support:** Native builds for Windows, Linux, and macOS.
+            * **📄 Native PDF Input Support (Single & Batch):** Directly process and extract images from PDF documents in both Single and Batch modes with dedicated picker dialogs.
+            * **⚡ Blazing Fast Image Stitching:** Optimized parallel buffer assembly for instant stitching of ultra-tall manhwa canvas strips with minimal RAM footprint.
+            * **🔄 Automatic In-App Release Checker:** Background GitHub release checks with a pulsating header badge, compact 3-dot theme dropdown, and About Us status pill.
+            * **🖼️ JFIF Format Support:** Integrated `.jfif` support across directory scanning, batch processing, AI enhancement staging, and PDF generation.
+            * **🎮 GPU & VRAM Auto-Detection:** DXGI hardware inspection to automatically select between Real-ESRGAN and Fast Clean CPU, with an on-demand Auto Detect button.
+            * **🛡️ Self-Healing Settings & Preset Protection:** Automatic recovery from backup configs with strict guardrails preventing accidental overwrites.
+            * **✂️ Balanced Slicing & Micro-Slice Elimination:** 15% gutter tolerance for safe margins, even gap division, 500px minimum slice threshold, and trailing slice coalescing.
+            * **💾 Output Safety & Shell Integration:** Datetime-stamped folders, disk sync before closing archives, Windows `SHChangeNotify` shell refresh, and spaces-in-path fix.
+            * **⏱️ UI Polish & Accurate Timing:** Elapsed timer freezes cleanly on pause, scoped button pulse animations, and enhanced security against XSS.
 
             ---
 

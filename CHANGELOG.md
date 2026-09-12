@@ -1,8 +1,27 @@
-[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۳-ارتقای-واترمارک-هوشمند-و-بهبود-پایداری) | [🇬🇧 **English**](#-photoslicer-v53-content-aware-watermarking--stability)
+[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۴-پشتیبانی-از-pdf-بررسی-خودکار-آپدیت-و-بهینه‌سازی-سرعت) | [🇬🇧 **English**](#-photoslicer-v54-pdf-input-auto-updates--performance)
 
 ---
 
 <div dir="rtl">
+
+# 🚀 فوتو اسلایسر نسخه ۵.۴: پشتیبانی از PDF، بررسی خودکار آپدیت و بهینه‌سازی سرعت
+
+**نسخه ۵.۴ منتشر شد!** این نسخه یک به‌روزرسانی بزرگ با پشتیبانی مستقیم از ورودی فایل‌های PDF، بررسی خودکار به‌روزرسانی‌ها از گیت‌هاب، پشتیبانی از فرمت تصویر JFIF، شتاب‌بخشی چشمگیر به چسباندن تصاویر، الگوریتم برش متعادل هوشمند، سیستم خودترمیمی پریست‌ها و پایداری در سطح سیستم‌عامل و رابط کاربری است.
+
+### 🌟 تغییرات جدید (نسخه ۵.۴)
+
+* **📄 پشتیبانی کامل از ورودی PDF (Single & Batch):** امکان انتخاب و پردازش مستقیم فایل‌های PDF برای استخراج تصاویر یا رندر صفحات باکیفیت بالا، در هر دو حالت تکی و دسته‌ای به همراه دیالوگ انتخاب فایل و برچسب‌های راهنما در UI.
+* **⚡ افزایش چشمگیر سرعت چسباندن تصاویر (Stitching Performance):** بازنویسی بهینه و موازی‌سازی کپی بافرها جهت مونتاژ بلادرنگ و فوق‌سریع بوم تصاویر بلند وب‌تون و مانهوا با مصرف حداقل حافظه رم.
+* **🔄 بررسی خودکار آپدیت با نشانگر زنده هدر:** بررسی خودکار نسخه‌های جدید از گیت‌هاب در پس‌زمینه (همراه با تست سریع DNS)، نشانگر تپنده و درخشان آپدیت روی بج نسخه در هدر برنامه، پالت بازشوی ۳-نقطه‌ای جمع‌وجور تم‌ها و برچسب اختصاصی وضعیت در بخش درباره ما.
+* **🖼️ پشتیبانی از فرمت تصویر JFIF:** اضافه شدن کامل پسوند `.jfif` به موتور ورودی، اسکن دایرکتوری، اکسترکتور آرشیوها، خط لوله هوش مصنوعی و مسیر سریع تولید PDF.
+* **🎮 تشخیص خودکار کارت گرافیک و VRAM:** مجهز به اسکنر مستقیم سخت‌افزاری DXGI جهت شناسایی کارت گرافیک و حافظه اختصاصی (VRAM >= 2GB) و انتخاب خودکار Real-ESRGAN یا Fast Clean همراه با دکمه Auto Detect در تنظیمات.
+* **🛡️ سیستم خودترمیمی و پشتیبان‌گیری محافظت‌شده پریست‌ها:** بازیابی خودکار تنظیمات و پریست‌های کاربر از فایل `settings.json.bak` در صورت بروز هرگونه مشکل یا حذف ناخواسته، با حفاظت کامل در برابر بازنویسی با مقادیر خالی.
+* **✂️ الگوریتم برش متعادل و حذف برش‌های بسیار ریز (Micro-Slice Prevention):** در نظر گرفتن تلورانس تا ۱۵٪ برای حاشیه‌های امن پنل‌ها (`CapSliceGapsWithTolerance`)، تقسیم مساوی و متقارن فاصله‌های بیش از حد بزرگ، افزایش کف ارتفاع برش به ۵۰۰ پیکسل و ادغام خودکار قطعات ریز انتهایی.
+* **💾 امنیت دیسک و یکپارچگی فایل اکسپلورر:** نام‌گذاری زمان‌دار پوشه‌های خروجی با تاریخ و ساعت، تخلیه بافر به دیسک (`Sync`) پیش از بستن آرشیوهای ZIP و PDF، ارسال سیگنال `SHChangeNotify` به ویندوز جهت رفرش آنی اکسپلورر و رفع مشکل `/select` با مسیرهای حاوی فاصله.
+* **⏱️ بهبودهای رابط کاربری و تایمر:** توقف (Freeze) دقیق زمان‌سنج پردازش در وضعیت Pause، همگام‌سازی انیمیشن پالس کلید شروع، و ایمن‌سازی کامل اعلان‌ها در برابر باگ‌های XSS.
+* **📦 ارتقای خط لوله بیلد و چندسکویی:** نام‌گذاری نسخه‌دار فایل‌های باینری خروجی در ویندوز، لینوکس و مک، امضای مجدد خودکار بسته برنامه‌ مک (macOS Code Re-signing) و کامپایل با فلگ‌های بهینه‌سازی CGO.
+
+---
 
 # 🚀 فوتو اسلایسر نسخه ۵.۳: ارتقای واترمارک هوشمند و بهبود پایداری
 
@@ -133,6 +152,25 @@
 فایل **ZIP** آخرین نسخه را از صفحه [Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest) دانلود کنید، اکسترکت کنید و `PhotoSlicer.exe` را اجرا کنید. لذت ببرید!
 
 </div>
+
+---
+
+# 🚀 PhotoSlicer v5.4: PDF Input, Auto-Updates & Performance
+
+**Version 5.4 is here!** This major release introduces native PDF input support for single and batch workflows, an in-app automatic release update checker, JFIF image support, heavily optimized image stitching pipeline, balanced smart slicing heuristics, self-healing preset protection, and system-level file explorer integration.
+
+### 🌟 What's New (v5.4)
+
+* **📄 Native PDF Input Support (Single & Batch):** Directly process and extract images from PDF documents in both Single Mode and Batch Mode, featuring dedicated file picker dialogs and UI inspection badges.
+* **⚡ Blazing Fast Image Stitching:** High-performance parallel buffer copying for instant assembling of ultra-tall manhwa canvas strips with minimal RAM usage.
+* **🔄 Automatic In-App Release Checker:** Background detection of new GitHub releases with a pulsating interactive header badge, compact 3-dot theme dropdown palette, and About Us status pill with direct release links.
+* **🖼️ JFIF Format Support:** Full integration of `.jfif` images across directory scanning, batch processing, AI enhancement staging, and PDF generation fast paths.
+* **🎮 GPU & VRAM Auto-Detection:** Direct DXGI hardware adapter inspection to identify dedicated GPU memory (>=2GB VRAM) and automatically pick between Real-ESRGAN and Fast Clean CPU, with an on-demand Auto Detect button in Settings.
+* **🛡️ Self-Healing Settings & Protected Backup:** Automatic recovery from `settings.json.bak` upon missing or corrupted configurations, with strict guardrails preventing backup overwrites with empty presets.
+* **✂️ Balanced Slicing & Micro-Slice Elimination:** 15% gutter tolerance for safe margins, even and symmetric subdivision of oversized gaps, higher minimum slice threshold (500px), and automatic trailing slice coalescing.
+* **💾 Output Safety & Shell Integration:** Datetime-stamped multi-run output directories, atomic folder reservation, disk sync before closing archives, Windows `SHChangeNotify` integration for instantaneous file explorer updates, and spaces-in-path support for `/select`.
+* **⏱️ UI Polish & Timer Accuracy:** Freezes elapsed processing timers accurately on pause, scopes button pulse glow strictly to ready/paused states, and hardens notifications against XSS.
+* **📦 Cross-Platform Build Automation:** Versioned binary naming across Wails and GitHub Actions artifacts, automated macOS app bundle code re-signing, and CGO -O3 compiler optimization flags.
 
 ---
 
