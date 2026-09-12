@@ -78,6 +78,10 @@ export function SelectFolder() {
   return window['go']['main']['App']['SelectFolder']();
 }
 
+export function SelectInputFile() {
+  return window['go']['main']['App']['SelectInputFile']();
+}
+
 export function SelectWatermarkFile() {
   return window['go']['main']['App']['SelectWatermarkFile']();
 }

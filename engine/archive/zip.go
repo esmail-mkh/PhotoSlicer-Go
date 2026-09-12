@@ -237,8 +237,12 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error)
 	return outputDir, nil
 }
 
-// FastScanDir scans subdirectories and extracts ZIP/CBZ files into temporary directories.
+// FastScanDir scans subdirectories and extracts ZIP/CBZ/PDF inputs into temporary directories.
 func FastScanDir(dirname string) ([]string, error) {
+	return FastScanDirWithCheck(dirname, nil)
+}
+
+func FastScanDirWithCheck(dirname string, checkState func() error) ([]string, error) {
 	entries, err := os.ReadDir(dirname)
 	if err != nil {
 		return nil, err
@@ -248,6 +252,11 @@ func FastScanDir(dirname string) ([]string, error) {
 	var result []string
 
 	for _, entry := range entries {
+		if checkState != nil {
+			if err := checkState(); err != nil {
+				return nil, err
+			}
+		}
 		fullPath := filepath.Join(dirname, entry.Name())
 		if entry.IsDir() {
 			result = append(result, fullPath)
@@ -255,15 +264,21 @@ func FastScanDir(dirname string) ([]string, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext == ".zip" || ext == ".cbz" {
+		if ext == ".zip" || ext == ".cbz" || ext == ".pdf" {
 			if tempRoot == "" {
 				tempRoot, err = os.MkdirTemp("", "photoslicer_extract_")
 				if err == nil {
 					RegisterTempDir(tempRoot)
 				}
+				if err != nil {
+					return nil, err
+				}
 			}
 			if tempRoot != "" {
-				extracted, err := ExtractImagesFromZip(fullPath, tempRoot)
+				extracted, err := ExtractInputFile(fullPath, tempRoot, checkState)
+				if err != nil && ext == ".pdf" {
+					return nil, fmt.Errorf("%s: %w", entry.Name(), err)
+				}
 				if err == nil && extracted != "" {
 					result = append(result, extracted)
 				}

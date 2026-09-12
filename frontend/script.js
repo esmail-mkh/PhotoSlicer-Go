@@ -6,6 +6,7 @@ const translations = {
         sourceDirectory: "Source Directory",
         pastePath: "Paste path",
         selectFolder: "Browse folder",
+        selectInputFile: "Choose PDF / ZIP / CBZ file",
         clearPath: "Clear",
         width: "Width",
         height: "Height",
@@ -92,7 +93,7 @@ const translations = {
         clipboardInvalid: "Clipboard text is not a valid directory path.",
         clipboardError: "Failed to get clipboard text.",
         dropSuccess: "Folder dropped successfully.",
-        dropHint: "Drop folder here",
+        dropHint: "Drop folder or PDF / ZIP / CBZ here",
         featFast: "Fast Stitching",
         featFastDesc: "High-speed image stitching with optimized algorithms.",
         featAI: "AI Enhance",
@@ -216,6 +217,7 @@ const translations = {
         sourceDirectory: "پوشه منبع تصاویر",
         pastePath: "جای‌گذاری مسیر",
         selectFolder: "انتخاب پوشه",
+        selectInputFile: "انتخاب فایل PDF / ZIP / CBZ",
         clearPath: "پاک کردن",
         width: "عرض دلخواه",
         height: "حد ارتفاع برش",
@@ -302,7 +304,7 @@ const translations = {
         clipboardInvalid: "متن کپی شده یک مسیر معتبر نیست.",
         clipboardError: "خطا در دریافت متن کلیپ‌بورد.",
         dropSuccess: "پوشه با موفقیت رها شد.",
-        dropHint: "پوشه را اینجا رها کنید",
+        dropHint: "پوشه یا فایل PDF / ZIP / CBZ را اینجا رها کنید",
         featFast: "چسباندن سریع",
         featFastDesc: "چسباندن تصاویر با سرعت بالا و الگوریتم‌های بهینه.",
         featAI: "افزایش کیفیت هوشمند",
@@ -466,6 +468,7 @@ function setLanguage(lang) {
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
         const key = el.getAttribute('data-i18n-title');
         if (texts[key]) el.title = texts[key];
+        if (key === 'selectInputFile' && texts[key]) el.setAttribute('aria-label', texts[key]);
     });
 
     // Restore select values so option re-translation never resets user selections
@@ -597,7 +600,17 @@ function selectFolder() {
 }
 
 let _inspectDebounce = null;
+let _inspectRequest = 0;
 let _dirReady = false;
+
+async function selectInputFile() {
+    const path = await window.pywebview?.api?.select_input_file?.();
+    if (path) {
+        document.getElementById('directory-input').value = path;
+        refreshDirectoryState();
+        updateSettings();
+    }
+}
 
 function setDirReady(ready) {
     _dirReady = !!ready;
@@ -608,6 +621,7 @@ function setDirReady(ready) {
 }
 
 async function updateDirectoryInspection(path) {
+    const request = ++_inspectRequest;
     const badge = document.getElementById('dir-inspection-badge');
     const input = document.getElementById('directory-input');
     const wrapper = input ? input.closest('.folder-wrapper') : document.getElementById('folder-wrapper');
@@ -624,9 +638,11 @@ async function updateDirectoryInspection(path) {
 
     if (!window.pywebview?.api?.inspect_directory) return;
 
+    setDirReady(false);
+
     try {
         const res = await window.pywebview.api.inspect_directory(path.trim());
-        if (!res) return;
+        if (!res || request !== _inspectRequest || input?.value.trim() !== path.trim()) return;
 
         const iconEl = document.getElementById('badge-icon');
         const countEl = document.getElementById('badge-count');
@@ -651,12 +667,14 @@ async function updateDirectoryInspection(path) {
                     ? `${res.item_count} چپتر شناسایی شد (پردازش گروهی)` 
                     : `${res.item_count} chapters detected (Batch Mode)`;
                 badge.setAttribute('data-tooltip-text', desc);
-            } else if (res.mode === 'archive_zip' || res.mode === 'archive_cbz') {
+            } else if (res.mode === 'archive_zip' || res.mode === 'archive_cbz' || res.mode === 'archive_pdf') {
                 badge.classList.add('badge-archive');
                 if (iconEl) iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>';
                 if (countEl) countEl.textContent = res.item_count;
-                const ext = res.mode === 'archive_cbz' ? 'CBZ' : 'ZIP';
-                const desc = isFa 
+                const ext = res.mode === 'archive_pdf' ? 'PDF' : res.mode === 'archive_cbz' ? 'CBZ' : 'ZIP';
+                const desc = ext === 'PDF'
+                    ? (isFa ? `${res.item_count} صفحه در فایل PDF` : `${res.item_count} pages in PDF`)
+                    : isFa
                     ? `${res.item_count} تصویر در آرشیو ${ext}` 
                     : `${res.item_count} images in ${ext} archive`;
                 badge.setAttribute('data-tooltip-text', desc);
@@ -683,6 +701,16 @@ async function updateDirectoryInspection(path) {
                 ? 'مسیر مورد نظر یافت نشد' 
                 : 'Path does not exist';
             badge.setAttribute('data-tooltip-text', desc);
+            badge.style.display = 'inline-flex';
+            if (wrapper) wrapper.classList.add('has-inspection');
+            setDirReady(false);
+        } else if (res.status === 'error' && res.mode === 'archive_pdf') {
+            badge.classList.add('badge-empty');
+            if (iconEl) iconEl.textContent = '!';
+            if (countEl) countEl.textContent = 'PDF';
+            badge.setAttribute('data-tooltip-text', isFa
+                ? 'فایل PDF قابل خواندن نیست؛ ممکن است خراب، خالی یا رمزدار باشد'
+                : 'Cannot read PDF; it may be damaged, empty, or password-protected');
             badge.style.display = 'inline-flex';
             if (wrapper) wrapper.classList.add('has-inspection');
             setDirReady(false);
@@ -3177,7 +3205,7 @@ function setupDragAndDrop() {
 }
 
 // Called from Python with the resolved absolute path(s) of the dropped items.
-// PhotoSlicer works on a single source folder (or .cbz), so we take the first.
+// PhotoSlicer works on one source folder or PDF/ZIP/CBZ file, so take the first.
 window.handleDroppedPaths = function(paths) {
     _dragDepth = 0;
     const wrapper = document.querySelector('.folder-wrapper');

@@ -688,6 +688,19 @@ func (a *App) SelectWatermarkFile() string {
 	return res
 }
 
+func (a *App) SelectInputFile() string {
+	res, err := wailsRuntime.OpenFileDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select PDF / ZIP / CBZ",
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "PDF / ZIP / CBZ", Pattern: "*.pdf;*.zip;*.cbz"},
+		},
+	})
+	if err != nil {
+		return ""
+	}
+	return res
+}
+
 func (a *App) ExportPresets(jsonText string, suggestedFilename string) string {
 	if suggestedFilename == "" {
 		suggestedFilename = "photoslicer-presets.json"
@@ -866,6 +879,18 @@ func (a *App) InspectDirectory(path string) map[string]interface{} {
 
 	if !fi.IsDir() {
 		extLower := strings.ToLower(filepath.Ext(cleanPath))
+		if extLower == ".pdf" {
+			count, err := archive.CountPDFPages(cleanPath)
+			status := "ok"
+			if err != nil {
+				status = "error"
+			}
+			result := map[string]interface{}{"status": status, "mode": "archive_pdf", "item_count": count, "path": cleanPath}
+			if err != nil {
+				result["error"] = err.Error()
+			}
+			return result
+		}
 		if extLower == ".zip" || extLower == ".cbz" {
 			r, err := zip.OpenReader(cleanPath)
 			if err != nil {
@@ -924,6 +949,12 @@ func (a *App) InspectDirectory(path string) map[string]interface{} {
 				continue
 			}
 			ext := strings.ToLower(filepath.Ext(entry.Name()))
+			if ext == ".pdf" {
+				count, err := archive.CountPDFPages(fullPath)
+				if err == nil && count > 0 {
+					validFolders++
+				}
+			}
 			if ext == ".zip" || ext == ".cbz" {
 				count, err := archive.CountImagesInArchive(fullPath)
 				if err == nil && count > 0 {
@@ -1002,7 +1033,8 @@ func (a *App) Start(params map[string]interface{}) {
 		var archiveTempDir string
 		if originalIsFile {
 			extLower := strings.ToLower(filepath.Ext(dirAddress))
-			if extLower == ".zip" || extLower == ".cbz" {
+			if extLower == ".zip" || extLower == ".cbz" || extLower == ".pdf" {
+				a.updateStep("scan")
 				tempRoot, err := os.MkdirTemp("", "photoslicer_extract_")
 				if err != nil {
 					a.showError(err.Error(), true)
@@ -1012,7 +1044,7 @@ func (a *App) Start(params map[string]interface{}) {
 					return
 				}
 				archive.RegisterTempDir(tempRoot)
-				extracted, err := archive.ExtractImagesFromZip(dirAddress, tempRoot)
+				extracted, err := archive.ExtractInputFile(dirAddress, tempRoot, checkState)
 				if err != nil || extracted == "" {
 					errMsg := getMsg("error_no_images", lang)
 					if err != nil {
@@ -1339,7 +1371,14 @@ func (a *App) Start(params map[string]interface{}) {
 			// Batch mode
 			a.changeProgress(0)
 			a.updateStep("scan")
-			subfolders, _ := archive.FastScanDir(dirAddress)
+			subfolders, scanErr := archive.FastScanDirWithCheck(dirAddress, checkState)
+			if scanErr != nil {
+				a.showError(scanErr.Error(), true)
+				a.updateStep("ready")
+				a.setButtonState("idle")
+				a.execJS("stopTimer();")
+				return
+			}
 			var validFolders []string
 			for _, sf := range subfolders {
 				imgs, _ := sorting.GetAllImagesDirectory(sf)

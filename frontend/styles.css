@@ -2223,13 +2223,13 @@ input#save-location-input[readonly] {
 .folder-wrapper input:focus,
 .folder-wrapper input:not(:placeholder-shown) {
     padding-left: 18px !important;
-    padding-right: 90px !important;
+    padding-right: 134px !important;
 }
 
 [dir="rtl"] .folder-wrapper input:focus,
 [dir="rtl"] .folder-wrapper input:not(:placeholder-shown) {
     padding-right: 18px !important;
-    padding-left: 90px !important;
+    padding-left: 134px !important;
 }
 
 /* Action Buttons */
@@ -2347,28 +2347,28 @@ input#save-location-input[readonly] {
     background: linear-gradient(180deg, #ef4444, #dc2626);
 }
 
-/* Make room for the 3rd (clear) button once a path is present */
+/* Make room for clear / paste / file / folder actions once a path is present. */
 .folder-wrapper.has-value input:focus,
 .folder-wrapper.has-value input:not(:placeholder-shown) {
-    padding-right: 134px !important;
+    padding-right: 175px !important;
 }
 
 [dir="rtl"] .folder-wrapper.has-value input:focus,
 [dir="rtl"] .folder-wrapper.has-value input:not(:placeholder-shown) {
     padding-right: 18px !important;
-    padding-left: 134px !important;
+    padding-left: 175px !important;
 }
 
 /* Make room for inline inspection badge when present */
 .folder-wrapper.has-inspection input:focus,
 .folder-wrapper.has-inspection input:not(:placeholder-shown) {
-    padding-right: 188px !important;
+    padding-right: 229px !important;
 }
 
 [dir="rtl"] .folder-wrapper.has-inspection input:focus,
 [dir="rtl"] .folder-wrapper.has-inspection input:not(:placeholder-shown) {
     padding-right: 18px !important;
-    padding-left: 188px !important;
+    padding-left: 229px !important;
 }
 
 /* ============================================

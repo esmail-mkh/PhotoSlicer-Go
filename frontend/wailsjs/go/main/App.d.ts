@@ -40,6 +40,8 @@ export function SaveSettings(arg1:Record<string, any>):Promise<void>;
 
 export function SelectFolder():Promise<string>;
 
+export function SelectInputFile():Promise<string>;
+
 export function SelectWatermarkFile():Promise<string>;
 
 export function Start(arg1:Record<string, any>):Promise<void>;

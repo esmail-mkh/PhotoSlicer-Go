@@ -52,6 +52,7 @@ It automates the entire webtoon production workflow: seamless vertical stitching
   * 🔥 **Real-ESRGAN (GPU):** State-of-the-art AI upscaler powered by NCNN Vulkan to upscale and clarify low-resolution artwork.
   * 🎮 **Automatic Hardware Detection:** Scans dedicated GPU & VRAM on startup to automatically select Real-ESRGAN for capable systems (>= 2GB VRAM), with an on-demand Auto Detect button in Settings.
 * **Format Mastery:** Supports input from **JPG, JFIF, PNG, WEBP, AVIF,** and layered **PSD** files.
+* **PDF Input:** Choose a **PDF / ZIP / CBZ** file with the file button, drop it onto the source field, or paste its path. Folders containing PDFs work in batch mode too. Embedded images retain their original resolution; image-free pages render at **144 DPI**, including those in mixed documents. PDFium is embedded in the application, so no extra tools are required. Password-protected PDFs are not supported.
 * **Multi-Mode Processing:**
   * **Single Mode:** Point to a folder of images to process a single chapter.
   * **Batch Mode:** Point to a parent directory containing multiple chapter folders; PhotoSlicer processes each chapter sequentially with full progress tracking.
@@ -255,7 +256,7 @@ Navigate to **Settings → Appearance → Custom Color** to design your own pale
 | **Language & Backend** | **Go 1.25+** (Goroutines, worker pools, native cross-platform runtime) |
 | **Desktop Framework** | **Wails v2** (Native WebView2 on Windows, WebKitGTK on Linux, WebKit on macOS) |
 | **Image Processing** | `github.com/disintegration/imaging`, pure-Go encoders & decoders |
-| **Document & Container Encoders** | Pure-Go PDF, layered PSD, ZIP, and CBZ writers |
+| **Document & Container Encoders** | Pure-Go PDF, layered PSD, ZIP, and CBZ writers; embedded PDFium (WebAssembly) for PDF input |
 | **AI Upscaling** | **Real-ESRGAN** (NCNN Vulkan GPU) & **Fast Clean** (CPU engine) |
 | **Frontend UI** | Modern HTML5, CSS3 Glassmorphism, Vanilla JavaScript |
 

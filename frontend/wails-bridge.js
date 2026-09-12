@@ -33,6 +33,7 @@
     const api = {
         app_ready: () => window.go?.main?.App?.AppReady(),
         select_folder: () => window.go?.main?.App?.SelectFolder(),
+        select_input_file: () => window.go?.main?.App?.SelectInputFile(),
         select_watermark_file: () => window.go?.main?.App?.SelectWatermarkFile(),
         export_presets: (jsonText, filename) => window.go?.main?.App?.ExportPresets(jsonText, filename),
         import_presets: () => window.go?.main?.App?.ImportPresets(),
