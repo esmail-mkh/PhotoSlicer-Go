@@ -15,6 +15,7 @@ const translations = {
         formatJpgDesc: "Smallest file size",
         formatPngDesc: "Lossless quality",
         formatWebpDesc: "Modern & compact",
+        formatAvifDesc: "Next-gen compression",
         formatPsdDesc: "Photoshop layers",
         aiEnhance: "AI Enhance",
         enhanceEngine: "Quality Engine",
@@ -99,7 +100,7 @@ const translations = {
         featAI: "AI Enhance",
         featAIDesc: "Smart quality enhancement for sharper results.",
         featFormat: "Multi-Format",
-        featFormatDesc: "JPG, JFIF, PNG, WEBP, PSD, ZIP, PDF & CBZ support.",
+        featFormatDesc: "JPG, JFIF, PNG, WEBP, AVIF, PSD, ZIP, PDF & CBZ support.",
         featBatch: "Batch Process",
         featBatchDesc: "Process entire folders with one click.",
         filesLabel: "Files",
@@ -226,6 +227,7 @@ const translations = {
         formatJpgDesc: "کمترین حجم فایل",
         formatPngDesc: "کیفیت بدون افت",
         formatWebpDesc: "مدرن و کم‌حجم",
+        formatAvifDesc: "فشرده‌سازی نسل جدید",
         formatPsdDesc: "لایه‌های فتوشاپ",
         aiEnhance: "افزایش کیفیت هوشمند",
         enhanceEngine: "موتور افزایش کیفیت",
@@ -310,7 +312,7 @@ const translations = {
         featAI: "افزایش کیفیت هوشمند",
         featAIDesc: "بهبود هوشمند کیفیت برای نتایج واضح‌تر.",
         featFormat: "چندفرمتی",
-        featFormatDesc: "پشتیبانی از JPG, JFIF, PNG, WEBP, PSD, ZIP, PDF و CBZ.",
+        featFormatDesc: "پشتیبانی از JPG, JFIF, PNG, WEBP, AVIF, PSD, ZIP, PDF و CBZ.",
         featBatch: "پردازش گروهی",
         featBatchDesc: "پردازش کل پوشه‌ها با یک کلیک.",
         filesLabel: "فایل‌ها",
@@ -1995,6 +1997,7 @@ const FORMAT_DESC_KEYS = {
     JPG: 'formatJpgDesc',
     PNG: 'formatPngDesc',
     WEBP: 'formatWebpDesc',
+    AVIF: 'formatAvifDesc',
     PSD: 'formatPsdDesc'
 };
 

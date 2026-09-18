@@ -1164,7 +1164,7 @@ func (a *App) Start(params map[string]interface{}) {
 			threadCount = 64
 		}
 		switch strings.ToUpper(saveFormat) {
-		case "PNG", "WEBP", "PSD":
+		case "PNG", "WEBP", "AVIF", "PSD":
 			saveFormat = strings.ToUpper(saveFormat)
 		default:
 			saveFormat = "JPG"

@@ -283,6 +283,18 @@ func EncodeImage(w io.Writer, img image.Image, format string, quality int) error
 	fmtLower := strings.ToLower(format)
 
 	switch fmtLower {
+	case "avif":
+		if quality <= 0 {
+			quality = 60
+		}
+		speed := 6
+		if quality >= 95 {
+			speed = 8
+		}
+		return avif.Encode(w, img, avif.Options{
+			Quality: quality,
+			Speed:   speed,
+		})
 	case "webp":
 		if quality <= 0 {
 			quality = 95

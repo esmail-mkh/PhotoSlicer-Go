@@ -165,7 +165,7 @@ func TestSaveImageFormats(t *testing.T) {
 	tempDir := t.TempDir()
 	img := image.NewRGBA(image.Rect(0, 0, 50, 50))
 
-	for _, fmtName := range []string{"JPG", "PNG", "WEBP"} {
+	for _, fmtName := range []string{"JPG", "PNG", "WEBP", "AVIF"} {
 		outPath := filepath.Join(tempDir, "out."+fmtName)
 		if err := SaveImage(img, outPath, fmtName, 90); err != nil {
 			t.Errorf("SaveImage failed for %s: %v", fmtName, err)
