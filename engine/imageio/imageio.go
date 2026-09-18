@@ -279,22 +279,43 @@ func opaqueNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
 	}
 }
 
+// avifEncodeGate bounds concurrent AVIF encodes to one. Every AVIF encode
+// internally spawns one worker thread per CPU core and allocates large frame
+// buffers (several GB for tall frames), so allowing multiple simultaneous
+// encodes multiplies that memory and can exhaust RAM.
+var avifEncodeGate = make(chan struct{}, 1)
+
+func encodeAVIF(w io.Writer, img image.Image, quality int) error {
+	if quality <= 0 {
+		quality = 60
+	}
+	b := img.Bounds()
+	pixels := int64(b.Dx()) * int64(b.Dy())
+	speed := 6
+	if pixels > 12_000_000 {
+		speed = 8
+	}
+	if pixels > 30_000_000 {
+		speed = 10
+	}
+	if quality >= 95 && speed < 8 {
+		speed = 8
+	}
+
+	avifEncodeGate <- struct{}{}
+	defer func() { <-avifEncodeGate }()
+	return avif.Encode(w, img, avif.Options{
+		Quality: quality,
+		Speed:   speed,
+	})
+}
+
 func EncodeImage(w io.Writer, img image.Image, format string, quality int) error {
 	fmtLower := strings.ToLower(format)
 
 	switch fmtLower {
 	case "avif":
-		if quality <= 0 {
-			quality = 60
-		}
-		speed := 6
-		if quality >= 95 {
-			speed = 8
-		}
-		return avif.Encode(w, img, avif.Options{
-			Quality: quality,
-			Speed:   speed,
-		})
+		return encodeAVIF(w, img, quality)
 	case "webp":
 		if quality <= 0 {
 			quality = 95

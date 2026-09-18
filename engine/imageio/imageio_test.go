@@ -3,6 +3,7 @@ package imageio
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -10,6 +11,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"photoslicer/engine/constants"
@@ -173,6 +175,30 @@ func TestSaveImageFormats(t *testing.T) {
 		fi, err := os.Stat(outPath)
 		if err != nil || fi.Size() == 0 {
 			t.Errorf("expected non-empty file for %s", fmtName)
+		}
+	}
+}
+
+func TestAVIFConcurrentEncodes(t *testing.T) {
+	tempDir := t.TempDir()
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+
+	const n = 4
+	errs := make(chan error, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			outPath := filepath.Join(tempDir, fmt.Sprintf("concurrent_%d.avif", i))
+			errs <- SaveImage(img, outPath, "AVIF", 80)
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Errorf("concurrent AVIF encode failed: %v", err)
 		}
 	}
 }
