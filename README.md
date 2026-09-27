@@ -48,7 +48,7 @@ It automates the entire webtoon production workflow: seamless vertical stitching
 * **Smart Stitching:** Seamlessly merges fragmented vertical panels into continuous long strips.
 * **Content-Aware Slicing:** Uses an intelligent boundary-detection algorithm (`Comparison Detector`) to identify safe cutting gaps (whitespaces and gutters) so speech bubbles and artwork are **never split in half**.
 * **Dual-Engine Quality Enhancement:**
-  * ⚡ **Fast Clean (CPU):** Instant built-in denoising and smoothing running efficiently across all CPU cores.
+  * ⚡ **Fast Clean (CPU):** Built-in restore & 2x upscale for comics, no GPU needed: removes JPEG noise, realigns colour to the ink lines and sharpens outlines and text without halos, across all CPU cores.
   * 🔥 **Real-ESRGAN (GPU):** State-of-the-art AI upscaler powered by NCNN Vulkan to upscale and clarify low-resolution artwork.
   * 🎮 **Automatic Hardware Detection:** Scans dedicated GPU & VRAM on startup to automatically select Real-ESRGAN for capable systems (>= 2GB VRAM), with an on-demand Auto Detect button in Settings.
 * **Format Mastery:** Supports input from **JPG, JFIF, PNG, WEBP, AVIF,** and layered **PSD** files.

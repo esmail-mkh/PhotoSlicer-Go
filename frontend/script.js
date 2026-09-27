@@ -35,7 +35,7 @@ const translations = {
         tipHeight: "Maximum vertical height per slice (16000px safe limit for WebP and browser canvas)",
         tipQuality: "Output compression quality from 1 to 100 (100 is lossless/highest)",
         tipFormat: "Output image format (JPG, PNG, compressed WebP, or layered PSD)",
-        tipAiEnhance: "Quality enhancement via Fast CPU denoiser or Real-ESRGAN GPU upscaler",
+        tipAiEnhance: "Quality enhancement via CPU restore & 2x upscale or Real-ESRGAN GPU upscaler",
         tipNoStitch: "Process, resize, and watermark files individually without stitching into a tall strip",
         tipArchive: "Automatically bundle results into a ZIP archive, multi-page PDF, or CBZ comic book",
         tipZip: "Compress output images into a single ZIP archive",
@@ -109,7 +109,7 @@ const translations = {
         elapsedLabel: "Elapsed",
         etaLabel: "ETA",
         statusEnhancing: "AI Enhancing...",
-        statusDenoising: "Denoising...",
+        statusDenoising: "Enhancing (CPU)...",
         statusProcessing: "Processing...",
         statusStitching: "Stitching images...",
         statusSlicing: "Slicing images...",
@@ -247,7 +247,7 @@ const translations = {
         tipHeight: "حداکثر ارتفاع هر برش (پیش‌فرض ۱۶۰۰۰ پیکسل برای ایمنی WebP و روان بودن مرورگر)",
         tipQuality: "کیفیت فشرده‌سازی خروجی از ۱ تا ۱۰۰ (۱۰۰ برای بالاترین وضوح)",
         tipFormat: "انتخاب فرمت خروجی تصویر (JPG, PNG, WebP فشرده، یا PSD لایه‌باز)",
-        tipAiEnhance: "ارتقای هوشمند کیفیت با دو موتور: پردازنده سریع (CPU) یا هوش مصنوعی Real-ESRGAN (GPU)",
+        tipAiEnhance: "ارتقای هوشمند کیفیت با دو موتور: بازسازی و بزرگ‌نمایی ۲ برابر با پردازنده (CPU) یا هوش مصنوعی Real-ESRGAN (GPU)",
         tipNoStitch: "پردازش، ریسایز و واترمارک مجزای فایل‌ها بدون چسباندن آن‌ها در یک نوار بلند وب‌تون",
         tipArchive: "بسته‌بندی خودکار خروجی در قالب فایل فشرده، سند پی‌دی‌اف یا کتاب الکترونیک کمیک",
         tipZip: "فشرده‌سازی خودکار تصاویر خروجی در یک فایل ZIP",
@@ -321,7 +321,7 @@ const translations = {
         elapsedLabel: "گذشته",
         etaLabel: "زمان باقیمانده",
         statusEnhancing: "افزایش کیفیت...",
-        statusDenoising: "نویزگیری...",
+        statusDenoising: "افزایش کیفیت (پردازنده)...",
         statusProcessing: "در حال پردازش...",
         statusStitching: "چسباندن...",
         statusSlicing: "برش...",
@@ -1650,7 +1650,7 @@ function updateEngineIcon() {
         badge.title = isFa ? 'مدل پردازش گرافیکی Real-ESRGAN' : 'Real-ESRGAN (GPU Engine)';
     } else {
         badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="engine-svg-fast"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
-        badge.title = isFa ? 'پردازش سریع خطوط با پردازنده' : 'Fast Clean (CPU Engine)';
+        badge.title = isFa ? 'بازسازی و بزرگ‌نمایی ۲ برابر با پردازنده' : 'Fast Clean (CPU Engine, 2x)';
     }
 }
 

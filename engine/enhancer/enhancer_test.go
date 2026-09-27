@@ -1,13 +1,17 @@
 package enhancer
 
 import (
+	"bytes"
 	"image"
 	"image/color"
+	"image/jpeg"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"photoslicer/engine/imageio"
 	"photoslicer/engine/pipeline"
 )
 
@@ -170,65 +174,149 @@ func TestEnhancerAndPipelineIntegration(t *testing.T) {
 	}
 }
 
-func TestFastDenoiseImage(t *testing.T) {
-	// Create a test image with distinct features:
-	// - White background with slight compression noise (250, 250, 250)
-	// - Skin tone region (255, 200, 180)
-	// - Sharp black ink line (25, 25, 25)
-	const w, h = 100, 100
+// testComicPage draws a small comic-like page: flat skin tone and paper
+// areas, a thick ink outline, thin hatching and a dark ink bar.
+func testComicPage(w, h int) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, w, h))
-
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			switch {
-			case x == 50: // Black ink line
-				img.SetRGBA(x, y, color.RGBA{R: 25, G: 25, B: 25, A: 255})
-			case x < 50: // Skin tone region
-				noise := uint8((x + y) % 3) // tiny ± noise
-				img.SetRGBA(x, y, color.RGBA{R: 240 + noise, G: 190 + noise, B: 170 + noise, A: 255})
-			default: // Background with JPEG-like near-white noise
-				noise := uint8((x * y) % 4)
-				img.SetRGBA(x, y, color.RGBA{R: 249 + noise, G: 249 + noise, B: 249 + noise, A: 255})
+			c := color.RGBA{R: 250, G: 250, B: 248, A: 255}
+			if x < w/2 {
+				c = color.RGBA{R: 240, G: 190, B: 170, A: 255}
 			}
+			ink := func(cov float64, v uint8) {
+				cov = math.Max(0, math.Min(1, cov))
+				c.R = uint8(float64(c.R)*(1-cov) + float64(v)*cov)
+				c.G = uint8(float64(c.G)*(1-cov) + float64(v)*cov)
+				c.B = uint8(float64(c.B)*(1-cov) + float64(v)*cov)
+			}
+			// Anti-aliased ink ring, 3px wide.
+			r := math.Hypot(float64(x-w/2)+0.5, float64(y-h/2)+0.5)
+			ink(2-math.Abs(r-float64(w)/4-1.5), 20)
+			// 3px diagonal hatching.
+			if x > w*3/4 && (x+y)%12 < 3 {
+				ink(1, 30)
+			}
+			if x >= w/2-2 && x < w/2+2 {
+				c = color.RGBA{R: 25, G: 25, B: 25, A: 255}
+			}
+			img.SetRGBA(x, y, c)
 		}
 	}
+	return img
+}
 
-	result := FastDenoiseImage(img)
-	if result.Bounds() != img.Bounds() {
-		t.Fatalf("bounds mismatch: got %v, want %v", result.Bounds(), img.Bounds())
+func TestEnhanceImageCPU(t *testing.T) {
+	const w, h = 96, 96
+	img := testComicPage(w, h)
+	res := EnhanceImageCPU(img)
+	if res.Bounds() != image.Rect(0, 0, 2*w, 2*h) {
+		t.Fatalf("expected 2x output %v, got %v", image.Rect(0, 0, 2*w, 2*h), res.Bounds())
 	}
 
-	// 1. Verify that the ink line at x=50 stayed dark and crisp
-	inkPixel := result.RGBAAt(50, 50)
-	if inkPixel.R > 35 || inkPixel.G > 35 || inkPixel.B > 35 {
-		t.Errorf("ink line was washed out: got %v", inkPixel)
+	if p := res.RGBAAt(w, 2*10); p.R > 40 || p.G > 40 || p.B > 40 {
+		t.Errorf("ink line was washed out: got %v", p)
+	}
+	if p := res.RGBAAt(2*60, 2*5); p.R < 246 || p.G < 246 || p.B < 244 {
+		t.Errorf("paper background changed: got %v", p)
 	}
 
-	// 2. Verify that the white background was cleaned
-	bgPixel := result.RGBAAt(80, 50)
-	if bgPixel.R < 250 || bgPixel.G < 250 || bgPixel.B < 250 {
-		t.Errorf("expected white background to be clean, got %v", bgPixel)
+	// Flat colour must keep its hue and saturation exactly.
+	orig := img.RGBAAt(10, 10)
+	_, oCb, oCr := color.RGBToYCbCr(orig.R, orig.G, orig.B)
+	got := res.RGBAAt(20, 20)
+	_, gCb, gCr := color.RGBToYCbCr(got.R, got.G, got.B)
+	if abs(int(oCb)-int(gCb)) > 1 || abs(int(oCr)-int(gCr)) > 1 {
+		t.Errorf("flat colour shifted: Cb %d->%d, Cr %d->%d", oCb, gCb, oCr, gCr)
+	}
+}
+
+func TestEnhanceImageCPUKeepsGrayscale(t *testing.T) {
+	src := testComicPage(64, 64)
+	for i := 0; i < len(src.Pix); i += 4 {
+		y := uint8((299*int(src.Pix[i]) + 587*int(src.Pix[i+1]) + 114*int(src.Pix[i+2])) / 1000)
+		src.Pix[i], src.Pix[i+1], src.Pix[i+2] = y, y, y
+	}
+	res := EnhanceImageCPU(src)
+	for i := 0; i < len(res.Pix); i += 4 {
+		r, g, b := int(res.Pix[i]), int(res.Pix[i+1]), int(res.Pix[i+2])
+		if abs(r-g) > 1 || abs(g-b) > 1 {
+			t.Fatalf("grayscale page gained colour at pixel %d: %d,%d,%d", i/4, r, g, b)
+		}
+	}
+}
+
+func TestEnhanceImageCPUStripsAreSeamless(t *testing.T) {
+	// Taller than several strips, with noise so every stage has work to do.
+	const w, h = 48, cpuStripRows*3 + 17
+	img := testComicPage(w, h)
+	for i := range img.Pix {
+		if i%4 != 3 {
+			img.Pix[i] = uint8(min(255, max(0, int(img.Pix[i])+(i*7919%9)-4)))
+		}
+	}
+	striped := EnhanceImageCPU(img)
+
+	whole := image.NewRGBA(striped.Rect)
+	sigma := max(estimateNoiseRGBA(img), defaultCPUEnhanceParams.minSigma)
+	enhanceStrip(img, whole, 0, h, sigma, defaultCPUEnhanceParams)
+
+	for i := range whole.Pix {
+		if abs(int(whole.Pix[i])-int(striped.Pix[i])) > 1 {
+			t.Fatalf("strip seam at output row %d: whole=%d striped=%d", i/whole.Stride, whole.Pix[i], striped.Pix[i])
+		}
+	}
+}
+
+// TestEnhanceImageCPUBeatsBicubic degrades a drawing the way web comics are
+// usually delivered (half resolution, JPEG) and checks that the CPU enhancer
+// restores it more faithfully than plain bicubic upscaling.
+func TestEnhanceImageCPUBeatsBicubic(t *testing.T) {
+	const w, h = 256, 256
+	hr := testComicPage(w, h)
+	lr := image.NewRGBA(image.Rect(0, 0, w/2, h/2))
+	for y := 0; y < h/2; y++ {
+		for x := 0; x < w/2; x++ {
+			for c := 0; c < 3; c++ {
+				s := int(hr.Pix[(2*y)*hr.Stride+(2*x)*4+c]) + int(hr.Pix[(2*y)*hr.Stride+(2*x+1)*4+c]) +
+					int(hr.Pix[(2*y+1)*hr.Stride+(2*x)*4+c]) + int(hr.Pix[(2*y+1)*hr.Stride+(2*x+1)*4+c])
+				lr.Pix[y*lr.Stride+x*4+c] = uint8((s + 2) / 4)
+			}
+			lr.Pix[y*lr.Stride+x*4+3] = 255
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, lr, &jpeg.Options{Quality: 75}); err != nil {
+		t.Fatal(err)
+	}
+	degraded, err := jpeg.Decode(&buf)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// 3. Verify Chroma (Cb, Cr) preservation on skin tone region (x=25, y=50)
-	origColor := img.RGBAAt(25, 50)
-	_, origCb, origCr := color.RGBToYCbCr(origColor.R, origColor.G, origColor.B)
-	resColor := result.RGBAAt(25, 50)
-	_, resCb, resCr := color.RGBToYCbCr(resColor.R, resColor.G, resColor.B)
+	psnr := func(a, b *image.RGBA) float64 {
+		var se float64
+		for i := 0; i < len(a.Pix); i += 4 {
+			for c := 0; c < 3; c++ {
+				d := float64(a.Pix[i+c]) - float64(b.Pix[i+c])
+				se += d * d
+			}
+		}
+		return 10 * math.Log10(255*255/(se/float64(len(a.Pix)/4*3)))
+	}
+	bicubic := psnr(hr, imageio.ResizeBicubic(degraded, w, h))
+	enhanced := psnr(hr, EnhanceImageCPU(degraded))
+	t.Logf("PSNR bicubic=%.2f dB enhanced=%.2f dB", bicubic, enhanced)
+	if enhanced < bicubic+0.5 {
+		t.Errorf("CPU enhancer should beat bicubic by at least 0.5 dB: bicubic=%.2f enhanced=%.2f", bicubic, enhanced)
+	}
+}
 
-	diffCb := int(origCb) - int(resCb)
-	if diffCb < 0 {
-		diffCb = -diffCb
+func abs(v int) int {
+	if v < 0 {
+		return -v
 	}
-	diffCr := int(origCr) - int(resCr)
-	if diffCr < 0 {
-		diffCr = -diffCr
-	}
-
-	// Tolerance of at most 1 unit due to standard integer rounding in YCbCr-RGB conversion
-	if diffCb > 1 || diffCr > 1 {
-		t.Errorf("chroma shifted significantly: origCb=%d resCb=%d, origCr=%d resCr=%d", origCb, resCb, origCr, resCr)
-	}
+	return v
 }
 
 func TestRunFastEnhancementBatch(t *testing.T) {
@@ -290,17 +378,10 @@ func TestRunFastEnhancementCancellation(t *testing.T) {
 	}
 }
 
-func BenchmarkFastDenoiseImage(b *testing.B) {
-	const w, h = 800, 1200
-	img := image.NewRGBA(image.Rect(0, 0, w, h))
-	for i := range img.Pix {
-		img.Pix[i] = uint8(i % 256)
-	}
-
+func BenchmarkEnhanceImageCPU(b *testing.B) {
+	img := testComicPage(800, 1200)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_ = FastDenoiseImage(img)
+		_ = EnhanceImageCPU(img)
 	}
 }
-
-

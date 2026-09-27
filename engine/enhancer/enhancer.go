@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"image"
-	"image/color"
-	"image/draw"
 	"io"
 	"math"
 	"os"
@@ -22,288 +20,10 @@ import (
 	"photoslicer/engine/imageio"
 	"photoslicer/engine/slicing"
 	"photoslicer/engine/sorting"
-
 )
 
-var (
-	rangeWeightTable   [256]float32
-	initRangeTableOnce sync.Once
-)
-
-func getRangeWeightTable() *[256]float32 {
-	initRangeTableOnce.Do(func() {
-		const sigmaR = 16.0
-		const twoSigmaSq = 2.0 * sigmaR * sigmaR
-		for d := 0; d < 256; d++ {
-			rangeWeightTable[d] = float32(math.Exp(-float64(d*d) / twoSigmaSq))
-		}
-	})
-	return &rangeWeightTable
-}
-
-// FastDenoiseImage applies an edge-preserving bilateral filter on the Y (luminance)
-// channel with noise-thresholded coring sharpening and paper whitening.
-// Cb and Cr (chroma) channels are strictly preserved to ensure 100% color accuracy.
-func FastDenoiseImage(img image.Image) *image.RGBA {
-	b := img.Bounds()
-	w, h := b.Dx(), b.Dy()
-
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	if w < 3 || h < 3 {
-		draw.Draw(dst, dst.Bounds(), img, b.Min, draw.Src)
-		return dst
-	}
-
-	rangeWeights := getRangeWeightTable()
-
-	// 1. Extract Luminance (Y), Chroma (Cb, Cr), and Alpha into contiguous buffers
-	yBuf := make([]uint8, w*h)
-	cbBuf := make([]uint8, w*h)
-	crBuf := make([]uint8, w*h)
-	aBuf := make([]uint8, w*h)
-
-	switch src := img.(type) {
-	case *image.RGBA:
-		for y := 0; y < h; y++ {
-			srcRow := (y+b.Min.Y-src.Rect.Min.Y)*src.Stride + (b.Min.X-src.Rect.Min.X)*4
-			bufRow := y * w
-			for x := 0; x < w; x++ {
-				si := srcRow + x*4
-				r := src.Pix[si]
-				g := src.Pix[si+1]
-				bl := src.Pix[si+2]
-				aBuf[bufRow+x] = src.Pix[si+3]
-				yBuf[bufRow+x], cbBuf[bufRow+x], crBuf[bufRow+x] = color.RGBToYCbCr(r, g, bl)
-			}
-		}
-	case *image.NRGBA:
-		for y := 0; y < h; y++ {
-			srcRow := (y+b.Min.Y-src.Rect.Min.Y)*src.Stride + (b.Min.X-src.Rect.Min.X)*4
-			bufRow := y * w
-			for x := 0; x < w; x++ {
-				si := srcRow + x*4
-				r := src.Pix[si]
-				g := src.Pix[si+1]
-				bl := src.Pix[si+2]
-				aBuf[bufRow+x] = src.Pix[si+3]
-				yBuf[bufRow+x], cbBuf[bufRow+x], crBuf[bufRow+x] = color.RGBToYCbCr(r, g, bl)
-			}
-		}
-	default:
-		for y := 0; y < h; y++ {
-			bufRow := y * w
-			for x := 0; x < w; x++ {
-				c := img.At(b.Min.X+x, b.Min.Y+y)
-				r32, g32, b32, a32 := c.RGBA()
-				r := uint8(r32 >> 8)
-				g := uint8(g32 >> 8)
-				bl := uint8(b32 >> 8)
-				aBuf[bufRow+x] = uint8(a32 >> 8)
-				yBuf[bufRow+x], cbBuf[bufRow+x], crBuf[bufRow+x] = color.RGBToYCbCr(r, g, bl)
-			}
-		}
-	}
-
-	// Spatial filter kernel constants (3x3)
-	const (
-		wCenter     float32 = 1.0
-		wOrthogonal float32 = 0.70710678
-		wDiagonal   float32 = 0.5
-	)
-
-	// Filter and reconstruct concurrently across CPU cores
-	numWorkers := runtime.GOMAXPROCS(0)
-	if numWorkers <= 0 {
-		numWorkers = 1
-	}
-	if numWorkers > h {
-		numWorkers = h
-	}
-
-	rowsPerWorker := (h + numWorkers - 1) / numWorkers
-	var wg sync.WaitGroup
-
-	for worker := 0; worker < numWorkers; worker++ {
-		startY := worker * rowsPerWorker
-		endY := startY + rowsPerWorker
-		if endY > h {
-			endY = h
-		}
-		if startY >= endY {
-			continue
-		}
-
-		wg.Add(1)
-		go func(yMin, yMax int) {
-			defer wg.Done()
-
-			for y := yMin; y < yMax; y++ {
-				rowCurr := y * w
-				rowPrev := (y - 1) * w
-				if y == 0 {
-					rowPrev = rowCurr
-				}
-				rowNext := (y + 1) * w
-				if y == h-1 {
-					rowNext = rowCurr
-				}
-
-				outRowStart := y * dst.Stride
-
-				for x := 0; x < w; x++ {
-					centerIdx := rowCurr + x
-					yc := yBuf[centerIdx]
-					centerVal := float32(yc)
-
-					// Neighbors with boundary clamping
-					xPrev := x - 1
-					if xPrev < 0 {
-						xPrev = 0
-					}
-					xNext := x + 1
-					if xNext >= w {
-						xNext = w - 1
-					}
-
-					p00 := yBuf[rowPrev+xPrev]
-					p01 := yBuf[rowPrev+x]
-					p02 := yBuf[rowPrev+xNext]
-
-					p10 := yBuf[rowCurr+xPrev]
-					p12 := yBuf[rowCurr+xNext]
-
-					p20 := yBuf[rowNext+xPrev]
-					p21 := yBuf[rowNext+x]
-					p22 := yBuf[rowNext+xNext]
-
-					// Bilateral accumulation
-					var sumY float32 = centerVal * wCenter
-					var sumW float32 = wCenter
-
-					// Orthogonal neighbors
-					d := int(p01) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight := wOrthogonal * rangeWeights[d]
-					sumY += float32(p01) * wWeight
-					sumW += wWeight
-
-					d = int(p10) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wOrthogonal * rangeWeights[d]
-					sumY += float32(p10) * wWeight
-					sumW += wWeight
-
-					d = int(p12) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wOrthogonal * rangeWeights[d]
-					sumY += float32(p12) * wWeight
-					sumW += wWeight
-
-					d = int(p21) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wOrthogonal * rangeWeights[d]
-					sumY += float32(p21) * wWeight
-					sumW += wWeight
-
-					// Diagonal neighbors
-					d = int(p00) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wDiagonal * rangeWeights[d]
-					sumY += float32(p00) * wWeight
-					sumW += wWeight
-
-					d = int(p02) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wDiagonal * rangeWeights[d]
-					sumY += float32(p02) * wWeight
-					sumW += wWeight
-
-					d = int(p20) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wDiagonal * rangeWeights[d]
-					sumY += float32(p20) * wWeight
-					sumW += wWeight
-
-					d = int(p22) - int(yc)
-					if d < 0 {
-						d = -d
-					}
-					wWeight = wDiagonal * rangeWeights[d]
-					sumY += float32(p22) * wWeight
-					sumW += wWeight
-
-					ySmooth := sumY / sumW
-
-					// High-frequency detail extraction and coring
-					diff := centerVal - ySmooth
-					const noiseThreshold float32 = 3.5
-					const sharpenFactor float32 = 0.50
-
-					var yEnhanced float32
-					if diff > noiseThreshold {
-						// Real edge: boost edge clarity & crispness
-						yEnhanced = centerVal + (diff-noiseThreshold)*sharpenFactor
-					} else if diff < -noiseThreshold {
-						// Real ink stroke / contour edge: deepen and define line art
-						yEnhanced = centerVal + (diff+noiseThreshold)*sharpenFactor
-					} else {
-						// Flat / subtle gradient noise: discard noise, keep smoothed Y
-						yEnhanced = ySmooth
-					}
-
-					// Clean white paper / gutter background (soft knee, removing JPEG gray/yellowish cast)
-					if yEnhanced > 243.0 {
-						yEnhanced = 243.0 + (yEnhanced-243.0)*1.4
-					}
-
-					// Manga ink line deepening (smooth natural boost for rich contrast on dark lines)
-					if yEnhanced < 55.0 {
-						inkDepth := (55.0 - yEnhanced) / 55.0 * 0.08
-						yEnhanced -= yEnhanced * inkDepth
-					}
-
-					// Clamp to 0..255
-					if yEnhanced < 0 {
-						yEnhanced = 0
-					} else if yEnhanced > 255.0 {
-						yEnhanced = 255.0
-					}
-
-					// Reconstruct RGB strictly keeping original Cb and Cr for 100% color accuracy
-					finalY := uint8(yEnhanced + 0.5)
-					cb := cbBuf[centerIdx]
-					cr := crBuf[centerIdx]
-					r, g, bl := color.YCbCrToRGB(finalY, cb, cr)
-
-					outIdx := outRowStart + x*4
-					dst.Pix[outIdx] = r
-					dst.Pix[outIdx+1] = g
-					dst.Pix[outIdx+2] = bl
-					dst.Pix[outIdx+3] = aBuf[centerIdx]
-				}
-			}
-		}(startY, endY)
-	}
-
-	wg.Wait()
-	return dst
-}
-
-// RunFastEnhancement batch-processes images in inputFolder using fast CPU denoising.
+// RunFastEnhancement batch-processes images in inputFolder with the CPU
+// enhancer (EnhanceImageCPU), producing 2x JPEGs like the GPU path.
 func RunFastEnhancement(
 	inputFolder string,
 	maxWorkers int,
@@ -322,8 +42,11 @@ func RunFastEnhancement(
 	}
 	archive.RegisterTempDir(outDir)
 
-	if maxWorkers <= 0 {
-		maxWorkers = 4
+	// EnhanceImageCPU already uses every core for one image, and each image
+	// in flight holds its source plus a 4x-larger output, so only overlap
+	// two images (one enhancing while the other decodes or encodes).
+	if maxWorkers <= 0 || maxWorkers > 2 {
+		maxWorkers = 2
 	}
 
 	taskChan := make(chan string, total)
@@ -373,7 +96,7 @@ func RunFastEnhancement(
 							continue
 						}
 					} else if h <= constants.MaxEnhanceHeight {
-						enhanced := FastDenoiseImage(img)
+						enhanced := EnhanceImageCPU(img)
 						if saveErr := imageio.SaveImage(enhanced, dstPath, "JPG", 98); saveErr != nil {
 							setFirstErr(fmt.Errorf("failed to save image %s: %w", dstPath, saveErr))
 							continue
@@ -400,7 +123,7 @@ func RunFastEnhancement(
 							} else {
 								chunk = img
 							}
-							enhancedChunk := FastDenoiseImage(chunk)
+							enhancedChunk := EnhanceImageCPU(chunk)
 							partDst := filepath.Join(outDir, fmt.Sprintf("%s__part_%04d.jpg", stem, j))
 							if saveErr := imageio.SaveImage(enhancedChunk, partDst, "JPG", 98); saveErr != nil {
 								setFirstErr(fmt.Errorf("failed to save part %s: %w", partDst, saveErr))
