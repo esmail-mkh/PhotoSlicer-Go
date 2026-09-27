@@ -11,15 +11,18 @@ import (
 // CPU enhancement: a classical (non-neural) restore-and-upscale pipeline for
 // comic pages that produces the same 2x output as the Real-ESRGAN GPU path.
 //
-//  1. Luma is denoised with non-local means at the source resolution. Its
-//     strength follows the measured JPEG noise level, so clean inputs are
-//     left almost untouched.
+//  1. Luma gets a gentle non-local-means pass at the source resolution. Its
+//     noise level is fixed, not estimated: JPEG leaves flat areas nearly
+//     noise-free, so any estimate there only measures intentional grain or
+//     paper texture, and denoising harder when it is present erased it.
 //  2. Chroma is filtered with luma as the guide. Colour edges snap back onto
 //     the ink lines, removing 4:2:0 blockiness and colour bleeding, while the
 //     average colour of every flat area stays exactly the same.
 //  3. Luma is upscaled 2x with Lanczos-3. A shock filter, gated to
-//     high-contrast ink edges only, steepens outlines and text; a clamped
-//     unsharp mask then sharpens without halos.
+//     high-contrast ink edges only, steepens outlines, text and screentone
+//     dots; a clamped unsharp mask then sharpens without halos. Finally the
+//     local average brightness is restored, so sharpening never changes
+//     tone (screentone density, shading).
 //  4. Chroma is upscaled and snapped to the new luma edges again.
 //
 // The image is processed in overlapping horizontal strips in parallel, so
@@ -27,9 +30,11 @@ import (
 //
 // Parameters were tuned by degrading clean comic pages (half resolution plus
 // JPEG at quality 65-92) and measuring how closely each method restores the
-// original. Against plain bicubic this pipeline gains about 1.8 dB PSNR on
-// line art and 0.7-1.1 dB on painted pages, with higher SSIM and about 1 dB
-// better chroma; the previous bilateral filter scored below plain bicubic.
+// original. Against plain bicubic this pipeline gains about 2 dB PSNR on
+// line art, 2.4-3 dB on screentone and 0.7-1.1 dB on painted pages, with
+// higher SSIM and lower colour error (CIE dE). Grain and paper texture are
+// kept at least as well as by bicubic. The previous bilateral filter scored
+// below plain bicubic and smoothed grain away.
 
 // plane is a single-channel float32 image, row-major, values in 0..255.
 type plane struct {
@@ -67,13 +72,15 @@ func clamp8(v float32) uint8 {
 type cpuEnhanceParams struct {
 	nlmStrength float32 // NLM filter strength, as a multiple of estimated noise
 	nlmSearch   int     // NLM search radius
-	minSigma    float32 // floor for the noise estimate (JPEG noise is never zero)
+	nlmSigma    float32 // noise level NLM assumes (fixed; see enhanceImageCPU)
 	chromaR     int     // guided-filter radius for chroma at source resolution
 	chromaEps   float32
 	crispAmount float32 // halo-free unsharp mask amount
 	shock       float32 // shock-filter strength on ink edges (0 disables)
 	shockLo     float32 // local contrast where the shock filter starts
 	shockHi     float32 // local contrast where it reaches full strength
+	shockSoft   float32 // Laplacian scale of the soft edge decision (0 = hard sign)
+	toneR       int     // radius over which sharpening must keep average tone (0 disables)
 	chromaHRR   int     // guided-filter radius for chroma after upscaling
 	chromaHREps float32
 }
@@ -81,13 +88,15 @@ type cpuEnhanceParams struct {
 var defaultCPUEnhanceParams = cpuEnhanceParams{
 	nlmStrength: 1.3,
 	nlmSearch:   3,
-	minSigma:    1.0,
+	nlmSigma:    1.0,
 	chromaR:     1,
 	chromaEps:   10,
 	crispAmount: 0.8,
 	shock:       0.2,
 	shockLo:     80,
 	shockHi:     180,
+	shockSoft:   5,
+	toneR:       2,
 	chromaHRR:   2,
 	chromaHREps: 16,
 }
@@ -116,11 +125,6 @@ func enhanceImageCPU(img image.Image, prm cpuEnhanceParams) *image.RGBA {
 		return out
 	}
 
-	sigma := estimateNoiseRGBA(src)
-	if sigma < prm.minSigma {
-		sigma = prm.minSigma
-	}
-
 	strips := make(chan int, (h+cpuStripRows-1)/cpuStripRows)
 	for y := 0; y < h; y += cpuStripRows {
 		strips <- y
@@ -138,7 +142,7 @@ func enhanceImageCPU(img image.Image, prm cpuEnhanceParams) *image.RGBA {
 			defer wg.Done()
 			for y0 := range strips {
 				y1 := min(y0+cpuStripRows, h)
-				enhanceStrip(src, out, y0, y1, sigma, prm)
+				enhanceStrip(src, out, y0, y1, prm)
 			}
 		}()
 	}
@@ -158,21 +162,25 @@ func toCompactRGBA(img image.Image) *image.RGBA {
 
 // enhanceStrip processes source rows [y0,y1) plus a margin and writes output
 // rows [2*y0, 2*y1).
-func enhanceStrip(src, out *image.RGBA, y0, y1 int, sigma float32, prm cpuEnhanceParams) {
+func enhanceStrip(src, out *image.RGBA, y0, y1 int, prm cpuEnhanceParams) {
 	h := src.Rect.Dy()
 	e0 := max(y0-cpuStripMargin, 0)
 	e1 := min(y1+cpuStripMargin, h)
 
 	yp, cb, cr := splitYCbCr(src, e0, e1)
-	yd := nlmDenoise(yp, sigma, prm.nlmStrength, prm.nlmSearch)
+	yd := nlmDenoise(yp, prm.nlmSigma, prm.nlmStrength, prm.nlmSearch)
 	cb, cr = guidedFilter2(yd, cb, cr, prm.chromaR, prm.chromaEps)
 
 	yh := upscale2x(yd)
+	smooth := yh
 	if prm.shock > 0 {
-		yh = shockFilter(yh, prm.shock, prm.shockLo, prm.shockHi)
+		yh = shockFilter(yh, prm.shock, prm.shockLo, prm.shockHi, prm.shockSoft)
 	}
 	if prm.crispAmount > 0 {
 		yh = crispen(yh, prm.crispAmount)
+	}
+	if prm.toneR > 0 {
+		yh = preserveTone(smooth, yh, prm.toneR)
 	}
 	cbh, crh := guidedFilter2(yh, upscale2x(cb), upscale2x(cr), prm.chromaHRR, prm.chromaHREps)
 
@@ -209,65 +217,6 @@ func splitYCbCr(src *image.RGBA, y0, y1 int) (yp, cb, cr *plane) {
 		}
 	}
 	return
-}
-
-// estimateNoiseRGBA estimates the noise sigma of the image's luma
-// (Immerkaer's method) from pixels away from edges, so line art does not
-// read as noise. It samples rows across the whole page and uses the mean
-// response of the flatter half, where noise dominates texture.
-func estimateNoiseRGBA(src *image.RGBA) float32 {
-	w, h := src.Rect.Dx(), src.Rect.Dy()
-	if w < 8 || h < 8 {
-		return 0
-	}
-	step := max(1, h/2048)
-	luma := func(y, x int) float32 {
-		p := src.Pix[y*src.Stride+x*4:]
-		return 0.299*float32(p[0]) + 0.587*float32(p[1]) + 0.114*float32(p[2])
-	}
-	// Histogram of responses in 1/8 steps; responses above 64 are edges.
-	const bins = 512
-	var hist [bins]int
-	total := 0
-	var r0, r1, r2 []float32
-	for y := 1; y+1 < h; y += step {
-		r0, r1, r2 = r0[:0], r1[:0], r2[:0]
-		for x := 0; x < w; x++ {
-			r0 = append(r0, luma(y-1, x))
-			r1 = append(r1, luma(y, x))
-			r2 = append(r2, luma(y+1, x))
-		}
-		for x := 1; x+1 < w; x++ {
-			gx, gy := r1[x+1]-r1[x-1], r2[x]-r0[x]
-			if gx*gx+gy*gy > 20*20 {
-				continue
-			}
-			v := r0[x-1] - 2*r0[x] + r0[x+1] - 2*r1[x-1] + 4*r1[x] - 2*r1[x+1] + r2[x-1] - 2*r2[x] + r2[x+1]
-			if v < 0 {
-				v = -v
-			}
-			b := int(v * 8)
-			if b >= bins {
-				b = bins - 1
-			}
-			hist[b]++
-			total++
-		}
-	}
-	if total < 1000 {
-		return 0
-	}
-	var sum float64
-	need := total / 2
-	for b := 0; b < bins && need > 0; b++ {
-		c := min(hist[b], need)
-		sum += float64(c) * (float64(b) + 0.5) / 8
-		need -= c
-	}
-	mean := sum / float64(total/2)
-	// E|response| for Gaussian noise through this kernel is sqrt(2/pi)*6*sigma;
-	// the lower half's mean is about half of that.
-	return float32(mean / (math.Sqrt(2/math.Pi) * 6 * 0.5))
 }
 
 // nlmDenoise is a non-local-means filter: each pixel becomes a weighted
@@ -482,17 +431,38 @@ func upscale2x(src *plane) *plane {
 	return dst
 }
 
+// preserveTone restores the local average brightness of before into after
+// over a (2r+1)^2 window. Sharpening moves pixels toward the darker or
+// lighter side of each edge; on screentone dots that shifts the printed tone
+// slightly darker. Adding back the difference of local means keeps the edges
+// steep while every small area keeps exactly the ink coverage it had.
+func preserveTone(before, after *plane, r int) *plane {
+	mb := boxMean(before, r)
+	ma := boxMean(after, r)
+	for i := range after.p {
+		after.p[i] += mb.p[i] - ma.p[i]
+	}
+	return after
+}
+
 // shockFilter steepens ink edges: pixels on the dark side of an edge
 // (positive Laplacian) move toward the local minimum, pixels on the light
 // side toward the local maximum. It is gated by the local 3x3 contrast range,
 // so it only acts on high-contrast line art and text and leaves painted
 // shading and gradients alone instead of posterizing them.
-func shockFilter(src *plane, strength, r0, r1 float32) *plane {
+func shockFilter(src *plane, strength, r0, r1, soft float32) *plane {
 	w, h := src.w, src.h
 	dst := newPlane(w, h)
 	inv := 1 / (r1 - r0)
+	// The edge side comes from a lightly smoothed copy, so the decision
+	// varies smoothly along curved edges (round screentone dots stay round).
+	sm := src
+	if soft > 0 {
+		sm = boxMean(src, 1)
+	}
 	for y := 0; y < h; y++ {
 		up, mid, dn := src.row(y-1), src.row(y), src.row(y+1)
+		su, sc, sd := sm.row(y-1), sm.row(y), sm.row(y+1)
 		out := dst.p[y*w : y*w+w]
 		for x := 0; x < w; x++ {
 			xl, xr := max(x-1, 0), min(x+1, w-1)
@@ -509,12 +479,23 @@ func shockFilter(src *plane, strength, r0, r1 float32) *plane {
 			}
 			gate = min(gate, 1)
 			gate = gate * gate * (3 - 2*gate) * strength
-			lap := (4*(b+d+f+hh)+(a+cc+g+i))*(1.0/20) - c
-			target := hi
-			if lap > 0 {
-				target = lo
+			lap := (4*(su[x]+sc[xl]+sc[xr]+sd[x])+(su[xl]+su[xr]+sd[xl]+sd[xr]))*(1.0/20) - sc[x]
+			if soft <= 0 {
+				target := hi
+				if lap > 0 {
+					target = lo
+				}
+				out[x] = c + gate*(target-c)
+				continue
 			}
-			out[x] = c + gate*(target-c)
+			// Soft sign: pixels right at the edge centre (lap ~ 0) barely
+			// move, so boundaries stay sub-pixel smooth instead of stepping.
+			t := max(-1, min(1, lap/soft))
+			if t > 0 {
+				out[x] = c + gate*t*(lo-c)
+			} else {
+				out[x] = c - gate*t*(hi-c)
+			}
 		}
 	}
 	return dst

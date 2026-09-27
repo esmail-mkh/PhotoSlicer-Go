@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -258,8 +259,7 @@ func TestEnhanceImageCPUStripsAreSeamless(t *testing.T) {
 	striped := EnhanceImageCPU(img)
 
 	whole := image.NewRGBA(striped.Rect)
-	sigma := max(estimateNoiseRGBA(img), defaultCPUEnhanceParams.minSigma)
-	enhanceStrip(img, whole, 0, h, sigma, defaultCPUEnhanceParams)
+	enhanceStrip(img, whole, 0, h, defaultCPUEnhanceParams)
 
 	for i := range whole.Pix {
 		if abs(int(whole.Pix[i])-int(striped.Pix[i])) > 1 {
@@ -309,6 +309,61 @@ func TestEnhanceImageCPUBeatsBicubic(t *testing.T) {
 	t.Logf("PSNR bicubic=%.2f dB enhanced=%.2f dB", bicubic, enhanced)
 	if enhanced < bicubic+0.5 {
 		t.Errorf("CPU enhancer should beat bicubic by at least 0.5 dB: bicubic=%.2f enhanced=%.2f", bicubic, enhanced)
+	}
+}
+
+// TestEnhanceImageCPUKeepsGrain checks that intentional grain / paper
+// texture on a clean page survives: downsized back to the source size, the
+// output must keep at least 90% of the grain and the same average colour.
+func TestEnhanceImageCPUKeepsGrain(t *testing.T) {
+	const w, h = 128, 128
+	rng := rand.New(rand.NewSource(1))
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	base := [3]float64{235, 200, 180}
+	for i := 0; i < w*h; i++ {
+		n := rng.NormFloat64() * 6
+		for c := 0; c < 3; c++ {
+			img.Pix[i*4+c] = uint8(math.Max(0, math.Min(255, math.Round(base[c]+n))))
+		}
+		img.Pix[i*4+3] = 255
+	}
+	res := EnhanceImageCPU(img)
+
+	lumaStats := func(get func(x, y, c int) float64) (mean [3]float64, grain float64) {
+		var s1, s2 float64
+		for y := 0; y < h; y++ {
+			for x := 0; x < w; x++ {
+				var l float64
+				for c := 0; c < 3; c++ {
+					v := get(x, y, c)
+					mean[c] += v / (w * h)
+					l += []float64{0.299, 0.587, 0.114}[c] * v
+				}
+				s1 += l
+				s2 += l * l
+			}
+		}
+		n := float64(w * h)
+		return mean, math.Sqrt(s2/n - (s1/n)*(s1/n))
+	}
+	srcMean, srcGrain := lumaStats(func(x, y, c int) float64 { return float64(img.Pix[y*img.Stride+x*4+c]) })
+	outMean, outGrain := lumaStats(func(x, y, c int) float64 {
+		// 2x2 box average: the output seen at source size.
+		var s float64
+		for dy := 0; dy < 2; dy++ {
+			for dx := 0; dx < 2; dx++ {
+				s += float64(res.Pix[(2*y+dy)*res.Stride+(2*x+dx)*4+c])
+			}
+		}
+		return s / 4
+	})
+	if outGrain < 0.9*srcGrain {
+		t.Errorf("grain was smoothed away: source std %.2f, output std %.2f", srcGrain, outGrain)
+	}
+	for c := 0; c < 3; c++ {
+		if math.Abs(outMean[c]-srcMean[c]) > 0.5 {
+			t.Errorf("average colour channel %d shifted: %.2f -> %.2f", c, srcMean[c], outMean[c])
+		}
 	}
 }
 
