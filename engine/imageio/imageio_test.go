@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"photoslicer/engine/constants"
 
@@ -200,6 +201,92 @@ func TestAVIFConcurrentEncodes(t *testing.T) {
 		if err != nil {
 			t.Errorf("concurrent AVIF encode failed: %v", err)
 		}
+	}
+}
+
+func TestAVIFEncodesSubImageSlice(t *testing.T) {
+	// A slice taken from a taller strip, like the slicer produces.
+	strip := image.NewRGBA(image.Rect(0, 0, 32, 96))
+	for y := 0; y < 96; y++ {
+		c := color.RGBA{R: uint8(y * 2), G: 80, B: 160, A: 255}
+		for x := 0; x < 32; x++ {
+			strip.SetRGBA(x, y, c)
+		}
+	}
+	slice := strip.SubImage(image.Rect(0, 32, 32, 64)).(*image.RGBA)
+
+	view, ok := compactRGBA(slice).(*image.RGBA)
+	if !ok {
+		t.Fatalf("expected *image.RGBA")
+	}
+	if len(view.Pix) != 32*32*4 || view.Stride != 32*4 || view.Rect != image.Rect(0, 0, 32, 32) {
+		t.Fatalf("slice not compacted: len=%d stride=%d rect=%v", len(view.Pix), view.Stride, view.Rect)
+	}
+	if view.RGBAAt(0, 0) != strip.RGBAAt(0, 32) || view.RGBAAt(31, 31) != strip.RGBAAt(31, 63) {
+		t.Fatalf("compacted pixels do not match the source slice")
+	}
+
+	// Narrower sub-image: stride differs from width and must be repacked.
+	narrow := strip.SubImage(image.Rect(8, 10, 24, 20)).(*image.RGBA)
+	packed := compactRGBA(narrow).(*image.RGBA)
+	if packed.Stride != 16*4 || len(packed.Pix) != 16*10*4 {
+		t.Fatalf("narrow slice not repacked: stride=%d len=%d", packed.Stride, len(packed.Pix))
+	}
+	if packed.RGBAAt(0, 0) != strip.RGBAAt(8, 10) || packed.RGBAAt(15, 9) != strip.RGBAAt(23, 19) {
+		t.Fatalf("repacked pixels do not match the source slice")
+	}
+
+	var buf bytes.Buffer
+	if err := EncodeImage(&buf, slice, "avif", 80); err != nil {
+		t.Fatalf("AVIF encode of sub-image failed: %v", err)
+	}
+	dec, err := avif.Decode(bytes.NewReader(buf.Bytes()))
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if b := dec.Bounds(); b.Dx() != 32 || b.Dy() != 32 {
+		t.Fatalf("expected 32x32, got %v", b)
+	}
+}
+
+func TestPixelLimiterBounds(t *testing.T) {
+	l := newPixelLimiter(100, 3)
+	var (
+		mu             sync.Mutex
+		active, peak   int
+		used, peakUsed int64
+		wg             sync.WaitGroup
+	)
+	for _, px := range []int64{40, 40, 40, 10, 10, 250, 30, 60} {
+		wg.Add(1)
+		go func(px int64) {
+			defer wg.Done()
+			l.acquire(px)
+			w := l.weight(px)
+			mu.Lock()
+			active++
+			used += w
+			if active > peak {
+				peak = active
+			}
+			if used > peakUsed {
+				peakUsed = used
+			}
+			mu.Unlock()
+			time.Sleep(5 * time.Millisecond)
+			mu.Lock()
+			active--
+			used -= w
+			mu.Unlock()
+			l.release(px)
+		}(px)
+	}
+	wg.Wait()
+	if peak > 3 {
+		t.Errorf("more than maxActive holders at once: %d", peak)
+	}
+	if peakUsed > 100 {
+		t.Errorf("pixel budget exceeded: %d", peakUsed)
 	}
 }
 

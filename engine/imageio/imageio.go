@@ -12,7 +12,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"sync"
 
 	"photoslicer/engine/constants"
 
@@ -279,11 +281,93 @@ func opaqueNRGBAToRGBA(src *image.NRGBA) *image.RGBA {
 	}
 }
 
-// avifEncodeGate bounds concurrent AVIF encodes to one. Every AVIF encode
-// internally spawns one worker thread per CPU core and allocates large frame
-// buffers (several GB for tall frames), so allowing multiple simultaneous
-// encodes multiplies that memory and can exhaust RAM.
-var avifEncodeGate = make(chan struct{}, 1)
+// AVIF encoding goes through gen2brain/avif, which uses a system libavif when
+// one can be loaded and otherwise falls back to a bundled, single-threaded
+// libaom compiled to WASM. The two need opposite scheduling:
+//
+//   - libavif (dynamic) already spreads one encode across every CPU core, so
+//     running several at once only multiplies memory; encodes are serialized.
+//   - The WASM encoder uses exactly one core per encode, so serializing them
+//     leaves the rest of the CPU idle; encodes run in parallel, bounded by the
+//     core count and by a budget of in-flight pixels so tall frames cannot
+//     exhaust RAM.
+const (
+	// avifPixelBudget caps the pixels being encoded at once. A WASM encode
+	// peaks at roughly 150 bytes of RAM per pixel (RGBA copy, YUV planes,
+	// encoder frame buffers, WASM heap growth), so this keeps concurrent AVIF
+	// work around 1.8 GB: several short slices run together, while a default
+	// 800x16000 slice runs alone.
+	avifPixelBudget = 12_000_000
+
+	// avifSpeedDefault is libaom's cpu-used. Measured on 800px-wide comic
+	// pages, speed 8 is ~5x faster than speed 6 at the same file size and
+	// within ~0.6 dB PSNR; slower presets are not worth it for this workload.
+	avifSpeedDefault = 8
+	// avifSpeedLarge is used above avifLargeFramePixels, where speed 8 gets
+	// both slow and memory-hungry. On a default 800x16000 slice speed 9 is
+	// ~2.8x faster and peaks at about half the RAM (1.6 GB vs 3.0 GB), for
+	// ~11% larger files at the same PSNR.
+	avifSpeedLarge       = 9
+	avifLargeFramePixels = 8_000_000
+)
+
+var (
+	avifLimiterOnce sync.Once
+	avifLimiter     *pixelLimiter
+	avifWarmOnce    sync.Once
+)
+
+func getAVIFLimiter() *pixelLimiter {
+	avifLimiterOnce.Do(func() {
+		if avif.Dynamic() == nil {
+			avifLimiter = newPixelLimiter(avifPixelBudget, 1)
+		} else {
+			avifLimiter = newPixelLimiter(avifPixelBudget, runtime.GOMAXPROCS(0))
+		}
+	})
+	return avifLimiter
+}
+
+// PrewarmAVIF compiles the AVIF encoder in the background. The first encode
+// otherwise pays a one-time WASM compilation (1-2 s) on the critical path;
+// calling this before decoding/stitching overlaps that cost with other work.
+func PrewarmAVIF() {
+	avifWarmOnce.Do(func() {
+		go func() {
+			_ = getAVIFLimiter()
+			_ = avif.Encode(io.Discard, image.NewRGBA(image.Rect(0, 0, 16, 16)), avif.Options{Speed: 10})
+		}()
+	})
+}
+
+// compactRGBA returns img as an *image.RGBA whose Pix holds exactly the
+// image's rows with a tight stride. The AVIF encoder copies len(Pix) bytes and
+// assumes stride == width*4, but a SubImage slice of a stitched strip keeps
+// the parent's Pix up to its end, so passing it directly copies the whole
+// remaining strip into the encoder for every slice.
+func compactRGBA(img image.Image) image.Image {
+	src, ok := img.(*image.RGBA)
+	if !ok {
+		// The encoder converts other types into a fresh, compact RGBA itself.
+		return img
+	}
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w <= 0 || h <= 0 {
+		return img
+	}
+	rowBytes := w * 4
+	off := src.PixOffset(b.Min.X, b.Min.Y)
+	if src.Stride == rowBytes {
+		end := off + h*rowBytes
+		return &image.RGBA{Pix: src.Pix[off:end:end], Stride: rowBytes, Rect: image.Rect(0, 0, w, h)}
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		copy(dst.Pix[y*rowBytes:(y+1)*rowBytes], src.Pix[off+y*src.Stride:])
+	}
+	return dst
+}
 
 func encodeAVIF(w io.Writer, img image.Image, quality int) error {
 	if quality <= 0 {
@@ -291,23 +375,69 @@ func encodeAVIF(w io.Writer, img image.Image, quality int) error {
 	}
 	b := img.Bounds()
 	pixels := int64(b.Dx()) * int64(b.Dy())
-	speed := 6
-	if pixels > 12_000_000 {
-		speed = 8
-	}
-	if pixels > 30_000_000 {
-		speed = 10
-	}
-	if quality >= 95 && speed < 8 {
-		speed = 8
+	speed := avifSpeedDefault
+	if pixels > avifLargeFramePixels {
+		speed = avifSpeedLarge
 	}
 
-	avifEncodeGate <- struct{}{}
-	defer func() { <-avifEncodeGate }()
-	return avif.Encode(w, img, avif.Options{
+	limiter := getAVIFLimiter()
+	limiter.acquire(pixels)
+	defer limiter.release(pixels)
+	return avif.Encode(w, compactRGBA(img), avif.Options{
 		Quality: quality,
 		Speed:   speed,
 	})
+}
+
+// pixelLimiter is a weighted semaphore: holders reserve their pixel count
+// against a shared budget and at most maxActive may run at once. A request
+// larger than the whole budget still runs, but only when nothing else does.
+type pixelLimiter struct {
+	mu        sync.Mutex
+	cond      *sync.Cond
+	budget    int64
+	maxActive int
+	used      int64
+	active    int
+}
+
+func newPixelLimiter(budget int64, maxActive int) *pixelLimiter {
+	if maxActive < 1 {
+		maxActive = 1
+	}
+	l := &pixelLimiter{budget: budget, maxActive: maxActive}
+	l.cond = sync.NewCond(&l.mu)
+	return l
+}
+
+func (l *pixelLimiter) weight(pixels int64) int64 {
+	if pixels < 1 {
+		return 1
+	}
+	if pixels > l.budget {
+		return l.budget
+	}
+	return pixels
+}
+
+func (l *pixelLimiter) acquire(pixels int64) {
+	w := l.weight(pixels)
+	l.mu.Lock()
+	for l.active > 0 && (l.active >= l.maxActive || l.used+w > l.budget) {
+		l.cond.Wait()
+	}
+	l.used += w
+	l.active++
+	l.mu.Unlock()
+}
+
+func (l *pixelLimiter) release(pixels int64) {
+	w := l.weight(pixels)
+	l.mu.Lock()
+	l.used -= w
+	l.active--
+	l.mu.Unlock()
+	l.cond.Broadcast()
 }
 
 func EncodeImage(w io.Writer, img image.Image, format string, quality int) error {

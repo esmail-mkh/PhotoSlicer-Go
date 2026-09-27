@@ -318,6 +318,9 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 	if opts.AutoTuneWorkers {
 		opts.MaxWorkers = tunedWorkerCount(opts.MaxWorkers)
 	}
+	if strings.EqualFold(opts.SaveFormat, "avif") {
+		imageio.PrewarmAVIF()
+	}
 
 	// Determine output save path
 	baseFolder := opts.OutputBase
