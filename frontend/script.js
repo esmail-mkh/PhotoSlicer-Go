@@ -82,6 +82,40 @@ const translations = {
         btnPause: "PAUSE",
         btnResume: "RESUME",
         btnStop: "STOP",
+        tabQueue: "Queue",
+        btnAddQueue: "Queue",
+        btnAddQueueTip: "Add to queue",
+        queueAdded: "Added to queue: {0}",
+        queueClear: "Clear finished",
+        queueStart: "Start queue",
+        queueRunningNow: "Running…",
+        queueEmptyTitle: "The queue is empty",
+        queueEmptyHint: "Choose a folder in Workspace and press Queue to line it up.",
+        queueCountWaiting: "{0} waiting",
+        queueCountDone: "{0} finished",
+        queueCountAttention: "{0} need attention",
+        queueStatusQueued: "Waiting",
+        queueStatusRunning: "Running",
+        queueStatusDone: "Done",
+        queueStatusPartial: "Partly done",
+        queueStatusFailed: "Failed",
+        queueStatusStopped: "Stopped",
+        queueMoveUp: "Move up",
+        queueMoveDown: "Move down",
+        queueRemove: "Remove",
+        queueRetry: "Run again",
+        queueOpenOutput: "Open output folder",
+        queuePause: "Pause",
+        queueResume: "Resume",
+        queueStop: "Stop the queue",
+        queueInterrupted: "Interrupted when the app closed",
+        queueItemsImages: "{0} images",
+        queueItemsChapters: "{0} chapters",
+        queueItemsPages: "{0} pages",
+        queueFolders: "{0} of {1} folders",
+        queueChipEnhance: "Enhance",
+        queueChipWatermark: "Watermark",
+        queueChipNoStitch: "No stitch",
         openFolder: "Open Folder",
         proTool: "Professional Manhwa Tool",
         desc: "Optimized for high-speed image stitching and editing workflow. Designed for efficiency.",
@@ -294,6 +328,40 @@ const translations = {
         btnPause: "مکث",
         btnResume: "ادامـه",
         btnStop: "توقف",
+        tabQueue: "صف",
+        btnAddQueue: "صف",
+        btnAddQueueTip: "افزودن به صف",
+        queueAdded: "به صف اضافه شد: {0}",
+        queueClear: "پاک کردن انجام‌شده‌ها",
+        queueStart: "شروع صف",
+        queueRunningNow: "در حال اجرا…",
+        queueEmptyTitle: "صف خالی است",
+        queueEmptyHint: "در میز کار یک پوشه انتخاب کنید و دکمه‌ی «صف» را بزنید.",
+        queueCountWaiting: "{0} در انتظار",
+        queueCountDone: "{0} تمام‌شده",
+        queueCountAttention: "{0} نیازمند بررسی",
+        queueStatusQueued: "در انتظار",
+        queueStatusRunning: "در حال پردازش",
+        queueStatusDone: "انجام شد",
+        queueStatusPartial: "ناقص",
+        queueStatusFailed: "ناموفق",
+        queueStatusStopped: "متوقف",
+        queueMoveUp: "بالا بردن",
+        queueMoveDown: "پایین بردن",
+        queueRemove: "حذف",
+        queueRetry: "اجرای دوباره",
+        queueOpenOutput: "باز کردن پوشه‌ی خروجی",
+        queuePause: "توقف موقت",
+        queueResume: "ادامه",
+        queueStop: "توقف صف",
+        queueInterrupted: "با بسته شدن برنامه قطع شد",
+        queueItemsImages: "{0} تصویر",
+        queueItemsChapters: "{0} چپتر",
+        queueItemsPages: "{0} صفحه",
+        queueFolders: "{0} از {1} پوشه",
+        queueChipEnhance: "افزایش کیفیت",
+        queueChipWatermark: "واترمارک",
+        queueChipNoStitch: "بدون چسباندن",
         openFolder: "باز کردن پوشه",
         proTool: "ابزار حرفه‌ای مانهوا و کمیک",
         desc: "بهینه‌سازی شده برای سرعت بالا در چسباندن و ویرایش تصاویر. طراحی شده برای کارایی.",
@@ -486,6 +554,9 @@ function setLanguage(lang) {
         buildFormatMenu();
     }
 
+    // Queue cards are built in JS, so rebuild them in the new language
+    if (typeof renderQueue === 'function') renderQueue();
+
     // Re-position tab indicator after text changes shift tab widths
     positionTabIndicator();
 
@@ -581,6 +652,7 @@ function showTab(tabName) {
 
     positionTabIndicator();
     updateSettings();
+    if (tabName === 'queue') refreshQueue();
 }
 
 function positionTabIndicator() {
@@ -616,6 +688,8 @@ async function selectInputFile() {
 
 function setDirReady(ready) {
     _dirReady = !!ready;
+    const addBtn = document.getElementById('queue-add-button');
+    if (addBtn) addBtn.disabled = !_dirReady;
     const startBtn = document.getElementById('start-button');
     if (!startBtn) return;
     const state = startBtn.dataset.state || 'idle';
@@ -1546,19 +1620,11 @@ function showSubtleToast(message) {
 // in engine/constants.py.
 const WEBP_MAX_DIMENSION = 16383;
 
-function start() {
-    document.getElementById('timer').style.display = 'block';
-    document.getElementById('mini-open-btn').style.display = 'none';
-
-    if (!document.getElementById('directory-input').value) {
-        showError(translations[currentLang].selectDirFirst);
-        return;
-    }
-
-    // WebP has a hard 16383px height limit. With a larger crop-height limit the
-    // slices silently fail to save, so warn the user, then clamp the limit to
-    // the WebP maximum and proceed. Only relevant in stitch mode (the height
-    // limit isn't applied when "No Stitch" is on).
+// WebP has a hard 16383px height limit. With a larger crop-height limit the
+// slices silently fail to save, so warn the user, then clamp the limit to
+// the WebP maximum and proceed. Only relevant in stitch mode (the height
+// limit isn't applied when "No Stitch" is on).
+function runWithWebpGuard(proceed) {
     const format = (document.getElementById('format-select').value || '').toUpperCase();
     const heightLimit = parseInt(document.getElementById('height-input').value) || 0;
     const noStitch = document.getElementById('no-stitch').checked;
@@ -1573,14 +1639,25 @@ function start() {
                 heightInput.value = WEBP_MAX_DIMENSION;
                 // Persist the adjusted value before Python reads it from the DOM.
                 heightInput.dispatchEvent(new Event('change', { bubbles: true }));
-                pywebview.api.start();
+                proceed();
                 return true;
             }
         });
         return;
     }
+    proceed();
+}
 
-    pywebview.api.start();
+function start() {
+    document.getElementById('timer').style.display = 'block';
+    document.getElementById('mini-open-btn').style.display = 'none';
+
+    if (!document.getElementById('directory-input').value) {
+        showError(translations[currentLang].selectDirFirst);
+        return;
+    }
+
+    runWithWebpGuard(() => pywebview.api.start());
 }
 
 function isChecked(id) {
@@ -2708,6 +2785,7 @@ function setButtonState(state) {
         startButton.innerHTML = `<div class="btn-content"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 15a.5.5 0 1 1 0-1h1v-1a4.5 4.5 0 0 1 2.557-4.06c.29-.139.443-.377.443-.59v-.7c0-.213-.154-.451-.443-.59A4.5 4.5 0 0 1 3.5 3V2h-1a.5.5 0 0 1 0-1h11a.5.5 0 0 1 0 1h-1v1a4.5 4.5 0 0 1-2.557 4.06c-.29.139-.443.377.443.59v.7c0 .213.154.451.443.59A4.5 4.5 0 0 1 12.5 13v1h1a.5.5 0 0 1 0 1h-11zm2-13v1c0 .537.12 1.045.337 1.5h6.326c.216-.455.337-.963.337-1.5V2h-7zm3 6.35c0 .701-.478 1.236-1.011 1.492A3.5 3.5 0 0 0 4.5 13s.866-1.299 3-1.48V8.35zm1 0v1.48c2.134.181 3 1.48 3 1.48a3.5 3.5 0 0 0-1.989-3.158C8.978 9.586 8.5 10.052 8.5 9.35z"/></svg><span>${texts.btnProcessing}</span></div>`;
         showProgressUI();
     }
+    if (typeof renderQueue === 'function') renderQueue();
 }
 
 /* ============================================
@@ -2826,6 +2904,7 @@ function updateProgressInfo(current, total, currentFile, elapsed, eta) {
     if (elapsedEl) elapsedEl.textContent = elapsed || '00:00:00';
     var etaEl = document.getElementById('pi-eta');
     if (etaEl) etaEl.textContent = eta || '-';
+    if (typeof updateQueueInfo === 'function') updateQueueInfo(current, total, displayFile, eta);
 }
 
 function resetProgressInfo() {
@@ -3440,3 +3519,276 @@ function manualCheckForUpdates() {
         });
 }
 window.manualCheckForUpdates = manualCheckForUpdates;
+
+/* ============================================
+   JOB QUEUE
+   ============================================ */
+let queueState = { jobs: [], active: false };
+let _queuePct = 0;
+let _queueInfo = null;
+
+const QUEUE_ICONS = {
+    up: '<path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"/>',
+    down: '<path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708"/>',
+    remove: '<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>',
+    retry: '<path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>',
+    folder: '<path d="M3.5 2A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 12.5 4H8.207a.5.5 0 0 1-.353-.146L7.147 3.147A1.5 1.5 0 0 0 6.086 2.5H3.5z"/>',
+    pause: '<path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>',
+    play: '<path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>',
+    stop: '<path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5"/>'
+};
+
+function queueText(key, ...args) {
+    const texts = translations[currentLang] || {};
+    let text = texts[key] || translations.en[key] || key;
+    args.forEach((value, i) => { text = text.split('{' + i + '}').join(value); });
+    return text;
+}
+
+let _queueRunningId = null;
+
+function onQueueChanged(state) {
+    queueState = state && Array.isArray(state.jobs) ? state : { jobs: [], active: false };
+    const running = queueState.jobs.find(j => j.status === 'running');
+    const runningId = running ? running.id : null;
+    if (runningId !== _queueRunningId) {
+        _queueRunningId = runningId;
+        _queuePct = 0;
+        _queueInfo = null;
+    }
+    renderQueue();
+}
+
+function refreshQueue() {
+    const request = window.pywebview?.api?.get_queue?.();
+    if (request && typeof request.then === 'function') request.then(onQueueChanged);
+}
+
+function addToQueue() {
+    if (!document.getElementById('directory-input').value.trim()) {
+        showError(translations[currentLang].selectDirFirst);
+        return;
+    }
+    runWithWebpGuard(() => {
+        Promise.resolve(pywebview.api.enqueue_job()).then(res => {
+            if (res && res.ok) showSubtleToast(queueText('queueAdded', res.name));
+        });
+    });
+}
+
+function startQueue() {
+    pywebview.api.start_queue();
+}
+
+function clearFinishedJobs() {
+    pywebview.api.clear_finished_jobs();
+}
+
+function queueMove(id, direction) {
+    pywebview.api.move_queue_job(id, direction);
+}
+
+function queueRemove(id) {
+    pywebview.api.remove_queue_job(id);
+}
+
+function queueRetry(id) {
+    pywebview.api.retry_queue_job(id);
+}
+
+function queueOpenOutput(path) {
+    if (path) pywebview.api.open_file_explorer(path);
+}
+
+function queueTogglePause() {
+    const state = queueButtonState();
+    if (state === 'processing' || state === 'paused') handleProcessClick();
+}
+
+function queueButtonState() {
+    const btn = document.getElementById('start-button');
+    return (btn && btn.dataset.state) || 'idle';
+}
+
+function queueChips(job) {
+    const p = job.params || {};
+    const chips = [];
+    if (p.custom_width_checked && p.width) chips.push(p.width + 'px');
+    chips.push(String(p.save_format || 'JPG').toUpperCase());
+    if (p.enhance_checked) chips.push(queueText('queueChipEnhance'));
+    if (p.watermark_enabled) chips.push(queueText('queueChipWatermark'));
+    if (p.no_stitch_checked) chips.push(queueText('queueChipNoStitch'));
+    if (p.zip_checked) chips.push('ZIP');
+    if (p.pdf_checked) chips.push('PDF');
+    if (p.cbz_checked) chips.push('CBZ');
+    return chips;
+}
+
+function queueItemsLabel(job) {
+    if (!job.items) return '';
+    if (job.mode === 'batch') return queueText('queueItemsChapters', job.items);
+    if (job.mode === 'archive_pdf') return queueText('queueItemsPages', job.items);
+    return queueText('queueItemsImages', job.items);
+}
+
+function queueEl(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+}
+
+function queueIconButton(icon, title, onClick, opts) {
+    opts = opts || {};
+    const btn = queueEl('button', 'queue-icon-btn' + (opts.danger ? ' danger' : ''));
+    btn.type = 'button';
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+    btn.disabled = !!opts.disabled;
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">' + QUEUE_ICONS[icon] + '</svg>';
+    btn.addEventListener('click', onClick);
+    return btn;
+}
+
+function buildQueueCard(job, waitingIndex, waitingCount) {
+    const card = queueEl('div', 'queue-card');
+    card.dataset.status = job.status;
+    card.dataset.id = job.id;
+
+    const main = queueEl('div', 'queue-card-main');
+
+    const title = queueEl('div', 'queue-card-title');
+    const name = queueEl('span', 'queue-name', job.name);
+    name.title = job.input;
+    title.appendChild(name);
+    title.appendChild(queueEl('span', 'queue-status', queueText('queueStatus' + job.status.charAt(0).toUpperCase() + job.status.slice(1))));
+    main.appendChild(title);
+
+    const path = queueEl('div', 'queue-path', job.input);
+    path.setAttribute('dir', 'ltr');
+    path.title = job.input;
+    main.appendChild(path);
+
+    const chips = queueEl('div', 'queue-chips');
+    const items = queueItemsLabel(job);
+    if (items) chips.appendChild(queueEl('span', 'queue-chip muted', items));
+    queueChips(job).forEach(label => chips.appendChild(queueEl('span', 'queue-chip', label)));
+    if (job.total > 1 && job.status !== 'queued' && job.status !== 'running') {
+        chips.appendChild(queueEl('span', 'queue-chip muted', queueText('queueFolders', job.ok, job.total)));
+    }
+    main.appendChild(chips);
+
+    if (job.status === 'running') {
+        const track = queueEl('div', 'queue-progress');
+        const fill = queueEl('div', 'queue-progress-fill');
+        fill.id = 'queue-running-fill';
+        track.appendChild(fill);
+        main.appendChild(track);
+        const row = queueEl('div', 'queue-progress-row');
+        const info = queueEl('span', 'queue-progress-info', queueText('queueRunningNow'));
+        info.id = 'queue-running-info';
+        const pct = queueEl('span', 'queue-progress-pct', '0%');
+        pct.id = 'queue-running-pct';
+        row.appendChild(info);
+        row.appendChild(pct);
+        main.appendChild(row);
+    }
+
+    if (job.error && job.status !== 'queued' && job.status !== 'running') {
+        const text = job.error === 'interrupted' ? queueText('queueInterrupted') : job.error;
+        const err = queueEl('div', 'queue-error', text);
+        err.title = text;
+        main.appendChild(err);
+    }
+    card.appendChild(main);
+
+    const actions = queueEl('div', 'queue-card-actions');
+    if (job.status === 'queued') {
+        actions.appendChild(queueIconButton('up', queueText('queueMoveUp'), () => queueMove(job.id, -1), { disabled: waitingIndex === 0 }));
+        actions.appendChild(queueIconButton('down', queueText('queueMoveDown'), () => queueMove(job.id, 1), { disabled: waitingIndex === waitingCount - 1 }));
+        actions.appendChild(queueIconButton('remove', queueText('queueRemove'), () => queueRemove(job.id), { danger: true }));
+    } else if (job.status === 'running') {
+        const paused = queueButtonState() === 'paused';
+        actions.appendChild(queueIconButton(paused ? 'play' : 'pause', queueText(paused ? 'queueResume' : 'queuePause'), queueTogglePause));
+        actions.appendChild(queueIconButton('stop', queueText('queueStop'), stopProcessing, { danger: true }));
+    } else {
+        if (job.status !== 'done') {
+            actions.appendChild(queueIconButton('retry', queueText('queueRetry'), () => queueRetry(job.id)));
+        }
+        if (job.output_path) {
+            actions.appendChild(queueIconButton('folder', queueText('queueOpenOutput'), () => queueOpenOutput(job.output_path)));
+        }
+        actions.appendChild(queueIconButton('remove', queueText('queueRemove'), () => queueRemove(job.id), { danger: true }));
+    }
+    card.appendChild(actions);
+    return card;
+}
+
+function renderQueue() {
+    const list = document.getElementById('queue-list');
+    if (!list) return;
+    const jobs = queueState.jobs || [];
+    const waiting = jobs.filter(j => j.status === 'queued');
+    const running = jobs.filter(j => j.status === 'running');
+    const finished = jobs.filter(j => j.status !== 'queued' && j.status !== 'running');
+    const attention = finished.filter(j => j.status !== 'done');
+
+    const badge = document.getElementById('queue-badge');
+    if (badge) {
+        const pending = waiting.length + running.length;
+        badge.textContent = pending;
+        badge.hidden = pending === 0;
+    }
+
+    const summary = document.getElementById('queue-summary');
+    if (summary) {
+        const parts = [];
+        if (waiting.length) parts.push(queueText('queueCountWaiting', waiting.length));
+        if (finished.length - attention.length) parts.push(queueText('queueCountDone', finished.length - attention.length));
+        if (attention.length) parts.push(queueText('queueCountAttention', attention.length));
+        summary.textContent = parts.join(' · ');
+    }
+
+    const busy = !!queueState.active || document.body.classList.contains('job-active');
+    const startBtn = document.getElementById('queue-start-btn');
+    if (startBtn) startBtn.disabled = busy || waiting.length === 0;
+    const clearBtn = document.getElementById('queue-clear-btn');
+    if (clearBtn) clearBtn.disabled = finished.length === 0;
+    const empty = document.getElementById('queue-empty');
+    if (empty) empty.hidden = jobs.length > 0;
+
+    const cards = document.createDocumentFragment();
+    let waitingIndex = 0;
+    jobs.forEach(job => {
+        const index = job.status === 'queued' ? waitingIndex++ : -1;
+        cards.appendChild(buildQueueCard(job, index, waiting.length));
+    });
+    list.replaceChildren(cards);
+
+    updateQueueProgress(_queuePct);
+    if (_queueInfo) updateQueueInfo(_queueInfo.current, _queueInfo.total, _queueInfo.file, _queueInfo.eta);
+}
+
+// Called from the backend on every progress tick while a job is running.
+function updateQueueProgress(pct) {
+    _queuePct = pct;
+    const fill = document.getElementById('queue-running-fill');
+    if (fill) fill.style.width = pct + '%';
+    const label = document.getElementById('queue-running-pct');
+    if (label) label.textContent = Math.round(pct) + '%';
+}
+
+function updateQueueInfo(current, total, file, eta) {
+    _queueInfo = { current: current, total: total, file: file, eta: eta };
+    const info = document.getElementById('queue-running-info');
+    if (!info) return;
+    const parts = [];
+    if (total > 1) parts.push(current + '/' + total);
+    if (file) parts.push(file);
+    if (eta) parts.push('ETA ' + eta);
+    info.textContent = parts.join(' · ') || queueText('queueRunningNow');
+}
+
+window.onQueueChanged = onQueueChanged;
+window.updateQueueProgress = updateQueueProgress;
+window.updateQueueInfo = updateQueueInfo;

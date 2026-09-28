@@ -84,6 +84,15 @@
                     </svg>
                     <span data-i18n="tabWorkspace">Workspace</span>
                 </button>
+                <button class="tab" onclick="showTab('queue')" id="tab-queue">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M2 2.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5zM3 3H2v1h1z"/>
+                        <path d="M5 3.5a.5.5 0 0 1 .5-.5H14a.5.5 0 0 1 0 1H5.5a.5.5 0 0 1-.5-.5M5.5 7a.5.5 0 0 0 0 1H14a.5.5 0 0 0 0-1zm0 4a.5.5 0 0 0 0 1H14a.5.5 0 0 0 0-1z"/>
+                        <path fill-rule="evenodd" d="M1.5 7a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5zM2 7h1v1H2zm0 3.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm1 .5H2v1h1z"/>
+                    </svg>
+                    <span data-i18n="tabQueue">Queue</span>
+                    <span class="tab-badge" id="queue-badge" hidden>0</span>
+                </button>
                 <button class="tab" onclick="showTab('settings')" id="tab-settings">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
                         <path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492M5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0"/>
@@ -428,6 +437,12 @@
                             <span data-i18n="btnInitiate">INITIATE</span>
                         </div>
                     </button>
+                    <button id="queue-add-button" class="queue-add-button" onclick="addToQueue()" data-i18n-title="btnAddQueueTip" title="Add to queue" aria-label="Add to queue" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2"/>
+                        </svg>
+                        <span data-i18n="btnAddQueue">Queue</span>
+                    </button>
                     <button id="stop-button" class="stop-button" onclick="stopProcessing()" data-i18n-title="btnStop" title="Stop" aria-label="Stop">
                         <div class="btn-content">
                             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-stop-fill" viewBox="0 0 16 16">
@@ -436,6 +451,32 @@
                             <span data-i18n="btnStop">STOP</span>
                         </div>
                     </button>
+                </div>
+            </div>
+
+            <!-- Queue Tab -->
+            <div id="queue" class="tab-content">
+                <div class="queue-toolbar">
+                    <div class="queue-summary" id="queue-summary" role="status" aria-live="polite"></div>
+                    <div class="queue-toolbar-actions">
+                        <button type="button" class="queue-btn" id="queue-clear-btn" onclick="clearFinishedJobs()" data-i18n="queueClear" disabled>Clear finished</button>
+                        <button type="button" class="queue-btn primary" id="queue-start-btn" onclick="startQueue()" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+                            </svg>
+                            <span data-i18n="queueStart">Start queue</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="queue-list" id="queue-list"></div>
+                <div class="queue-empty" id="queue-empty">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M2 2.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3a.5.5 0 0 0-.5-.5zM3 3H2v1h1z"/>
+                        <path d="M5 3.5a.5.5 0 0 1 .5-.5H14a.5.5 0 0 1 0 1H5.5a.5.5 0 0 1-.5-.5M5.5 7a.5.5 0 0 0 0 1H14a.5.5 0 0 0 0-1zm0 4a.5.5 0 0 0 0 1H14a.5.5 0 0 0 0-1z"/>
+                        <path fill-rule="evenodd" d="M1.5 7a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5H2a.5.5 0 0 1-.5-.5zM2 7h1v1H2zm0 3.5a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zm1 .5H2v1h1z"/>
+                    </svg>
+                    <p class="queue-empty-title" data-i18n="queueEmptyTitle">The queue is empty</p>
+                    <span class="queue-empty-hint" data-i18n="queueEmptyHint">Choose a folder in Workspace and press Queue to line it up.</span>
                 </div>
             </div>
 

@@ -98,6 +98,7 @@ It automates the entire webtoon production workflow: seamless vertical stitching
   * Real-time preview of the output filename.
 * **Thread & Performance Control:** Select active worker concurrency (`1–16` CPU threads).
 * **Presets Management:** Save configurations, set default (starred) presets for startup, and export/import presets via JSON.
+* **Job Queue:** Line up several folders, archives or PDFs from the **Queue** button and run them one after another, each with the settings it was added with (different width, format or watermark per job). Reorder or remove waiting jobs, re-run stopped or failed ones, and pick up where you left off after a restart.
 
 ---
 
@@ -205,6 +206,13 @@ Click the **🚀 INITIATE** button to start.
 * Monitor progress with the progress bar, file counters, elapsed timer, and ETA.
 * Use **Pause** / **Resume** or click **STOP** to halt processing immediately.
 * Click **Open Folder** when done to inspect your sliced images.
+
+### 5️⃣ Or Queue Several Jobs
+Instead of starting right away, press **Queue** next to INITIATE. The current folder and settings are saved as a job and the path field clears so you can add the next one — even while another job is running.
+* Open the **Queue** tab to see every job, its settings, and its status (waiting, running, done, partly done, failed, stopped). Waiting jobs can be moved up/down or removed.
+* Press **Start queue** to process the waiting jobs in order. A failed job never blocks the ones after it; its error stays on its card and you can re-run it.
+* **STOP** ends the running job and pauses the queue. Press **Start queue** again to continue with the jobs still waiting.
+* Finished jobs stay in the list until you press **Clear finished**. The queue is saved to disk, so waiting jobs survive closing the app.
 
 ---
 

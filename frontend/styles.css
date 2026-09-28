@@ -961,11 +961,13 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
    and make the tab content scrollable. Scoped via body[data-tab]
    so the Workspace tab's dropdown menus are unaffected. */
 body[data-tab="settings"] .container,
+body[data-tab="queue"] .container,
 body[data-tab="aboutUs"] .container {
     overflow: hidden;
 }
 
 body[data-tab="settings"] .tab-content.active,
+body[data-tab="queue"] .tab-content.active,
 body[data-tab="aboutUs"] .tab-content.active {
     overflow-y: auto;
     flex: 1;
@@ -979,15 +981,18 @@ body[data-tab="settings"] .tab-content.active {
 
 /* Themed scrollbar for Settings and About tabs */
 body[data-tab="settings"] .tab-content.active::-webkit-scrollbar,
+body[data-tab="queue"] .tab-content.active::-webkit-scrollbar,
 body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar {
     width: 5px;
 }
 body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-track,
+body[data-tab="queue"] .tab-content.active::-webkit-scrollbar-track,
 body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-track {
     background: transparent;
     margin: 8px 0;
 }
 body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb,
+body[data-tab="queue"] .tab-content.active::-webkit-scrollbar-thumb,
 body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-thumb {
     background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
     border-radius: 20px;
@@ -995,6 +1000,7 @@ body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-thumb {
     transition: background 0.3s ease;
 }
 body[data-tab="settings"] .tab-content.active::-webkit-scrollbar-thumb:hover,
+body[data-tab="queue"] .tab-content.active::-webkit-scrollbar-thumb:hover,
 body[data-tab="aboutUs"] .tab-content.active::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(180deg, var(--theme-glow-soft), rgba(255,255,255,0.1));
     border-color: rgba(255,255,255,0.1);
@@ -5172,4 +5178,367 @@ body.workspace-processing .progress-text {
 [dir="ltr"] .custom-tooltip-popup {
     text-align: left;
     direction: ltr;
+}
+
+/* ============================================
+   JOB QUEUE
+   ============================================ */
+/* Four tabs share the header bar, so tighten each one a little */
+@media (max-width: 560px) {
+    .tab {
+        padding: 11px 6px;
+        gap: 6px;
+        font-size: 0.8rem;
+    }
+}
+
+.tab-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--theme-gradient);
+    color: var(--on-theme-text, #fff);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    box-shadow: 0 0 10px var(--theme-glow-soft);
+}
+
+.tab-badge[hidden] {
+    display: none;
+}
+
+/* Secondary button next to INITIATE that lines the current folder up */
+.queue-add-button {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 0 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.queue-add-button svg {
+    color: var(--theme-solid);
+    transition: var(--transition-fast);
+}
+
+.queue-add-button:hover:not(:disabled) {
+    border-color: var(--theme-solid);
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 8px 22px var(--theme-glow-soft);
+}
+
+.queue-add-button:hover:not(:disabled) svg {
+    transform: rotate(90deg);
+}
+
+.queue-add-button:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.queue-add-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.queue-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.queue-summary {
+    min-width: 0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.queue-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    margin-inline-start: auto;
+}
+
+.queue-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.queue-btn:hover:not(:disabled) {
+    color: var(--text-primary);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.queue-btn.primary {
+    border-color: transparent;
+    background: var(--theme-gradient);
+    color: var(--on-theme-text, #fff);
+    box-shadow: 0 6px 18px var(--theme-glow-soft);
+}
+
+.queue-btn.primary:hover:not(:disabled) {
+    color: var(--on-theme-text, #fff);
+    filter: brightness(1.08);
+}
+
+.queue-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.queue-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.queue-card {
+    --queue-accent: rgba(255, 255, 255, 0.22);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-inline-start: 3px solid var(--queue-accent);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 60%, transparent 100%);
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transition: var(--transition-med);
+}
+
+.queue-card[data-status="running"] {
+    --queue-accent: var(--theme-solid);
+    box-shadow:
+        0 0 22px var(--theme-glow-soft),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.queue-card[data-status="done"] { --queue-accent: #34d399; }
+.queue-card[data-status="partial"],
+.queue-card[data-status="stopped"] { --queue-accent: #fbbf24; }
+.queue-card[data-status="failed"] { --queue-accent: #f87171; }
+
+.queue-card-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: start;
+}
+
+.queue-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.queue-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.queue-status {
+    flex: 0 0 auto;
+    padding: 2px 9px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.07);
+    color: var(--queue-accent);
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.queue-card[data-status="queued"] .queue-status {
+    color: var(--text-secondary);
+}
+
+.queue-path {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    color: var(--text-tertiary);
+}
+
+.queue-path {
+    text-align: left;
+}
+
+[dir="rtl"] .queue-path {
+    text-align: right;
+}
+
+.queue-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.queue-chip {
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: var(--theme-gradient-soft);
+    color: var(--theme-solid);
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.queue-chip.muted {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+}
+
+.queue-progress {
+    height: 6px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+.queue-progress-fill {
+    width: 0;
+    height: 100%;
+    border-radius: 6px;
+    background: var(--theme-gradient);
+    box-shadow: 0 0 10px var(--theme-glow);
+    transition: width 0.35s ease;
+}
+
+.queue-progress-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.queue-progress-info {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.queue-progress-pct {
+    flex: 0 0 auto;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 700;
+    color: var(--theme-solid);
+}
+
+.queue-error {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+    font-size: 0.72rem;
+    color: #f87171;
+}
+
+.queue-card-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 4px;
+}
+
+.queue-icon-btn {
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.queue-icon-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.11);
+    color: var(--text-primary);
+}
+
+.queue-icon-btn.danger:hover:not(:disabled) {
+    background: rgba(248, 113, 113, 0.16);
+    color: #f87171;
+}
+
+.queue-icon-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.queue-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 38px 20px;
+    text-align: center;
+    color: var(--text-tertiary);
+}
+
+.queue-empty[hidden] {
+    display: none;
+}
+
+.queue-empty svg {
+    color: var(--theme-solid);
+    opacity: 0.5;
+}
+
+.queue-empty-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.queue-empty-hint {
+    max-width: 300px;
+    font-size: 0.78rem;
+    line-height: 1.6;
 }

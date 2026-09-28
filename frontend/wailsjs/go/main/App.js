@@ -14,8 +14,16 @@ export function CheckForUpdate() {
   return window['go']['main']['App']['CheckForUpdate']();
 }
 
+export function ClearFinishedJobs() {
+  return window['go']['main']['App']['ClearFinishedJobs']();
+}
+
 export function CloseWindow() {
   return window['go']['main']['App']['CloseWindow']();
+}
+
+export function EnqueueJob(arg1) {
+  return window['go']['main']['App']['EnqueueJob'](arg1);
 }
 
 export function ExportPresets(arg1, arg2) {
@@ -38,6 +46,10 @@ export function GetGPUInfo() {
   return window['go']['main']['App']['GetGPUInfo']();
 }
 
+export function GetQueue() {
+  return window['go']['main']['App']['GetQueue']();
+}
+
 export function ImportPresets() {
   return window['go']['main']['App']['ImportPresets']();
 }
@@ -54,6 +66,10 @@ export function MinimizeWindow() {
   return window['go']['main']['App']['MinimizeWindow']();
 }
 
+export function MoveQueueJob(arg1, arg2) {
+  return window['go']['main']['App']['MoveQueueJob'](arg1, arg2);
+}
+
 export function OpenFileExplorer(arg1) {
   return window['go']['main']['App']['OpenFileExplorer'](arg1);
 }
@@ -66,8 +82,16 @@ export function PauseProcessing() {
   return window['go']['main']['App']['PauseProcessing']();
 }
 
+export function RemoveQueueJob(arg1) {
+  return window['go']['main']['App']['RemoveQueueJob'](arg1);
+}
+
 export function ResumeProcessing() {
   return window['go']['main']['App']['ResumeProcessing']();
+}
+
+export function RetryQueueJob(arg1) {
+  return window['go']['main']['App']['RetryQueueJob'](arg1);
 }
 
 export function SaveSettings(arg1) {
@@ -88,6 +112,10 @@ export function SelectWatermarkFile() {
 
 export function Start(arg1) {
   return window['go']['main']['App']['Start'](arg1);
+}
+
+export function StartQueue() {
+  return window['go']['main']['App']['StartQueue']();
 }
 
 export function StopProcessing() {

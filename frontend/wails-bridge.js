@@ -46,6 +46,16 @@
             if (typeof updateSettings === 'function') updateSettings();
             return window.go?.main?.App?.Start(gatherUIParams());
         },
+        enqueue_job: () => {
+            if (typeof updateSettings === 'function') updateSettings();
+            return window.go?.main?.App?.EnqueueJob(gatherUIParams());
+        },
+        get_queue: () => window.go?.main?.App?.GetQueue(),
+        start_queue: () => window.go?.main?.App?.StartQueue(),
+        remove_queue_job: (id) => window.go?.main?.App?.RemoveQueueJob(id),
+        move_queue_job: (id, direction) => window.go?.main?.App?.MoveQueueJob(id, direction),
+        retry_queue_job: (id) => window.go?.main?.App?.RetryQueueJob(id),
+        clear_finished_jobs: () => window.go?.main?.App?.ClearFinishedJobs(),
         minimize_window: () => window.go?.main?.App?.MinimizeWindow(),
         close_window: () => window.go?.main?.App?.CloseWindow(),
         get_clipboard_text: () => window.go?.main?.App?.GetClipboardText(),
