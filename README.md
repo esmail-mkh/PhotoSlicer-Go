@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 <p align="left">
-  <img src="assets/app-v5.1-fa-image.jpg" alt="PhotoSlicer Interface" width="420">
+  <img src="assets/app-en.jpg" alt="PhotoSlicer Interface" width="420">
 </p>
 
 **PhotoSlicer** is a blazing-fast, aesthetically stunning, cross-platform desktop application designed specifically for **Webtoon, Manhwa, and Manga translators, scanlation teams, and editors**. Completely rewritten in **Go** and **Wails v2**, it delivers pure native performance with an ultra-lightweight memory footprint and zero external runtime dependencies (no Python or heavy runtimes required).

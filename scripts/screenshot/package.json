@@ -1,0 +1,12 @@
+{
+  "name": "photoslicer-screenshots",
+  "private": true,
+  "description": "Renders the README screenshots from the real frontend (see screenshot.mjs)",
+  "type": "module",
+  "scripts": {
+    "screenshots": "node screenshot.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

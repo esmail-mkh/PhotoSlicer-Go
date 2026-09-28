@@ -29,6 +29,9 @@ photoslicer_enhanced_*
 frontend/dist/
 frontend/node_modules/
 
+# README screenshot tooling
+scripts/screenshot/node_modules/
+
 # Operating System artifacts
 Thumbs.db
 ehthumbs.db
