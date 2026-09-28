@@ -78,6 +78,7 @@ const translations = {
         errNothingExport: "There are no presets to export",
         errImportInvalid: "Invalid or unreadable preset file",
         btnInitiate: "INITIATE",
+        btnStartQueue: "START QUEUE ({0})",
         btnProcessing: "PROCESSING",
         btnPause: "PAUSE",
         btnResume: "RESUME",
@@ -333,6 +334,7 @@ const translations = {
         errNothingExport: "هیچ پریستی برای خروجی وجود ندارد",
         errImportInvalid: "فایل پریست نامعتبر یا غیرقابل خواندن است",
         btnInitiate: "شـروع عملیـات",
+        btnStartQueue: "شـروع صـف ({0})",
         btnProcessing: "در حال پردازش...",
         btnPause: "مکث",
         btnResume: "ادامـه",
@@ -512,6 +514,7 @@ const translations = {
 };
 
 let currentLang = 'fa';
+let queueState = { jobs: [], active: false }; // kept in sync by onQueueChanged
 let isInitializing = true;
 let cachedGPUInfo = null;
 
@@ -629,12 +632,34 @@ function setLanguage(lang) {
     }
 }
 
+// With nothing typed in the path field, the Workspace start button runs the
+// waiting queue jobs instead: this returns how many there are (0 = normal start).
+function queueStartCount() {
+    const input = document.getElementById('directory-input');
+    if (input && input.value.trim()) return 0;
+    return (queueState.jobs || []).filter(job => job.status === 'queued').length;
+}
+
+function startButtonLabel(texts) {
+    const waiting = queueStartCount();
+    return waiting ? texts.btnStartQueue.split('{0}').join(waiting) : texts.btnInitiate;
+}
+
+// Re-evaluate the start button after the path field or the queue changed
+function refreshStartButton() {
+    const btn = document.getElementById('start-button');
+    if (!btn) return;
+    const state = btn.dataset.state || 'idle';
+    updateStartButtonText(state, currentLang);
+    btn.classList.toggle('btn-ready', (state === 'idle' || state === 'paused') && (_dirReady || queueStartCount() > 0));
+}
+
 function updateStartButtonText(state, lang) {
     const texts = translations[lang];
     const btnSpan = document.querySelector('#start-button .btn-content span');
     if (!btnSpan) return;
 
-    if (state === 'idle') btnSpan.textContent = texts.btnInitiate;
+    if (state === 'idle') btnSpan.textContent = startButtonLabel(texts);
     else if (state === 'processing') btnSpan.textContent = texts.btnPause;
     else if (state === 'paused') btnSpan.textContent = texts.btnResume;
     else if (state === 'busy') btnSpan.textContent = texts.btnProcessing;
@@ -979,7 +1004,8 @@ function setDirReady(ready) {
     const startBtn = document.getElementById('start-button');
     if (!startBtn) return;
     const state = startBtn.dataset.state || 'idle';
-    startBtn.classList.toggle('btn-ready', _dirReady && (state === 'idle' || state === 'paused'));
+    startBtn.classList.toggle('btn-ready', (_dirReady || queueStartCount() > 0) && (state === 'idle' || state === 'paused'));
+    updateStartButtonText(state, currentLang);
 }
 
 async function updateDirectoryInspection(path) {
@@ -1096,6 +1122,7 @@ function refreshDirectoryState() {
     if (!input || !wrapper) return;
     const hasValue = input.value.trim().length > 0;
     wrapper.classList.toggle('has-value', hasValue);
+    refreshStartButton();
     input.title = hasValue ? input.value : '';
 
     if (!hasValue) {
@@ -3026,7 +3053,8 @@ function handleProcessClick() {
     const state = startButton.dataset.state || 'idle'; 
 
     if (state === 'idle') {
-        start(); 
+        if (queueStartCount() > 0) startQueue();
+        else start();
     } else if (state === 'processing') {
         pywebview.api.pause_processing();
         stopTimer();
@@ -3049,7 +3077,7 @@ function stopProcessing() {
 
 function setButtonState(state) {
     startButton.dataset.state = state;
-    startButton.classList.toggle('btn-ready', (state === 'idle' || state === 'paused') && _dirReady);
+    startButton.classList.toggle('btn-ready', (state === 'idle' || state === 'paused') && (_dirReady || queueStartCount() > 0));
     // Drive idle-pausing of the progress-bar animations (see styles.css)
     document.body.classList.toggle('is-processing', state === 'processing' || state === 'busy');
     // Show the Stop button for any active job (processing / paused / busy)
@@ -3062,7 +3090,7 @@ function setButtonState(state) {
     const texts = translations[currentLang];
 
     if (state === 'idle') {
-        startButton.innerHTML = `<div class="btn-content"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-rocket-takeoff" viewBox="0 0 16 16"><path d="M9.752 6.193c.599.6 1.73.437 2.528-.362s.96-1.932.362-2.531c-.599-.6-1.73-.438-2.528.361-.798.8-.96 1.933-.362 2.532"/><path d="M15.811 3.312c-.363 1.534-1.334 3.626-3.64 6.218l-.24 2.408a2.56 2.56 0 0 1-.732 1.526L8.817 15.85a.51.51 0 0 1-.867-.434l.27-1.899c.04-.28-.013-.593-.131-.956a9 9 0 0 0-.249-.657l-.082-.202c-.815-.197-1.578-.662-2.191-1.277-.614-.615-1.079-1.379-1.275-2.195l-.203-.083a10 10 0 0 0-.655-.248c-.363-.119-.675-.172-.955-.132l-1.896.27A.51.51 0 0 1 .15 7.17l2.382-2.386c.41-.41.947-.67 1.524-.734h.006l2.4-.238C9.005 1.55 11.087.582 12.623.208c.89-.217 1.59-.232 2.08-.188.244.023.435.06.57.093q.1.026.16.045c.184.06.279.13.351.295l.029.073a3.5 3.5 0 0 1 .157.721c.055.485.051 1.178-.159 2.065m-4.828 7.475.04-.04-.107 1.081a1.54 1.54 0 0 1-.44.913l-1.298 1.3.054-.38c.072-.506-.034-.993-.172-1.418a9 9 0 0 0-.164-.45c.738-.065 1.462-.38 2.087-1.006M5.205 5c-.625.626-.94 1.351-1.004 2.09a9 9 0 0 0-.45-.164c-.424-.138-.91-.244-1.416-.172l-.38.054 1.3-1.3c.245-.246.566-.401.91-.44l1.08-.107zm9.406-3.961c-.38-.034-.967-.027-1.746.163-1.558.38-3.917 1.496-6.937 4.521-.62.62-.799 1.34-.687 2.051.107.676.483 1.362 1.048 1.928.564.565 1.25.941 1.924 1.049.71.112 1.429-.067 2.048-.688 3.079-3.083 4.192-5.444 4.556-6.987.183-.771.18-1.345.138-1.713a3 3 0 0 0-.045-.283 3 3 0 0 0-.3-.041Z"/><path d="M7.009 12.139a7.6 7.6 0 0 1-1.804-1.352A7.6 7.6 0 0 1 3.794 8.86c-1.102.992-1.965 5.054-1.839 5.18.125.126 3.936-.896 5.054-1.902Z"/></svg><span>${texts.btnInitiate}</span></div>`;
+        startButton.innerHTML = `<div class="btn-content"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-rocket-takeoff" viewBox="0 0 16 16"><path d="M9.752 6.193c.599.6 1.73.437 2.528-.362s.96-1.932.362-2.531c-.599-.6-1.73-.438-2.528.361-.798.8-.96 1.933-.362 2.532"/><path d="M15.811 3.312c-.363 1.534-1.334 3.626-3.64 6.218l-.24 2.408a2.56 2.56 0 0 1-.732 1.526L8.817 15.85a.51.51 0 0 1-.867-.434l.27-1.899c.04-.28-.013-.593-.131-.956a9 9 0 0 0-.249-.657l-.082-.202c-.815-.197-1.578-.662-2.191-1.277-.614-.615-1.079-1.379-1.275-2.195l-.203-.083a10 10 0 0 0-.655-.248c-.363-.119-.675-.172-.955-.132l-1.896.27A.51.51 0 0 1 .15 7.17l2.382-2.386c.41-.41.947-.67 1.524-.734h.006l2.4-.238C9.005 1.55 11.087.582 12.623.208c.89-.217 1.59-.232 2.08-.188.244.023.435.06.57.093q.1.026.16.045c.184.06.279.13.351.295l.029.073a3.5 3.5 0 0 1 .157.721c.055.485.051 1.178-.159 2.065m-4.828 7.475.04-.04-.107 1.081a1.54 1.54 0 0 1-.44.913l-1.298 1.3.054-.38c.072-.506-.034-.993-.172-1.418a9 9 0 0 0-.164-.45c.738-.065 1.462-.38 2.087-1.006M5.205 5c-.625.626-.94 1.351-1.004 2.09a9 9 0 0 0-.45-.164c-.424-.138-.91-.244-1.416-.172l-.38.054 1.3-1.3c.245-.246.566-.401.91-.44l1.08-.107zm9.406-3.961c-.38-.034-.967-.027-1.746.163-1.558.38-3.917 1.496-6.937 4.521-.62.62-.799 1.34-.687 2.051.107.676.483 1.362 1.048 1.928.564.565 1.25.941 1.924 1.049.71.112 1.429-.067 2.048-.688 3.079-3.083 4.192-5.444 4.556-6.987.183-.771.18-1.345.138-1.713a3 3 0 0 0-.045-.283 3 3 0 0 0-.3-.041Z"/><path d="M7.009 12.139a7.6 7.6 0 0 1-1.804-1.352A7.6 7.6 0 0 1 3.794 8.86c-1.102.992-1.965 5.054-1.839 5.18.125.126 3.936-.896 5.054-1.902Z"/></svg><span>${startButtonLabel(texts)}</span></div>`;
         resetProgressUI();
     } else if (state === 'processing') {
         startButton.innerHTML = `<div class="btn-content"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16"><path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/></svg><span>${texts.btnPause}</span></div>`;
@@ -3824,7 +3852,6 @@ window.manualCheckForUpdates = manualCheckForUpdates;
 /* ============================================
    JOB QUEUE
    ============================================ */
-let queueState = { jobs: [], active: false };
 let _queuePct = 0;
 let _queueInfo = null;
 
@@ -4066,6 +4093,7 @@ function renderQueue() {
     });
     list.replaceChildren(cards);
 
+    refreshStartButton();
     updateQueueProgress(_queuePct);
     if (_queueInfo) updateQueueInfo(_queueInfo.current, _queueInfo.total, _queueInfo.file, _queueInfo.eta);
 }
