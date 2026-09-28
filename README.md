@@ -214,7 +214,7 @@ Instead of starting right away, press **Queue** next to INITIATE. The current fo
 * Open the **Queue** tab to see every job, its settings, and its status (waiting, running, done, partly done, failed, stopped). Waiting jobs can be moved up/down or removed.
 * Press **Start queue** (or, with the path field empty, the **START QUEUE (N)** button that INITIATE turns into in the Workspace) to process the waiting jobs in order. A failed job never blocks the ones after it; its error stays on its card and you can re-run it.
 * **STOP** ends the running job and pauses the queue. Press **Start queue** again to continue with the jobs still waiting.
-* Finished jobs stay in the list until you press **Clear finished**. The queue is saved to disk, so waiting jobs survive closing the app.
+* Finished jobs stay visible so you can see how each one went, and are cleared automatically as soon as you add something new to the queue or start another run (or press **Clear finished**). The queue is saved to disk, so waiting jobs survive closing the app.
 
 ---
 

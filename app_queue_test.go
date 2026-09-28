@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"photoslicer/engine/queue"
 )
@@ -263,5 +264,95 @@ func TestRunJobBatchReportsPartialFailure(t *testing.T) {
 	}
 	if res.Error == "" {
 		t.Fatal("a partial result should say which chapter failed")
+	}
+}
+
+// finishedJob puts a job into the queue and finishes it with the given status,
+// bypassing EnqueueJob so it does not clear anything itself.
+func finishedJob(t *testing.T, app *App, name string, status queue.Status) {
+	t.Helper()
+	q := app.getJobs()
+	q.Add(queue.Job{Name: name, Input: "/in/" + name, Params: map[string]interface{}{}})
+	job := q.Next()
+	if job == nil || job.Name != name {
+		t.Fatalf("expected %s to be next, got %+v", name, job)
+	}
+	q.Finish(job.ID, queue.Result{Status: status})
+}
+
+func jobNames(app *App) []string {
+	var names []string
+	for _, j := range app.getJobs().Snapshot() {
+		names = append(names, j.Name)
+	}
+	return names
+}
+
+func TestEnqueueJobClearsFinishedJobsButKeepsWaitingOnes(t *testing.T) {
+	app := newQueueTestApp(t)
+	root := t.TempDir()
+
+	finishedJob(t, app, "done-1", queue.StatusDone)
+	finishedJob(t, app, "failed-1", queue.StatusFailed)
+	app.getJobs().Add(queue.Job{Name: "waiting-1", Input: "/in/waiting-1", Params: map[string]interface{}{}})
+
+	dir := writeChapter(t, root, "fresh")
+	if res := app.EnqueueJob(queueParams(dir, filepath.Join(root, "out"))); res["ok"] != true {
+		t.Fatalf("EnqueueJob = %v", res)
+	}
+
+	got := jobNames(app)
+	want := []string{"waiting-1", "fresh"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("jobs after adding a new one = %v, want %v", got, want)
+	}
+}
+
+func TestRejectedEnqueueKeepsTheResults(t *testing.T) {
+	app := newQueueTestApp(t)
+	finishedJob(t, app, "done-1", queue.StatusDone)
+
+	if res := app.EnqueueJob(map[string]interface{}{"directory": ""}); res["ok"] != false {
+		t.Fatalf("an empty path must be rejected, got %v", res)
+	}
+	if got := jobNames(app); len(got) != 1 || got[0] != "done-1" {
+		t.Fatalf("a rejected job must not clear the earlier results, jobs = %v", got)
+	}
+}
+
+func TestRunQueueDropsPreviousResultsButKeepsItsOwn(t *testing.T) {
+	app := newQueueTestApp(t)
+	root := t.TempDir()
+
+	finishedJob(t, app, "old-result", queue.StatusFailed)
+	dir := writeChapter(t, root, "this-run")
+	app.getJobs().Add(queue.Job{Name: "this-run", Input: dir, Params: queueParams(dir, filepath.Join(root, "out"))})
+
+	app.runQueue()
+
+	jobs := app.getJobs().Snapshot()
+	if len(jobs) != 1 || jobs[0].Name != "this-run" || jobs[0].Status != queue.StatusDone {
+		t.Fatalf("after the run the list should hold only this run's finished job, got %+v", jobs)
+	}
+}
+
+func TestStartClearsPreviousQueueResults(t *testing.T) {
+	app := newQueueTestApp(t)
+	root := t.TempDir()
+
+	finishedJob(t, app, "old-result", queue.StatusDone)
+	app.getJobs().Add(queue.Job{Name: "still-waiting", Input: "/in/still-waiting", Params: map[string]interface{}{}})
+
+	app.Start(queueParams(writeChapter(t, root, "one-off"), filepath.Join(root, "out")))
+	deadline := time.Now().Add(20 * time.Second)
+	for atomic.LoadInt32(&app.isBusy) != 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the one-off run did not finish")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	if got := jobNames(app); len(got) != 1 || got[0] != "still-waiting" {
+		t.Fatalf("starting a new operation should drop old results and keep waiting jobs, jobs = %v", got)
 	}
 }

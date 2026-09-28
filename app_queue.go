@@ -100,6 +100,8 @@ func (a *App) EnqueueJob(params map[string]interface{}) map[string]interface{} {
 	mode, _ := info["mode"].(string)
 	items, _ := info["item_count"].(int)
 
+	// Results of earlier operations are only kept until the next one begins
+	a.getJobs().ClearFinished()
 	job := a.getJobs().Add(queue.Job{
 		Name:   name,
 		Input:  input,
@@ -160,6 +162,11 @@ func (a *App) StartQueue() {
 func (a *App) runQueue() {
 	q := a.getJobs()
 	ran, succeeded := 0, 0
+
+	// A new run: drop the results of the previous one. The jobs this run
+	// finishes stay in the list until the next operation.
+	q.ClearFinished()
+	a.pushQueue()
 
 	for atomic.LoadInt32(&a.queueAbort) == 0 {
 		job := q.Next()

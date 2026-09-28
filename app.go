@@ -1072,6 +1072,10 @@ func (a *App) Start(params map[string]interface{}) {
 		defer atomic.StoreInt32(&a.isBusy, 0)
 		defer archive.CleanupAllTempDirs()
 
+		// A new operation: results of the queue's previous run are stale now
+		a.getJobs().ClearFinished()
+		a.pushQueue()
+
 		a.beginRun()
 		a.runJob(params, false)
 		a.endRun()
