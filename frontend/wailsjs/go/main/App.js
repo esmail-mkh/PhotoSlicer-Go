@@ -114,6 +114,10 @@ export function SelectWatermarkFile() {
   return window['go']['main']['App']['SelectWatermarkFile']();
 }
 
+export function SetAlwaysOnTop(arg1) {
+  return window['go']['main']['App']['SetAlwaysOnTop'](arg1);
+}
+
 export function Start(arg1) {
   return window['go']['main']['App']['Start'](arg1);
 }

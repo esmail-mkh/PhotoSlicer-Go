@@ -899,6 +899,11 @@ func (a *App) ToggleMaximiseWindow() {
 	wailsRuntime.WindowToggleMaximise(a.ctx)
 }
 
+// SetAlwaysOnTop keeps the window above all others (or stops doing so).
+func (a *App) SetAlwaysOnTop(on bool) {
+	wailsRuntime.WindowSetAlwaysOnTop(a.ctx, on)
+}
+
 // IsWindowMaximised reports whether the window is currently maximised.
 func (a *App) IsWindowMaximised() bool {
 	return wailsRuntime.WindowIsMaximised(a.ctx)

@@ -58,6 +58,8 @@ export function SelectInputFile():Promise<string>;
 
 export function SelectWatermarkFile():Promise<string>;
 
+export function SetAlwaysOnTop(arg1:boolean):Promise<void>;
+
 export function Start(arg1:Record<string, any>):Promise<void>;
 
 export function StartQueue():Promise<void>;

@@ -82,6 +82,13 @@ const translations = {
         btnPause: "PAUSE",
         btnResume: "RESUME",
         btnStop: "STOP",
+        tbReady: "Ready",
+        tbProcessing: "Processing",
+        tbPaused: "Paused",
+        tbDone: "Done",
+        tbQueue: "Queue",
+        tbPin: "Keep on top",
+        tbUnpin: "Stop keeping on top",
         winMinimize: "Minimize",
         winMaximize: "Maximize",
         winRestore: "Restore",
@@ -332,6 +339,13 @@ const translations = {
         btnPause: "مکث",
         btnResume: "ادامـه",
         btnStop: "توقف",
+        tbReady: "آماده",
+        tbProcessing: "در حال پردازش",
+        tbPaused: "مکث",
+        tbDone: "تمام شد",
+        tbQueue: "صف",
+        tbPin: "نگه‌داشتن بالای بقیه",
+        tbUnpin: "لغو نگه‌داشتن بالا",
         winMinimize: "کوچک کردن",
         winMaximize: "بزرگ کردن",
         winRestore: "بازگردانی",
@@ -568,6 +582,7 @@ function setLanguage(lang) {
     // Re-position tab indicator after text changes shift tab widths
     positionTabIndicator();
     if (typeof refreshMaximisedState === 'function') refreshMaximisedState();
+    if (typeof updateTitlebarSection === 'function') { updateTitlebarSection(); renderTitlebarStatus(); updatePinLabel(); }
 
     // Refresh the presets dropdown/labels for the new language
     if (typeof renderPresetMenu === 'function') {
@@ -675,6 +690,98 @@ function updateWindowShape() {
     }, 60);
 }
 
+/* ---- Title bar: section label, live status pill, keep-on-top ---- */
+const TITLEBAR_SECTION_KEYS = { process: 'tabWorkspace', queue: 'tabQueue', settings: 'tabSettings', aboutUs: 'tabInfo' };
+
+function updateTitlebarSection() {
+    const el = document.getElementById('titlebar-section');
+    if (!el) return;
+    const active = document.querySelector('.tab-content.active');
+    const text = (translations[currentLang] || {})[TITLEBAR_SECTION_KEYS[active ? active.id : 'process']];
+    if (text) el.textContent = text;
+}
+
+let _tbState = 'idle'; // idle | processing | paused | done
+let _tbPct = 0;
+let _tbDoneTimer = null;
+
+function renderTitlebarStatus() {
+    const pill = document.getElementById('status-pill');
+    if (!pill) return;
+    const t = translations[currentLang] || {};
+    const running = _tbState === 'processing' || _tbState === 'paused';
+    const label = _tbState === 'processing' ? (queueState && queueState.active ? t.tbQueue : t.tbProcessing)
+        : _tbState === 'paused' ? t.tbPaused
+        : _tbState === 'done' ? t.tbDone
+        : t.tbReady;
+    pill.dataset.state = _tbState;
+    document.getElementById('status-pill-text').textContent = label || '';
+    document.getElementById('status-pill-pct').textContent = running ? Math.round(_tbPct) + '%' : '';
+    pill.style.setProperty('--p', (running ? _tbPct : 0) + '%');
+}
+
+// Follows the main button's state (idle / processing / paused / busy)
+function syncTitlebarStatus(buttonState) {
+    if (buttonState === 'processing' || buttonState === 'busy') {
+        clearTimeout(_tbDoneTimer);
+        _tbState = 'processing';
+    } else if (buttonState === 'paused') {
+        _tbState = 'paused';
+    } else if (_tbState !== 'done') {
+        _tbState = 'idle'; // a finished job keeps showing "Done" until its timer runs out
+        _tbPct = 0;
+    }
+    renderTitlebarStatus();
+}
+
+function markTitlebarDone() {
+    clearTimeout(_tbDoneTimer);
+    _tbState = 'done';
+    _tbPct = 100;
+    renderTitlebarStatus();
+    _tbDoneTimer = setTimeout(() => {
+        if (_tbState === 'done') {
+            _tbState = 'idle';
+            _tbPct = 0;
+            renderTitlebarStatus();
+        }
+    }, 6000);
+}
+
+function setTitlebarProgress(pct) {
+    _tbPct = pct;
+    if (_tbState === 'processing' || _tbState === 'paused') renderTitlebarStatus();
+}
+
+// Keep the window above others. Remembered in the browser storage, like a
+// per-user convenience, and re-applied once the backend is ready.
+let _pinned = false;
+try { _pinned = localStorage.getItem('photoslicer.pinned') === '1'; } catch (e) { /* storage unavailable */ }
+
+function updatePinLabel() {
+    const button = document.getElementById('win-pin');
+    if (!button) return;
+    const t = translations[currentLang] || {};
+    const label = _pinned ? t.tbUnpin : t.tbPin;
+    if (label) {
+        button.title = label;
+        button.setAttribute('aria-label', label);
+    }
+    button.setAttribute('aria-pressed', String(_pinned));
+    document.body.classList.toggle('is-pinned', _pinned);
+}
+
+function togglePinWindow() {
+    _pinned = !_pinned;
+    try { localStorage.setItem('photoslicer.pinned', _pinned ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+    updatePinLabel();
+    window.pywebview?.api?.set_always_on_top?.(_pinned);
+}
+
+window.addEventListener('pywebviewready', function() {
+    if (_pinned) window.pywebview?.api?.set_always_on_top?.(true);
+});
+
 // Double-clicking the bar (but not its buttons) maximises or restores the window
 document.getElementById('titlebar').addEventListener('dblclick', e => {
     if (!e.target.closest('.win-btn')) toggleMaximiseWindow();
@@ -709,6 +816,7 @@ function showTab(tabName) {
     }
 
     positionTabIndicator({ travel: true });
+    updateTitlebarSection();
     updateSettings();
     if (tabName === 'queue') refreshQueue();
 }
@@ -2999,6 +3107,7 @@ function setButtonState(state) {
         showProgressUI();
     }
     if (typeof renderQueue === 'function') renderQueue();
+    if (typeof syncTitlebarStatus === 'function') syncTitlebarStatus(state);
 }
 
 /* ============================================
@@ -3156,6 +3265,7 @@ var STEP_ALIASES = {
 
 function updateStepIndicator(step) {
     var raw = (step || '').toString().toLowerCase();
+    if (raw === 'done' && typeof markTitlebarDone === 'function') markTitlebarDone();
     var targetStep = STEP_ALIASES[raw] || raw;
 
     // Filter to visible steps (watermark step may be hidden via display: none)
@@ -4002,6 +4112,7 @@ function setTabsProgress(pct) {
 function updateQueueProgress(pct) {
     _queuePct = pct;
     setTabsProgress(pct);
+    setTitlebarProgress(pct);
     const fill = document.getElementById('queue-running-fill');
     if (fill) fill.style.width = pct + '%';
     const label = document.getElementById('queue-running-pct');
