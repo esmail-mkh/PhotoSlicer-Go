@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -317,4 +318,40 @@ func TestOpenURL(t *testing.T) {
 	app.OpenURL("")
 }
 
+func TestSettingsScriptRevealsTheWindowOnlyAfterApplyingThem(t *testing.T) {
+	app := NewApp()
+	var scripts []string
+	app.jsSink = func(js string) { scripts = append(scripts, js) }
 
+	app.applySettingsToDOM(map[string]interface{}{"language": "en", "theme": "ruby"})
+
+	if len(scripts) != 1 {
+		t.Fatalf("expected one script, got %d", len(scripts))
+	}
+	js := scripts[0]
+	show := strings.Index(js, "show_window")
+	if show < 0 {
+		t.Fatal("the settings script must ask the backend to show the window (the window starts hidden)")
+	}
+	for _, step := range []string{"setTheme(", "setLanguage(", "showTab(", "initPresets("} {
+		at := strings.Index(js, step)
+		if at < 0 {
+			t.Fatalf("settings script never calls %s", step)
+		}
+		if at > show {
+			t.Errorf("%s runs after the window is revealed, so its change would be visible", step)
+		}
+	}
+}
+
+func TestShowWindowOnlyRevealsOnce(t *testing.T) {
+	app := NewApp() // no window context: nothing to show, and nothing may panic
+	app.ShowWindow()
+	app.showWindowOnce()
+	if atomic.LoadInt32(&app.windowShown) != 0 {
+		t.Fatal("without a window the reveal must not be marked as done")
+	}
+
+	app.windowShown = 1
+	app.ShowWindow() // already revealed: must be a no-op
+}

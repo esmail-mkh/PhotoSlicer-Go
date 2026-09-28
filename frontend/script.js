@@ -87,8 +87,6 @@ const translations = {
         tbPaused: "Paused",
         tbDone: "Done",
         tbQueue: "Queue",
-        tbPin: "Keep on top",
-        tbUnpin: "Stop keeping on top",
         winMinimize: "Minimize",
         winMaximize: "Maximize",
         winRestore: "Restore",
@@ -344,8 +342,6 @@ const translations = {
         tbPaused: "مکث",
         tbDone: "تمام شد",
         tbQueue: "صف",
-        tbPin: "نگه‌داشتن بالای بقیه",
-        tbUnpin: "لغو نگه‌داشتن بالا",
         winMinimize: "کوچک کردن",
         winMaximize: "بزرگ کردن",
         winRestore: "بازگردانی",
@@ -582,7 +578,7 @@ function setLanguage(lang) {
     // Re-position tab indicator after text changes shift tab widths
     positionTabIndicator();
     if (typeof refreshMaximisedState === 'function') refreshMaximisedState();
-    if (typeof updateTitlebarSection === 'function') { updateTitlebarSection(); renderTitlebarStatus(); updatePinLabel(); }
+    if (typeof updateTitlebarSection === 'function') { updateTitlebarSection(); renderTitlebarStatus(); }
 
     // Refresh the presets dropdown/labels for the new language
     if (typeof renderPresetMenu === 'function') {
@@ -752,35 +748,6 @@ function setTitlebarProgress(pct) {
     _tbPct = pct;
     if (_tbState === 'processing' || _tbState === 'paused') renderTitlebarStatus();
 }
-
-// Keep the window above others. Remembered in the browser storage, like a
-// per-user convenience, and re-applied once the backend is ready.
-let _pinned = false;
-try { _pinned = localStorage.getItem('photoslicer.pinned') === '1'; } catch (e) { /* storage unavailable */ }
-
-function updatePinLabel() {
-    const button = document.getElementById('win-pin');
-    if (!button) return;
-    const t = translations[currentLang] || {};
-    const label = _pinned ? t.tbUnpin : t.tbPin;
-    if (label) {
-        button.title = label;
-        button.setAttribute('aria-label', label);
-    }
-    button.setAttribute('aria-pressed', String(_pinned));
-    document.body.classList.toggle('is-pinned', _pinned);
-}
-
-function togglePinWindow() {
-    _pinned = !_pinned;
-    try { localStorage.setItem('photoslicer.pinned', _pinned ? '1' : '0'); } catch (e) { /* storage unavailable */ }
-    updatePinLabel();
-    window.pywebview?.api?.set_always_on_top?.(_pinned);
-}
-
-window.addEventListener('pywebviewready', function() {
-    if (_pinned) window.pywebview?.api?.set_always_on_top?.(true);
-});
 
 // Double-clicking the bar (but not its buttons) maximises or restores the window
 document.getElementById('titlebar').addEventListener('dblclick', e => {

@@ -23,8 +23,8 @@ func main() {
 		Height:    baseWindowLayout.Height,
 		MinWidth:  baseWindowLayout.MinWidth,
 		MinHeight: baseWindowLayout.MinHeight,
-		// Shown by App.fitWindowToScreen once it has sized the window for the
-		// monitor, so the window never opens at one size and jumps to another.
+		// Shown by the frontend (App.ShowWindow) once the saved theme, language
+		// and layout are applied, so nothing visibly changes right after launch.
 		StartHidden: true,
 		// The native frame is replaced by the title bar in frontend/index.html.
 		// Wails keeps the drop shadow and, on Windows 11, the rounded corners.

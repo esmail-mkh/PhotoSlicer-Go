@@ -23,6 +23,9 @@ const (
 	dwmwaWindowCornerPref = 33 // DWMWA_WINDOW_CORNER_PREFERENCE
 	dwmwcpRound           = 2  // DWMWCP_ROUND
 	defaultDPI            = 96
+
+	swMaximize = 3 // SW_MAXIMIZE
+	swRestore  = 9 // SW_RESTORE
 )
 
 var (
@@ -36,6 +39,7 @@ var (
 	procGetClassNameW            = user32.NewProc("GetClassNameW")
 	procIsWindow                 = user32.NewProc("IsWindow")
 	procIsZoomed                 = user32.NewProc("IsZoomed")
+	procShowWindow               = user32.NewProc("ShowWindow")
 	procGetWindowRect            = user32.NewProc("GetWindowRect")
 	procSetWindowRgn             = user32.NewProc("SetWindowRgn")
 	procGetDpiForWindow          = user32.NewProc("GetDpiForWindow")
@@ -147,4 +151,25 @@ func applyWindowShape(radius int) {
 	}
 	// The system owns the region once it is set, so it must not be deleted here
 	procSetWindowRgn.Call(hwnd, region, 1)
+}
+
+// toggleMaximise maximises the window, or restores it if it already is, with
+// the window API directly. Before maximising it drops the rounded region: that
+// region was cut for the old size and would keep clipping the window to it.
+// It reports false if the window could not be found.
+func toggleMaximise() bool {
+	shapeMu.Lock()
+	defer shapeMu.Unlock()
+
+	hwnd := findAppWindow()
+	if hwnd == 0 {
+		return false
+	}
+	if zoomed, _, _ := procIsZoomed.Call(hwnd); zoomed != 0 {
+		procShowWindow.Call(hwnd, swRestore)
+		return true
+	}
+	procSetWindowRgn.Call(hwnd, 0, 1)
+	procShowWindow.Call(hwnd, swMaximize)
+	return true
 }

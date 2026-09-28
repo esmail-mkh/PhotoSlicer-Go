@@ -154,6 +154,8 @@ type App struct {
 	isBusy               int32
 	startTime            time.Time
 	lastOutput           string
+	jsSink               func(js string) // tests capture the scripts sent to the page here
+	windowShown          int32           // set once the window has been revealed
 	jobsMu               sync.Mutex
 	jobs                 *queue.Queue
 	queueActive          int32
@@ -234,6 +236,9 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.fitWindowToScreen(ctx)
+	// The window stays hidden until the frontend has applied the saved settings
+	// (see ShowWindow). Show it regardless if that never happens.
+	time.AfterFunc(startupShowDeadline, a.showWindowOnce)
 	wailsRuntime.WindowExecJS(ctx, fmt.Sprintf("window.__APP_VERSION__ = '%s'; if (typeof applyAppVersion === 'function') applyAppVersion('%s');", constants.Version, constants.Version))
 	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		if len(paths) > 0 {
@@ -245,12 +250,13 @@ func (a *App) startup(ctx context.Context) {
 	})
 }
 
-// fitWindowToScreen resizes the window for the monitor it is on. The window is
-// created hidden (see main.go) so that this never shows as a jump, which means
-// it has to be shown again on every path out of here.
-func (a *App) fitWindowToScreen(ctx context.Context) {
-	defer wailsRuntime.WindowShow(ctx)
+// startupShowDeadline is how long the hidden window may wait for the frontend
+// before it is shown anyway.
+const startupShowDeadline = 5 * time.Second
 
+// fitWindowToScreen resizes the window for the monitor it is on. The window is
+// created hidden (see main.go), so this never shows as a jump.
+func (a *App) fitWindowToScreen(ctx context.Context) {
 	screens, _ := wailsRuntime.ScreenGetAll(ctx)
 	screen, ok := pickScreen(screens)
 	if !ok {
@@ -480,6 +486,10 @@ func (a *App) saveSettingsToDisk(settings map[string]interface{}) {
 }
 
 func (a *App) execJS(js string) {
+	if a.jsSink != nil {
+		a.jsSink(js)
+		return
+	}
 	if a.ctx != nil {
 		wailsRuntime.WindowExecJS(a.ctx, js)
 	}
@@ -569,9 +579,6 @@ func (a *App) clearSourceDirectory() {
 
 // AppReady is called when the frontend DOM and Wails runtime are ready.
 func (a *App) AppReady() {
-	if a.ctx != nil {
-		wailsRuntime.WindowShow(a.ctx) // no-op if already visible; see fitWindowToScreen
-	}
 	a.UpdateWindowShape()
 	a.execJS(fmt.Sprintf(`if (typeof applyAppVersion === 'function') applyAppVersion('%s');`, constants.Version))
 	settings := a.loadSettings()
@@ -692,6 +699,12 @@ func (a *App) applySettingsToDOM(settings map[string]interface{}) {
 			if (typeof showTab === 'function') showTab(s.selected_tab || 'process');
 			if (typeof syncFormatDropdown === 'function') syncFormatDropdown();
 			if (typeof initPresets === 'function') initPresets(%s, %s);
+
+			// Everything is in place: only now let the window appear, so the theme,
+			// language and layout never visibly change under the user.
+			setTimeout(function() {
+				if (window.pywebview && window.pywebview.api && window.pywebview.api.show_window) window.pywebview.api.show_window();
+			}, 80);
 		})();
 	`, sJSON, presetsJSON, defaultPresetJSON)
 
@@ -896,12 +909,32 @@ func (a *App) CloseWindow() {
 
 // ToggleMaximiseWindow maximises the window, or restores it if it already is.
 func (a *App) ToggleMaximiseWindow() {
-	wailsRuntime.WindowToggleMaximise(a.ctx)
+	// On Windows this goes straight to the window API and first drops the
+	// rounded shape, which would otherwise keep clipping a maximised window to
+	// its old size. Elsewhere the Wails call does the job.
+	if !toggleMaximise() {
+		wailsRuntime.WindowToggleMaximise(a.ctx)
+	}
+	// The new size settles a moment later; give the window its shape for it.
+	go func() {
+		time.Sleep(250 * time.Millisecond)
+		a.UpdateWindowShape()
+	}()
 }
 
-// SetAlwaysOnTop keeps the window above all others (or stops doing so).
-func (a *App) SetAlwaysOnTop(on bool) {
-	wailsRuntime.WindowSetAlwaysOnTop(a.ctx, on)
+// ShowWindow reveals the window. The frontend calls it once the saved theme,
+// language and layout are in place, so the user never sees them change.
+func (a *App) ShowWindow() {
+	a.showWindowOnce()
+}
+
+// showWindowOnce reveals the window the first time it is called. Later calls do
+// nothing, so the startup deadline cannot pull a window the user has already
+// minimised back onto the screen.
+func (a *App) showWindowOnce() {
+	if a.ctx != nil && atomic.CompareAndSwapInt32(&a.windowShown, 0, 1) {
+		wailsRuntime.WindowShow(a.ctx)
+	}
 }
 
 // IsWindowMaximised reports whether the window is currently maximised.
