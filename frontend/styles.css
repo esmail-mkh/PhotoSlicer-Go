@@ -4005,76 +4005,178 @@ select:focus {
 .mini-open-btn svg { width: 13px; height: 13px; }
 
 /* ============================================
-   PROGRESS BAR — Polished Glassmorphism
+   PROGRESS BAR — glass tube, flowing fill, glowing head
    ============================================ */
 
-/* --- Progress Track --- */
+/* The card owns a small palette so a paused job can recolour everything inside
+   it in one place. */
+.status-area {
+    --pg-a: var(--theme-solid);
+    --pg-b: var(--theme-solid-2, var(--theme-solid));
+    --pg-glow: var(--theme-glow);
+    --pg-glow-strong: var(--theme-glow-strong);
+    --pg-soft: var(--theme-glow-soft);
+}
+
+body.is-paused .status-area {
+    --pg-a: #fbbf24;
+    --pg-b: #f59e0b;
+    --pg-glow: rgba(251, 191, 36, 0.45);
+    --pg-glow-strong: rgba(251, 191, 36, 0.65);
+    --pg-soft: rgba(251, 191, 36, 0.16);
+}
+
+/* While a job runs the card picks up a soft wash of the theme colour */
+body.workspace-processing .status-area {
+    background:
+        radial-gradient(120% 85% at 50% -12%, var(--pg-soft), transparent 62%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.03), transparent 60%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.24));
+    border-color: var(--pg-soft);
+}
+
+body.workspace-processing .status-area::before {
+    left: 6%;
+    right: 6%;
+    background: linear-gradient(90deg, transparent, var(--pg-a), transparent);
+    opacity: 0.55;
+}
+
+/* --- Status line: live dot and a timer pill --- */
+/* At rest the line is all the card holds, so it should not leave a gap below it */
+.status-header {
+    transition: margin-bottom 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body:not(.workspace-processing) .status-header {
+    margin-bottom: 0;
+}
+
+body.workspace-processing .status {
+    color: var(--text-primary);
+}
+
+body.workspace-processing .status::before {
+    background: var(--pg-a);
+    box-shadow: 0 0 0 3px var(--pg-soft), 0 0 10px var(--pg-glow);
+}
+
+body.is-processing .status::before {
+    animation: statusDot 1.6s ease-in-out infinite;
+}
+
+@keyframes statusDot {
+    50% { box-shadow: 0 0 0 6px transparent, 0 0 14px var(--pg-glow-strong); }
+}
+
+#timer {
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--pg-soft);
+    font-variant-numeric: tabular-nums;
+}
+
+body.workspace-processing #timer {
+    color: var(--pg-a);
+    text-shadow: 0 0 12px var(--pg-soft);
+}
+
+/* --- Progress Track (glass tube) --- */
 .progress-track {
     height: 0;
     max-height: 0;
     opacity: 0;
     margin-bottom: 0;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(255, 255, 255, 0.03));
-    border-radius: 10px;
-    overflow: hidden;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.3));
+    border-radius: 999px;
     position: relative;
-    transform: scaleY(0.92);
+    transform: scaleY(0.9);
     transform-origin: center;
     transition: all 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: none;
 }
 
 body.workspace-processing .progress-track {
-    height: 12px;
-    max-height: 12px;
+    height: 16px;
+    max-height: 16px;
     opacity: 1;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     transform: scaleY(1);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     box-shadow:
-        inset 0 2px 5px rgba(0, 0, 0, 0.5),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.04),
-        0 0 24px var(--theme-glow-soft),
-        0 0 6px var(--theme-glow-soft);
+        inset 0 2px 5px rgba(0, 0, 0, 0.55),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+        0 0 22px var(--pg-soft);
 }
 
-/* Shimmer sweep on active track */
-.progress-track::after {
+/* Quarter marks, so 25 / 50 / 75 % can be read at a glance */
+.progress-track::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-    animation: shimmer 2.8s infinite;
-    animation-play-state: paused;
+    border-radius: inherit;
+    z-index: 2;
     pointer-events: none;
-    z-index: 5;
+    background:
+        linear-gradient(90deg, transparent 24.6%, rgba(255, 255, 255, 0.14) 24.6% 25.3%, transparent 25.3%),
+        linear-gradient(90deg, transparent 49.6%, rgba(255, 255, 255, 0.14) 49.6% 50.3%, transparent 50.3%),
+        linear-gradient(90deg, transparent 74.6%, rgba(255, 255, 255, 0.14) 74.6% 75.3%, transparent 75.3%);
 }
 
-@keyframes shimmer {
-    from { transform: translateX(-100%); }
-    to { transform: translateX(200%); }
+/* Glass highlight along the top of the tube */
+.progress-track::after {
+    content: '';
+    position: absolute;
+    left: 7px;
+    right: 7px;
+    top: 1px;
+    height: 36%;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0));
+    pointer-events: none;
+    z-index: 3;
+}
+
+/* Nothing done yet but the job is running (scanning): a glint sweeps the empty tube */
+body.is-processing .progress-track.is-empty::after {
+    inset: 1px;
+    height: auto;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, var(--pg-glow-strong), transparent) no-repeat;
+    background-size: 34% 100%;
+    animation: progressScan 1.5s ease-in-out infinite;
+}
+
+@keyframes progressScan {
+    from { background-position: -30% 0; }
+    to { background-position: 130% 0; }
+}
+
+[dir="rtl"] .progress-track.is-empty::after {
+    animation-direction: reverse;
 }
 
 /* --- Progress Fill --- */
 .progress-fill {
     height: 100%;
     width: 0%;
-    background:
-        linear-gradient(90deg, var(--theme-solid), var(--theme-solid-2), var(--theme-solid), var(--theme-solid-2));
+    min-width: 10px;
+    background: linear-gradient(90deg, var(--pg-a), var(--pg-b), var(--pg-a), var(--pg-b));
     background-size: 300% 100%;
     animation: progressFlow 2.8s linear infinite;
     animation-play-state: paused;
-    border-radius: 10px;
-    transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    border-radius: 999px;
+    transition: width 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
     box-shadow:
-        0 0 20px var(--theme-glow-strong),
-        0 0 8px var(--theme-glow),
-        inset 0 1.5px 0 rgba(255, 255, 255, 0.45);
+        0 0 18px var(--pg-glow-strong),
+        0 0 6px var(--pg-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
     position: relative;
-    min-width: 2px;
 }
 
-/* Zero-state hiding for progress fill: prevent glowing dot/bar when at 0% */
+/* Nothing to show yet: hide the bar, its glow and the head so no stray dot remains */
+.progress-track.is-empty .progress-fill,
 .progress-fill[style*="width: 0%"],
 .progress-fill[style*="width: 0.0%"],
 .progress-fill[style*="width: 0;"],
@@ -4089,32 +4191,71 @@ body.workspace-processing .progress-track {
     100% { background-position: 300% 50%; }
 }
 
-/* Only animate while actively running */
-body.is-processing .progress-track::after,
-body.is-processing .progress-fill {
-    animation-play-state: running;
+/* Gloss and moving stripes */
+.progress-fill::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.06) 48%, rgba(0, 0, 0, 0.1) 52%, rgba(0, 0, 0, 0.22) 100%),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.16) 25%, transparent 25%, transparent 50%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.16) 75%, transparent 75%);
+    background-size: 100% 100%, 20px 20px;
+    animation: progressStripes 0.9s linear infinite;
+    animation-play-state: paused;
 }
 
-/* Trailing edge highlight */
+@keyframes progressStripes {
+    from { background-position: 0 0, 0 0; }
+    to { background-position: 0 0, 20px 0; }
+}
+
+/* Glowing head at the leading edge */
 .progress-fill::after {
     content: '';
     position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: linear-gradient(180deg, rgba(255,255,255,0.8), rgba(255,255,255,0.2));
-    border-radius: 0 10px 10px 0;
-    filter: blur(1.5px);
+    top: 50%;
+    inset-inline-end: -5px;
+    width: 12px;
+    height: 12px;
+    margin-top: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 36%, var(--pg-a) 72%);
+    box-shadow:
+        0 0 10px 3px var(--pg-glow-strong),
+        0 0 3px 1px rgba(255, 255, 255, 0.8);
     pointer-events: none;
-    z-index: 3;
+    z-index: 4;
+    animation: progressHead 1.4s ease-in-out infinite;
+    animation-play-state: paused;
+    transition: opacity 0.3s ease;
 }
 
-/* RTL Trailing edge highlight (anchor to leading head on the left) */
-[dir="rtl"] .progress-fill::after {
-    right: auto;
-    left: 0;
-    border-radius: 10px 0 0 10px;
+@keyframes progressHead {
+    50% {
+        transform: scale(1.22);
+        box-shadow:
+            0 0 16px 5px var(--pg-glow-strong),
+            0 0 4px 1px rgba(255, 255, 255, 0.9);
+    }
+}
+
+.progress-track.is-complete .progress-fill::after {
+    opacity: 0;
+}
+
+/* Only animate while actively running */
+body.is-processing .progress-fill,
+body.is-processing .progress-fill::before,
+body.is-processing .progress-fill::after {
+    animation-play-state: running;
+}
+
+/* The bar grows from the right in RTL, so its motion runs that way too */
+[dir="rtl"] .progress-fill,
+[dir="rtl"] .progress-fill::before {
+    animation-direction: reverse;
 }
 
 /* --- Progress Text (legacy, kept hidden) --- */
@@ -4912,11 +5053,11 @@ body.workspace-processing .workspace-controls {
     overflow: hidden;
 }
 
-/* Progress Meta Row */
+/* Progress Meta Row: big percentage and file counter */
 .progress-meta {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     margin-bottom: 0;
     padding: 0 2px;
     transition: var(--transition-med);
@@ -4931,44 +5072,79 @@ body.workspace-processing .workspace-controls {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
-    max-height: 60px;
-    margin-bottom: 8px;
+    max-height: 80px;
+    margin-bottom: 12px;
+    overflow: visible;
 }
 
 .progress-percent {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--theme-solid);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 3px;
     font-family: 'Poppins', sans-serif;
-    letter-spacing: 0.5px;
-    text-shadow: 0 0 10px var(--theme-glow-soft);
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
 }
 
-.progress-detail {
-    font-size: 0.72rem;
-    font-weight: 500;
+.pp-num {
+    font-size: 2.3rem;
+    letter-spacing: -1px;
+    color: var(--pg-a);
+    background: linear-gradient(180deg, #fff 8%, var(--pg-a) 105%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 14px var(--pg-glow));
+}
+
+.pp-sign {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--pg-a);
+    opacity: 0.75;
+}
+
+.progress-files {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     color: var(--text-tertiary);
-    max-width: 70%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: right;
+    margin-bottom: 3px;
 }
 
-[dir="rtl"] .progress-detail {
-    text-align: left;
+.progress-files .pi-icon {
+    width: 13px;
+    height: 13px;
 }
 
-/* Progress Info Grid */
+.progress-files-count {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.progress-files-label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.1px;
+}
+
+/* Progress Info Tiles */
 .progress-info {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: 1.45fr 1fr 1fr;
     gap: 0;
     margin: 0;
     padding: 0;
-    background: linear-gradient(160deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.01) 60%, transparent 100%);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 10px;
     transition: var(--transition-med);
     opacity: 0;
     transform: translateY(6px);
@@ -4980,9 +5156,9 @@ body.workspace-processing .workspace-controls {
 .progress-info.visible {
     opacity: 1;
     transform: translateY(0);
-    gap: 6px;
-    margin: 10px 0 12px;
-    padding: 10px;
+    gap: 8px;
+    margin: 0 0 14px;
+    padding: 1px;
     max-height: 200px;
 }
 
@@ -4990,23 +5166,47 @@ body.workspace-processing .workspace-controls {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
+    gap: 5px;
+    min-width: 0;
+    padding: 9px 8px 10px;
     text-align: center;
+    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.progress-info-head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    color: var(--text-tertiary);
+}
+
+.pi-icon {
+    width: 11px;
+    height: 11px;
+    flex: none;
+    color: var(--pg-a);
+    opacity: 0.9;
 }
 
 .progress-info-label {
-    font-size: 0.58rem;
+    font-size: 0.56rem;
     font-weight: 700;
     color: var(--text-tertiary);
     text-transform: uppercase;
-    letter-spacing: 1.2px;
+    letter-spacing: 1.1px;
+    white-space: nowrap;
 }
 
 .progress-info-value {
-    font-size: 0.74rem;
+    font-size: 0.84rem;
     font-weight: 600;
-    color: var(--text-secondary);
+    color: var(--text-primary);
     font-family: 'Poppins', sans-serif;
+    font-variant-numeric: tabular-nums;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -5019,7 +5219,6 @@ body.workspace-processing .workspace-controls {
 #pi-eta {
     direction: ltr !important;
     unicode-bidi: isolate;
-    text-align: center;
 }
 
 #pi-current {
@@ -5039,9 +5238,9 @@ body.workspace-processing .workspace-controls {
 /* Step Indicator */
 .step-indicator {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 2px;
+    gap: 4px;
     margin: 0;
     padding: 0;
     opacity: 0;
@@ -5054,8 +5253,8 @@ body.workspace-processing .workspace-controls {
 .step-indicator.visible {
     opacity: 1;
     transform: translateY(0);
-    margin: 10px 0 8px;
-    padding: 8px 6px;
+    margin: 0 0 2px;
+    padding: 6px 2px 2px;
     max-height: 200px;
 }
 
@@ -5063,62 +5262,99 @@ body.workspace-processing .workspace-controls {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     position: relative;
     flex: 1;
     min-width: 0;
 }
 
-/* --- Step Icon (replaces dot) --- */
+/* --- Step dot --- */
 .step-dot {
-    width: 20px;
-    height: 20px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     background: rgba(255, 255, 255, 0.04);
-    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.09);
     transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     position: relative;
     flex-shrink: 0;
     box-shadow: 0 0 0 0 transparent;
 }
 
+/* Ring that ripples out of the step being worked on */
+.step-dot::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid var(--pg-a);
+    opacity: 0;
+    pointer-events: none;
+}
+
+body.is-processing .step.active .step-dot::before {
+    animation: stepRing 1.8s ease-out infinite;
+}
+
+@keyframes stepRing {
+    0% { transform: scale(0.85); opacity: 0.7; }
+    100% { transform: scale(1.55); opacity: 0; }
+}
+
 .step-icon {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
     color: var(--text-tertiary);
     transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-    opacity: 0.5;
+    opacity: 0.55;
 }
 
 .step.active .step-dot {
-    background: var(--theme-gradient-soft);
-    border-color: var(--theme-solid);
-    box-shadow: 0 0 0 3px var(--theme-glow-soft), 0 0 12px var(--theme-glow);
-    transform: scale(1.12);
+    background: linear-gradient(135deg, var(--pg-a), var(--pg-b));
+    border-color: transparent;
+    box-shadow: 0 0 0 4px var(--pg-soft), 0 0 16px var(--pg-glow);
+    transform: scale(1.08);
 }
 
 .step.active .step-icon {
-    color: var(--theme-solid);
+    color: var(--on-theme-text, #fff);
     opacity: 1;
-    filter: drop-shadow(0 0 4px var(--theme-glow));
 }
 
+/* Finished steps swap their icon for a check mark */
 .step.completed .step-dot {
-    background: linear-gradient(135deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.04));
-    border-color: var(--theme-glow-soft);
-    box-shadow: 0 0 0 2px var(--theme-glow-soft);
+    background: var(--pg-soft);
+    border-color: var(--pg-a);
 }
 
 .step.completed .step-icon {
-    color: var(--theme-solid);
-    opacity: 0.7;
+    opacity: 0;
+    transform: scale(0.4);
+}
+
+.step.completed .step-dot::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 13px;
+    height: 13px;
+    background: var(--pg-a);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.4 8.6l3.1 3.1 6.1-7.2'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' d='M3.4 8.6l3.1 3.1 6.1-7.2'/%3E%3C/svg%3E") center / contain no-repeat;
+    animation: stepCheck 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes stepCheck {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
 }
 
 .step-label {
-    font-size: 0.6rem;
+    font-size: 0.58rem;
     font-weight: 600;
     color: var(--text-tertiary);
     text-transform: uppercase;
@@ -5128,8 +5364,9 @@ body.workspace-processing .workspace-controls {
 }
 
 .step.active .step-label {
-    color: var(--theme-solid);
-    text-shadow: 0 0 8px var(--theme-glow-soft);
+    color: var(--pg-a);
+    font-weight: 700;
+    text-shadow: 0 0 8px var(--pg-soft);
 }
 
 .step.completed .step-label {
@@ -5139,23 +5376,24 @@ body.workspace-processing .workspace-controls {
 /* Step connector line */
 .step-line {
     flex: 1;
-    height: 2px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 1px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 2px;
     position: relative;
-    margin-top: -8px;
+    margin-top: 12.5px;
     min-width: 8px;
+    overflow: hidden;
 }
 
 .step-line::after {
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
+    inset-inline-start: 0;
     height: 100%;
     width: 0%;
-    background: var(--theme-gradient);
-    border-radius: 1px;
+    background: linear-gradient(90deg, var(--pg-a), var(--pg-b));
+    border-radius: 2px;
     transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -5163,14 +5401,28 @@ body.workspace-processing .workspace-controls {
     width: 100%;
 }
 
-/* RTL */
-[dir="rtl"] .step-indicator {
-    flex-direction: row;
+/* The connector leading out of the active step glints while work is in flight */
+.step-line.current::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--pg-a), transparent) no-repeat;
+    background-size: 45% 100%;
+    animation: stepLineFlow 1.4s ease-in-out infinite;
+    animation-play-state: paused;
 }
 
-[dir="rtl"] .step-line::after {
-    left: auto;
-    right: 0;
+body.is-processing .step-line.current::before {
+    animation-play-state: running;
+}
+
+@keyframes stepLineFlow {
+    from { background-position: -30% 0; }
+    to { background-position: 130% 0; }
+}
+
+[dir="rtl"] .step-line.current::before {
+    animation-direction: reverse;
 }
 
 /* ============================================

@@ -372,32 +372,51 @@
                         </button>
                     </div>
 
-                    <!-- Progress Meta -->
+                    <!-- Progress Meta: the big percentage and the file counter -->
                     <div class="progress-meta" id="progress-meta">
-                        <span class="progress-percent" id="progress-percent">0%</span>
-                        <span class="progress-detail" id="progress-detail" data-i18n="readyStatus">Ready to Slice</span>
+                        <div class="progress-percent" id="progress-percent" dir="ltr" aria-hidden="true"><span class="pp-num">0</span><span class="pp-sign">%</span></div>
+                        <div class="progress-files">
+                            <svg class="pi-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="1.7" y="4.6" width="9.6" height="9" rx="1.6"/>
+                                <path d="M4.6 2.4h7.7a1.6 1.6 0 0 1 1.6 1.6v7.4"/>
+                            </svg>
+                            <span class="progress-files-count" id="pi-files" dir="ltr">0/0</span>
+                            <span class="progress-files-label" data-i18n="filesLabel">Files</span>
+                        </div>
                     </div>
 
-                    <div class="progress-track">
+                    <div class="progress-track is-empty" id="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="status">
                         <div class="progress-fill" id="pr" style="width: 0%;"></div>
                     </div>
 
-                    <!-- Progress Info Grid -->
+                    <!-- Progress Info Tiles -->
                     <div class="progress-info" id="progress-info">
                         <div class="progress-info-item">
-                            <span class="progress-info-label" data-i18n="filesLabel">Files</span>
-                            <span class="progress-info-value" id="pi-files" dir="ltr">0/0</span>
-                        </div>
-                        <div class="progress-info-item">
-                            <span class="progress-info-label" data-i18n="currentLabel">Current</span>
+                            <div class="progress-info-head">
+                                <svg class="pi-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                                    <path d="M9.4 1 3.2 8.9h3.6L6 15l6.8-8.2H9.2z"/>
+                                </svg>
+                                <span class="progress-info-label" data-i18n="currentLabel">Current</span>
+                            </div>
                             <span class="progress-info-value" id="pi-current" dir="ltr">-</span>
                         </div>
                         <div class="progress-info-item">
-                            <span class="progress-info-label" data-i18n="elapsedLabel">Elapsed</span>
+                            <div class="progress-info-head">
+                                <svg class="pi-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="8" cy="9" r="5.3"/>
+                                    <path d="M8 9V6.2M6.2 1.6h3.6"/>
+                                </svg>
+                                <span class="progress-info-label" data-i18n="elapsedLabel">Elapsed</span>
+                            </div>
                             <span class="progress-info-value" id="pi-elapsed" dir="ltr">00:00:00</span>
                         </div>
                         <div class="progress-info-item">
-                            <span class="progress-info-label" data-i18n="etaLabel">ETA</span>
+                            <div class="progress-info-head">
+                                <svg class="pi-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M3.6 1.6h8.8M3.6 14.4h8.8M4.6 1.6c0 3.2 3.4 4.2 3.4 6.4s-3.4 3.2-3.4 6.4M11.4 1.6c0 3.2-3.4 4.2-3.4 6.4s3.4 3.2 3.4 6.4"/>
+                                </svg>
+                                <span class="progress-info-label" data-i18n="etaLabel">ETA</span>
+                            </div>
                             <span class="progress-info-value" id="pi-eta" dir="ltr">-</span>
                         </div>
                     </div>

@@ -355,3 +355,25 @@ func TestShowWindowOnlyRevealsOnce(t *testing.T) {
 	app.windowShown = 1
 	app.ShowWindow() // already revealed: must be a no-op
 }
+
+func TestChangeProgressDrivesTheProgressBarAndTheQueue(t *testing.T) {
+	app := NewApp()
+	var scripts []string
+	app.jsSink = func(js string) { scripts = append(scripts, js) }
+
+	app.changeProgress(44)
+	app.changeProgress(12.34)
+
+	if len(scripts) != 2 {
+		t.Fatalf("expected one script per tick, got %d", len(scripts))
+	}
+	for i, want := range []string{"44.0", "12.3"} {
+		js := scripts[i]
+		if !strings.Contains(js, "setProgress("+want+")") {
+			t.Errorf("tick %d must call setProgress(%s), got %q", i, want, js)
+		}
+		if !strings.Contains(js, "updateQueueProgress("+want+")") {
+			t.Errorf("tick %d must keep the queue and tab progress in step, got %q", i, js)
+		}
+	}
+}

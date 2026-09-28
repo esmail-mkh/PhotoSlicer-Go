@@ -3124,21 +3124,68 @@ function resetProgressUI() {
     if (info) info.classList.remove('visible');
     var steps = document.getElementById('step-indicator');
     if (steps) steps.classList.remove('visible');
-    var pr = document.getElementById('pr');
-    if (pr) pr.style.width = '0%';
+    setProgress(0, true);
     if (typeof setTabsProgress === 'function') setTabsProgress(0);
-    var prText = document.getElementById('pr-text');
-    if (prText) prText.textContent = '0%';
     resetProgressInfo();
     resetStepIndicator();
-    var percent = document.getElementById('progress-percent');
-    if (percent) percent.textContent = '0%';
-    var detail = document.getElementById('progress-detail');
-    if (detail) {
-        var texts = translations[currentLang] || {};
-        detail.textContent = texts.readyStatus || 'Ready to Slice';
+}
+
+// Moves the Workspace bar to `pct` (0-100). The bar itself eases through its CSS
+// width transition; the big number chases the same target so the two stay in
+// step. `instant` skips the easing (used when the bar is reset).
+var _progShown = 0;
+var _progTarget = 0;
+var _progRaf = 0;
+var _progLast = 0;
+
+function renderProgressNumber(value) {
+    var num = document.querySelector('#progress-percent .pp-num');
+    if (num) num.textContent = String(Math.round(value));
+}
+
+function stepProgressNumber(now) {
+    _progRaf = 0;
+    var dt = Math.min(64, now - (_progLast || now));
+    _progLast = now;
+    var diff = _progTarget - _progShown;
+    if (Math.abs(diff) < 0.35) {
+        _progShown = _progTarget;
+        renderProgressNumber(_progShown);
+        _progLast = 0;
+        return;
+    }
+    _progShown += diff * (1 - Math.exp(-dt / 130));
+    renderProgressNumber(_progShown);
+    _progRaf = requestAnimationFrame(stepProgressNumber);
+}
+
+function setProgress(pct, instant) {
+    var value = Math.max(0, Math.min(100, Number(pct) || 0));
+    value = Math.round(value * 10) / 10;
+    var pr = document.getElementById('pr');
+    if (pr) pr.style.width = value + '%';
+    var track = document.getElementById('progress-track');
+    if (track) {
+        track.classList.toggle('is-empty', value < 0.5);
+        track.classList.toggle('is-complete', value >= 100);
+        track.setAttribute('aria-valuenow', String(Math.round(value)));
+    }
+    var prText = document.getElementById('pr-text');
+    if (prText) prText.textContent = Math.round(value) + '%';
+
+    _progTarget = value;
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (instant || calm) {
+        if (_progRaf) cancelAnimationFrame(_progRaf);
+        _progRaf = 0;
+        _progLast = 0;
+        _progShown = value;
+        renderProgressNumber(value);
+    } else if (!_progRaf) {
+        _progRaf = requestAnimationFrame(stepProgressNumber);
     }
 }
+window.setProgress = setProgress;
 
 var PROGRESS_STATUS_MAP = {
     'Enhancing...': 'statusEnhancing',
@@ -3309,6 +3356,8 @@ function updateStepIndicator(step) {
         } else {
             l.classList.remove('completed');
         }
+        // The connector leading out of the active step carries the "in flight" glint
+        l.classList.toggle('current', targetStep !== 'done' && idx === targetIndex);
     });
 }
 
@@ -3322,6 +3371,7 @@ function resetStepIndicator() {
     if (steps[0]) steps[0].classList.add('active');
     lines.forEach(function(l) {
         l.classList.remove('completed');
+        l.classList.remove('current');
     });
 }
 

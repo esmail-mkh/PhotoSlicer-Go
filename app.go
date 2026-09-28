@@ -498,11 +498,9 @@ func (a *App) execJS(js string) {
 func (a *App) changeProgress(percent float64) {
 	pct := fmt.Sprintf("%.1f", percent)
 	a.execJS(fmt.Sprintf(`
-		if (document.getElementById('pr')) document.getElementById('pr').style.width = '%s%%';
-		if (document.getElementById('pr-text')) document.getElementById('pr-text').textContent = '%s%%';
-		if (document.getElementById('progress-percent')) document.getElementById('progress-percent').textContent = '%s%%';
+		if (typeof setProgress === 'function') setProgress(%s);
 		if (typeof updateQueueProgress === 'function') updateQueueProgress(%s);
-	`, pct, pct, pct, pct))
+	`, pct, pct))
 }
 
 func (a *App) changeProgressDetail(current, total int, filename, elapsed, eta string) {
@@ -533,8 +531,7 @@ func (a *App) changeStatusText(text string) {
 	tJSON, _ := json.Marshal(text)
 	a.execJS(fmt.Sprintf(`
 		if (document.getElementById('status')) document.getElementById('status').textContent = %s;
-		if (document.getElementById('progress-detail')) document.getElementById('progress-detail').textContent = %s;
-	`, string(tJSON), string(tJSON)))
+	`, string(tJSON)))
 }
 
 func (a *App) changeStatusOnly(text string) {
