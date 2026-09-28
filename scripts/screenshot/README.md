@@ -19,7 +19,8 @@ npx playwright install chromium
 node screenshot.mjs          # writes ../../assets/app-fa.jpg and app-en.jpg
 ```
 
-`SHOT_THEME` picks the colour theme (`blue` by default; also `purple`, `ruby`,
-`sunset`, `gold`, `emerald`) and `SHOT_OUT` changes the output folder. The
+`SHOT_THEME` picks the colour theme (`ruby`, the red one, by default; also
+`blue`, `purple`, `sunset`, `gold`, `emerald`) and `SHOT_OUT` changes the output
+folder. The
 output is deterministic, so an unchanged UI gives byte-identical files and
 produces no commit.

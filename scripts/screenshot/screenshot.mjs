@@ -7,7 +7,7 @@
 //   node screenshot.mjs                # writes into ../../assets
 //
 // SHOT_OUT overrides the output folder and SHOT_THEME picks the colour theme
-// (blue, purple, ruby, sunset, gold or emerald; default blue).
+// (blue, purple, ruby, sunset, gold or emerald; default ruby, the red theme).
 import { chromium } from 'playwright';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,7 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const outDir = process.env.SHOT_OUT || path.join(root, 'assets');
-const theme = process.env.SHOT_THEME || 'blue';
+const theme = process.env.SHOT_THEME || 'ruby';
 
 // The UI is drawn on a 520x810 canvas (DESIGN_WIDTH/HEIGHT in script.js), so
 // that viewport renders it at exactly 100%. Twice the pixel density keeps text
