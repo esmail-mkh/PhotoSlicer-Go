@@ -6,8 +6,10 @@
 //   cd scripts/screenshot && npm ci && npx playwright install chromium
 //   node screenshot.mjs                # writes into ../../assets
 //
-// SHOT_OUT overrides the output folder and SHOT_THEME picks the colour theme
-// (blue, purple, ruby, sunset, gold or emerald; default ruby, the red theme).
+// SHOT_OUT overrides the output folder. SHOT_THEME picks the colour theme: one
+// of the built-in names (blue, purple, ruby, sunset, gold, emerald) or any hex
+// colour such as #e60000, which is applied like the custom colour in Settings.
+// The default is a deep, saturated red.
 import { chromium } from 'playwright';
 import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const outDir = process.env.SHOT_OUT || path.join(root, 'assets');
-const theme = process.env.SHOT_THEME || 'ruby';
+const theme = process.env.SHOT_THEME || '#e60000';
 
 // The UI is drawn on a 520x810 canvas (DESIGN_WIDTH/HEIGHT in script.js), so
 // that viewport renders it at exactly 100%. Twice the pixel density keeps text
@@ -57,7 +59,13 @@ try {
 
     await page.evaluate(({ lang, theme, version }) => {
       setLanguage(lang);
-      setTheme(theme);
+      if (theme.startsWith('#')) {
+        setTheme('ruby'); // keeps the red dot marked as the selected theme
+        applyCustomTheme(theme);
+        document.querySelector('.dot-ruby')?.classList.add('active');
+      } else {
+        setTheme(theme);
+      }
       applyAppVersion(version);
       showTab('process');
     }, { lang, theme, version });
