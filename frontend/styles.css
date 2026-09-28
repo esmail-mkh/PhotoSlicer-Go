@@ -832,7 +832,9 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
         0 8px 32px rgba(0, 0, 0, 0.25),
         inset 0 -1px 0 rgba(255, 255, 255, 0.02);
-    overflow: hidden;
+    /* Visible so the hover lens can swell past the bar's edge like a droplet;
+       the sheen and the progress line below round themselves instead */
+    overflow: visible;
 }
 
 /* Subtle diagonal sheen across the glass bar */
@@ -918,7 +920,12 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
 .tab svg {
     width: 16px;
     height: 16px;
-    transition: var(--transition-med);
+    /* transform gets the springy curve so the icon "pops" under the glass lens */
+    transition:
+        transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+        opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+        color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     flex-shrink: 0;
     opacity: 0.55;
 }
@@ -5201,10 +5208,13 @@ body.workspace-processing .progress-text {
    Settings, Queue or Info tab is open. The Workspace has its own big bar. */
 .tabs-progress {
     position: absolute;
-    left: 0;
-    right: 0;
+    /* inset by the bar's corner radius so the line stays inside the curve */
+    left: var(--radius-md);
+    right: var(--radius-md);
     bottom: 0;
     height: 3px;
+    border-radius: 3px;
+    overflow: hidden;
     background: rgba(255, 255, 255, 0.05);
     opacity: 0;
     pointer-events: none;
@@ -5584,4 +5594,118 @@ body[data-tab="queue"] .container {
     max-width: 300px;
     font-size: 0.78rem;
     line-height: 1.6;
+}
+
+/* ============================================
+   LIQUID-GLASS HOVER LENS (tab bar)
+   ============================================ */
+/* A droplet of glass follows the pointer between tabs. It stretches while it
+   travels, settles with a spring overshoot, magnifies what is under it, and
+   carries a specular highlight that tracks the cursor. script.js positions
+   it (see initTabHoverGlass); everything else is here. */
+@property --hx {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 50%;
+}
+
+@property --hy {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 30%;
+}
+
+.tab-hover-glass {
+    --hover-sx: 0.86;
+    --hover-sy: 0.86;
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 0;
+    width: var(--hover-w, 0px);
+    border-radius: 15px;
+    transform: translateX(var(--hover-x, 0px)) scale(var(--hover-sx), var(--hover-sy));
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1;
+    background:
+        radial-gradient(90px 44px at var(--hx) var(--hy), rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0) 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 55%, rgba(255, 255, 255, 0.11));
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    backdrop-filter: blur(10px) saturate(190%) brightness(1.18);
+    -webkit-backdrop-filter: blur(10px) saturate(190%) brightness(1.18);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.65),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 0 14px rgba(255, 255, 255, 0.1),
+        inset 0 -10px 16px -10px var(--theme-glow),
+        0 6px 18px rgba(0, 0, 0, 0.3),
+        0 0 22px var(--theme-glow-soft);
+    /* Position, width and squash use different curves and lengths, so the two
+       edges of the droplet arrive at different moments: that is what makes it
+       read as liquid rather than a sliding box */
+    transition:
+        transform 0.6s cubic-bezier(0.3, 1.5, 0.5, 1),
+        width 0.72s cubic-bezier(0.34, 1.55, 0.64, 1),
+        opacity 0.25s ease,
+        --hx 0.18s ease-out,
+        --hy 0.18s ease-out;
+}
+
+/* Thin bright rim along the top edge, like light catching the curved glass */
+.tab-hover-glass::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14%;
+    right: 14%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+    border-radius: 1px;
+}
+
+.tabs[data-hover="on"] .tab-hover-glass {
+    --hover-sx: 1.04;
+    --hover-sy: 1.04;
+    opacity: 1;
+}
+
+/* Squash-and-stretch: wider and flatter while it slides to a new tab */
+.tabs[data-hover="on"] .tab-hover-glass.is-stretching {
+    --hover-sx: 1.22;
+    --hover-sy: 0.9;
+}
+
+/* Pressed: the glass gives a little under the finger */
+.tabs[data-pressed="true"][data-hover="on"] .tab-hover-glass {
+    --hover-sx: 0.95;
+    --hover-sy: 0.92;
+}
+
+/* First placement jumps straight to the tab instead of sliding in from
+   wherever the lens was last seen */
+.tab-hover-glass.is-instant {
+    transition: none !important;
+}
+
+/* Magnify the label and icon of the tab under the lens */
+.tab > span:not(.tab-badge) {
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tab:hover > span:not(.tab-badge) {
+    transform: scale(1.06);
+}
+
+.tab:hover svg,
+.tab.active:hover svg {
+    transform: scale(1.22);
+}
+
+.tab .tab-badge {
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tab:hover .tab-badge {
+    transform: scale(1.14);
 }

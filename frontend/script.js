@@ -685,7 +685,92 @@ function positionTabIndicator() {
     if (!tabsContainer || !activeTab) return;
     tabsContainer.style.setProperty('--tab-indicator-left', activeTab.offsetLeft + 'px');
     tabsContainer.style.setProperty('--tab-indicator-width', activeTab.offsetWidth + 'px');
+    if (typeof window.refreshTabHoverGlass === 'function') window.refreshTabHoverGlass();
 }
+
+/* Liquid-glass lens that follows the pointer across the tab bar. The visuals
+   live in styles.css (LIQUID-GLASS HOVER LENS); this only decides where it is,
+   when it stretches, and where its highlight sits. */
+(function initTabHoverGlass() {
+    const bar = document.querySelector('.tabs');
+    const glass = bar && bar.querySelector('.tab-hover-glass');
+    if (!bar || !glass) return;
+
+    let current = null;
+    let stretchTimer = null;
+
+    function place(tab, instant) {
+        if (instant) glass.classList.add('is-instant');
+        glass.style.setProperty('--hover-x', tab.offsetLeft + 'px');
+        glass.style.setProperty('--hover-w', tab.offsetWidth + 'px');
+        if (instant) {
+            void glass.offsetWidth; // apply the jump before transitions come back
+            glass.classList.remove('is-instant');
+        }
+    }
+
+    // The bar has padding and the tabs touch, so pick the nearest tab sideways
+    // instead of flickering off in the gaps.
+    function tabNear(clientX) {
+        let best = null;
+        let bestGap = Infinity;
+        bar.querySelectorAll('.tab').forEach(tab => {
+            const r = tab.getBoundingClientRect();
+            const gap = clientX < r.left ? r.left - clientX : clientX > r.right ? clientX - r.right : 0;
+            if (gap < bestGap) { best = tab; bestGap = gap; }
+        });
+        return best;
+    }
+
+    function hoverOn(tab, clientX, clientY) {
+        const visible = bar.dataset.hover === 'on';
+        if (tab !== current) {
+            place(tab, !visible);
+            if (visible) {
+                glass.classList.add('is-stretching');
+                clearTimeout(stretchTimer);
+                stretchTimer = setTimeout(() => glass.classList.remove('is-stretching'), 210);
+            }
+            current = tab;
+        }
+        const r = tab.getBoundingClientRect();
+        const x = Math.max(0, Math.min(100, (clientX - r.left) / r.width * 100));
+        const y = Math.max(0, Math.min(100, (clientY - r.top) / r.height * 100));
+        glass.style.setProperty('--hx', x.toFixed(1) + '%');
+        glass.style.setProperty('--hy', y.toFixed(1) + '%');
+        bar.dataset.hover = 'on';
+    }
+
+    function hoverOff() {
+        bar.dataset.hover = 'off';
+        bar.dataset.pressed = 'false';
+    }
+
+    bar.addEventListener('pointermove', e => {
+        if (e.pointerType === 'touch') return;
+        const tab = e.target.closest('.tab') || tabNear(e.clientX);
+        if (tab) hoverOn(tab, e.clientX, e.clientY);
+    });
+    bar.addEventListener('pointerleave', hoverOff);
+    bar.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') bar.dataset.pressed = 'true'; });
+    ['pointerup', 'pointercancel'].forEach(type => bar.addEventListener(type, () => { bar.dataset.pressed = 'false'; }));
+
+    // Keyboard focus gets the same lens, centred on the tab
+    bar.addEventListener('focusin', e => {
+        const tab = e.target.closest('.tab');
+        if (!tab || !tab.matches(':focus-visible')) return;
+        const r = tab.getBoundingClientRect();
+        hoverOn(tab, r.left + r.width / 2, r.top + r.height * 0.3);
+    });
+    bar.addEventListener('focusout', () => {
+        if (!bar.matches(':hover')) hoverOff();
+    });
+
+    // Tab widths change with the language, so re-measure the tab it rests on
+    window.refreshTabHoverGlass = function() {
+        if (current) place(current, true);
+    };
+})();
 
 function selectFolder() {
     pywebview.api.select_folder().then(function(folderPath) {
