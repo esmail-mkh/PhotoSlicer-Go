@@ -656,7 +656,7 @@ function showTab(tabName) {
         tabElement.tabIndex = 0;
     }
 
-    positionTabIndicator();
+    positionTabIndicator({ travel: true });
     updateSettings();
     if (tabName === 'queue') refreshQueue();
 }
@@ -679,13 +679,35 @@ document.querySelector('.tabs').addEventListener('keydown', function(e) {
     tabs[next].click();
 });
 
-function positionTabIndicator() {
+let _indicatorLeft = null;
+
+function pulseStretch(el, ms) {
+    if (!el) return;
+    el.classList.add('is-stretching');
+    clearTimeout(el._stretchTimer);
+    el._stretchTimer = setTimeout(() => el.classList.remove('is-stretching'), ms || 210);
+}
+
+// options.travel: the selection just moved to another tab, so squash-and-stretch
+function positionTabIndicator(options) {
     const tabsContainer = document.querySelector('.tabs');
     const activeTab = document.querySelector('.tab.active');
     if (!tabsContainer || !activeTab) return;
-    tabsContainer.style.setProperty('--tab-indicator-left', activeTab.offsetLeft + 'px');
+    const left = activeTab.offsetLeft;
+    if (options && options.travel && _indicatorLeft !== null && Math.abs(left - _indicatorLeft) > 2) {
+        pulseStretch(tabsContainer.querySelector('.tab-indicator'));
+    }
+    _indicatorLeft = left;
+    tabsContainer.style.setProperty('--tab-indicator-left', left + 'px');
     tabsContainer.style.setProperty('--tab-indicator-width', activeTab.offsetWidth + 'px');
     if (typeof window.refreshTabHoverGlass === 'function') window.refreshTabHoverGlass();
+}
+
+// Tab widths follow their content (fonts finishing loading, the Queue badge
+// appearing, a language switch), so keep the pill and lens on their tabs
+if (typeof ResizeObserver === 'function') {
+    const tabResizeObserver = new ResizeObserver(() => positionTabIndicator());
+    document.querySelectorAll('.tab').forEach(tab => tabResizeObserver.observe(tab));
 }
 
 /* Liquid-glass lens that follows the pointer across the tab bar. The visuals
@@ -694,19 +716,28 @@ function positionTabIndicator() {
 (function initTabHoverGlass() {
     const bar = document.querySelector('.tabs');
     const glass = bar && bar.querySelector('.tab-hover-glass');
-    if (!bar || !glass) return;
+    const pill = bar && bar.querySelector('.tab-indicator');
+    if (!bar || !glass || !pill) return;
 
     let current = null;
-    let stretchTimer = null;
+    let lastX = null;
+    let lastW = null;
 
     function place(tab, instant) {
+        lastX = tab.offsetLeft;
+        lastW = tab.offsetWidth;
         if (instant) glass.classList.add('is-instant');
-        glass.style.setProperty('--hover-x', tab.offsetLeft + 'px');
-        glass.style.setProperty('--hover-w', tab.offsetWidth + 'px');
+        glass.style.setProperty('--hover-x', lastX + 'px');
+        glass.style.setProperty('--hover-w', lastW + 'px');
         if (instant) {
             void glass.offsetWidth; // apply the jump before transitions come back
             glass.classList.remove('is-instant');
         }
+    }
+
+    // Over the selected tab the pill brightens itself; elsewhere the lens shows
+    function setMode(tab) {
+        bar.dataset.lens = tab.classList.contains('active') ? 'merged' : 'free';
     }
 
     // The bar has padding and the tabs touch, so pick the nearest tab sideways
@@ -726,18 +757,15 @@ function positionTabIndicator() {
         const visible = bar.dataset.hover === 'on';
         if (tab !== current) {
             place(tab, !visible);
-            if (visible) {
-                glass.classList.add('is-stretching');
-                clearTimeout(stretchTimer);
-                stretchTimer = setTimeout(() => glass.classList.remove('is-stretching'), 210);
-            }
+            if (visible) pulseStretch(glass);
             current = tab;
         }
+        setMode(tab);
+        // Specular highlight follows the pointer, on the lens and on the pill
         const r = tab.getBoundingClientRect();
-        const x = Math.max(0, Math.min(100, (clientX - r.left) / r.width * 100));
-        const y = Math.max(0, Math.min(100, (clientY - r.top) / r.height * 100));
-        glass.style.setProperty('--hx', x.toFixed(1) + '%');
-        glass.style.setProperty('--hy', y.toFixed(1) + '%');
+        const x = Math.max(0, Math.min(100, (clientX - r.left) / r.width * 100)).toFixed(1) + '%';
+        const y = Math.max(0, Math.min(100, (clientY - r.top) / r.height * 100)).toFixed(1) + '%';
+        [glass, pill].forEach(el => { el.style.setProperty('--hx', x); el.style.setProperty('--hy', y); });
         bar.dataset.hover = 'on';
     }
 
@@ -746,29 +774,51 @@ function positionTabIndicator() {
         bar.dataset.pressed = 'false';
     }
 
+    // A tab the keyboard is on keeps its lens even when the mouse leaves
+    function keyboardTab() {
+        const focused = document.activeElement;
+        return focused && bar.contains(focused) && focused.matches('.tab:focus-visible') ? focused : null;
+    }
+
     bar.addEventListener('pointermove', e => {
         if (e.pointerType === 'touch') return;
+        bar.dataset.focus = 'false';
         const tab = e.target.closest('.tab') || tabNear(e.clientX);
         if (tab) hoverOn(tab, e.clientX, e.clientY);
     });
-    bar.addEventListener('pointerleave', hoverOff);
+    bar.addEventListener('pointerleave', () => {
+        const tab = keyboardTab();
+        if (tab) {
+            const r = tab.getBoundingClientRect();
+            hoverOn(tab, r.left + r.width / 2, r.top + r.height * 0.3);
+            bar.dataset.focus = 'true';
+            bar.dataset.pressed = 'false';
+        } else {
+            hoverOff();
+        }
+    });
     bar.addEventListener('pointerdown', e => { if (e.pointerType !== 'touch') bar.dataset.pressed = 'true'; });
     ['pointerup', 'pointercancel'].forEach(type => bar.addEventListener(type, () => { bar.dataset.pressed = 'false'; }));
 
-    // Keyboard focus gets the same lens, centred on the tab
+    // Keyboard focus gets the same lens, centred on the tab, with a focus ring
     bar.addEventListener('focusin', e => {
         const tab = e.target.closest('.tab');
         if (!tab || !tab.matches(':focus-visible')) return;
         const r = tab.getBoundingClientRect();
         hoverOn(tab, r.left + r.width / 2, r.top + r.height * 0.3);
+        bar.dataset.focus = 'true';
     });
     bar.addEventListener('focusout', () => {
+        bar.dataset.focus = 'false';
         if (!bar.matches(':hover')) hoverOff();
     });
 
-    // Tab widths change with the language, so re-measure the tab it rests on
+    // Called whenever the tabs may have moved or the selection changed. Only
+    // re-measures when something actually changed, so it never cuts a glide short.
     window.refreshTabHoverGlass = function() {
-        if (current) place(current, true);
+        if (!current) return;
+        setMode(current);
+        if (current.offsetLeft !== lastX || current.offsetWidth !== lastW) place(current, false);
     };
 })();
 

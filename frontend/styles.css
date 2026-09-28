@@ -848,25 +848,49 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
     z-index: 0;
 }
 
-/* Sliding glass indicator pill */
+/* Selected-tab pill. It is the same liquid glass as the hover lens (see
+   LIQUID-GLASS HOVER LENS) only calmer, and it moves the same way: a spring
+   with overshoot, stretching while it slides to another tab. Hovering the
+   selected tab raises this pill to the lens's intensity in place, so the two
+   never stack into a double outline. */
+@property --spec {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0.1;
+}
+
 .tab-indicator {
+    --ind-sx: 1;
+    --ind-sy: 1;
+    --ring: 0px;
     position: absolute;
-    top: 5px;
-    bottom: 5px;
+    top: 4px;
+    bottom: 4px;
     left: 0;
     width: var(--tab-indicator-width, 33.33%);
-    transform: translateX(var(--tab-indicator-left, 0px));
-    border-radius: calc(var(--radius-sm) - 1px);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04));
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    transform: translateX(var(--tab-indicator-left, 0px)) scale(var(--ind-sx), var(--ind-sy));
+    border-radius: 13px;
+    background:
+        radial-gradient(90px 44px at var(--hx) var(--hy), rgba(255, 255, 255, var(--spec)), rgba(255, 255, 255, 0) 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045) 55%, rgba(255, 255, 255, 0.085));
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
     box-shadow:
+        0 0 0 var(--ring) var(--theme-solid),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+        inset 0 -10px 16px -10px var(--theme-glow-soft),
         0 4px 12px rgba(0, 0, 0, 0.35),
-        inset 0 1px 0 rgba(255, 255, 255, 0.18),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
         0 0 20px var(--theme-glow-soft);
-    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    transition:
+        transform 0.6s cubic-bezier(0.3, 1.5, 0.5, 1),
+        width 0.72s cubic-bezier(0.34, 1.55, 0.64, 1),
+        border-color 0.25s ease,
+        box-shadow 0.25s ease,
+        --hx 0.18s ease-out,
+        --hy 0.18s ease-out,
+        --spec 0.25s ease-out;
     z-index: 1;
     pointer-events: none;
 }
@@ -5623,7 +5647,8 @@ body[data-tab="queue"] .container {
     bottom: 4px;
     left: 0;
     width: var(--hover-w, 0px);
-    border-radius: 15px;
+    --ring: 0px;
+    border-radius: 14px;
     transform: translateX(var(--hover-x, 0px)) scale(var(--hover-sx), var(--hover-sy));
     opacity: 0;
     pointer-events: none;
@@ -5635,6 +5660,7 @@ body[data-tab="queue"] .container {
     backdrop-filter: blur(10px) saturate(190%) brightness(1.18);
     -webkit-backdrop-filter: blur(10px) saturate(190%) brightness(1.18);
     box-shadow:
+        0 0 0 var(--ring) var(--theme-solid),
         inset 0 1px 0 rgba(255, 255, 255, 0.65),
         inset 0 -1px 0 rgba(255, 255, 255, 0.14),
         inset 0 0 14px rgba(255, 255, 255, 0.1),
@@ -5648,6 +5674,7 @@ body[data-tab="queue"] .container {
         transform 0.6s cubic-bezier(0.3, 1.5, 0.5, 1),
         width 0.72s cubic-bezier(0.34, 1.55, 0.64, 1),
         opacity 0.25s ease,
+        box-shadow 0.25s ease,
         --hx 0.18s ease-out,
         --hy 0.18s ease-out;
 }
@@ -5682,6 +5709,52 @@ body[data-tab="queue"] .container {
     --hover-sy: 0.92;
 }
 
+/* Over the selected tab the lens steps aside and the pill takes its place,
+   brightened to the same intensity, so the selected style never disappears
+   under a second layer of glass */
+.tabs[data-hover="on"][data-lens="merged"] .tab-hover-glass {
+    opacity: 0;
+}
+
+.tabs[data-hover="on"][data-lens="merged"] .tab-indicator {
+    --ind-sx: 1.04;
+    --ind-sy: 1.04;
+    --spec: 0.42;
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow:
+        0 0 0 var(--ring) var(--theme-solid),
+        inset 0 1px 0 rgba(255, 255, 255, 0.65),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 0 14px rgba(255, 255, 255, 0.1),
+        inset 0 -10px 16px -10px var(--theme-glow),
+        0 6px 18px rgba(0, 0, 0, 0.3),
+        0 0 22px var(--theme-glow-soft);
+}
+
+.tabs[data-pressed="true"][data-hover="on"][data-lens="merged"] .tab-indicator {
+    --ind-sx: 0.95;
+    --ind-sy: 0.92;
+}
+
+/* The pill stretches while it slides to a newly selected tab. Listed after the
+   hover rules and more specific, so it wins even if the pointer is still on it */
+.tabs .tab-indicator.is-stretching,
+.tabs[data-hover="on"][data-lens="merged"] .tab-indicator.is-stretching {
+    --ind-sx: 1.18;
+    --ind-sy: 0.94;
+}
+
+/* Keyboard focus shows the lens (or the raised pill) with a theme-coloured
+   ring instead of the browser outline, which would sit on top of both */
+.tab:focus-visible {
+    outline: none;
+}
+
+.tabs[data-focus="true"] .tab-hover-glass,
+.tabs[data-focus="true"] .tab-indicator {
+    --ring: 1.5px;
+}
+
 /* First placement jumps straight to the tab instead of sliding in from
    wherever the lens was last seen */
 .tab-hover-glass.is-instant {
@@ -5693,12 +5766,14 @@ body[data-tab="queue"] .container {
     transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.tab:hover > span:not(.tab-badge) {
+.tab:hover > span:not(.tab-badge),
+.tab:focus-visible > span:not(.tab-badge) {
     transform: scale(1.06);
 }
 
 .tab:hover svg,
-.tab.active:hover svg {
+.tab.active:hover svg,
+.tab:focus-visible svg {
     transform: scale(1.22);
 }
 
@@ -5706,6 +5781,7 @@ body[data-tab="queue"] .container {
     transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.tab:hover .tab-badge {
+.tab:hover .tab-badge,
+.tab:focus-visible .tab-badge {
     transform: scale(1.14);
 }
