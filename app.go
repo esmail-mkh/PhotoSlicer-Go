@@ -17,6 +17,7 @@ import (
 	"photoslicer/engine/constants"
 	"photoslicer/engine/enhancer"
 	"photoslicer/engine/pipeline"
+	"photoslicer/engine/queue"
 	"photoslicer/engine/sorting"
 	"photoslicer/engine/updater"
 
@@ -61,6 +62,7 @@ var translations = map[string]map[string]string{
 		"status_slicing":         "Slicing...",
 		"status_stitching":       "Stitching...",
 		"status_processing":      "Processing...",
+		"queue_done":             "Queue finished: %d of %d jobs completed.",
 	},
 	"fa": {
 		"ready":                  "آماده برای شروع",
@@ -98,6 +100,7 @@ var translations = map[string]map[string]string{
 		"status_slicing":         "برش...",
 		"status_stitching":       "چسباندن...",
 		"status_processing":      "در حال پردازش...",
+		"queue_done":             "صف تمام شد: %d از %d کار انجام شد.",
 	},
 }
 
@@ -151,6 +154,10 @@ type App struct {
 	isBusy               int32
 	startTime            time.Time
 	lastOutput           string
+	jobsMu               sync.Mutex
+	jobs                 *queue.Queue
+	queueActive          int32
+	queueAbort           int32
 }
 
 func (a *App) getSettingsFilePath() string {
@@ -463,7 +470,8 @@ func (a *App) changeProgress(percent float64) {
 		if (document.getElementById('pr')) document.getElementById('pr').style.width = '%s%%';
 		if (document.getElementById('pr-text')) document.getElementById('pr-text').textContent = '%s%%';
 		if (document.getElementById('progress-percent')) document.getElementById('progress-percent').textContent = '%s%%';
-	`, pct, pct, pct))
+		if (typeof updateQueueProgress === 'function') updateQueueProgress(%s);
+	`, pct, pct, pct, pct))
 }
 
 func (a *App) changeProgressDetail(current, total int, filename, elapsed, eta string) {
@@ -550,6 +558,7 @@ func (a *App) AppReady() {
 	wailsRuntime.WindowSetTitle(a.ctx, getMsg("app_window_title", lang))
 	a.changeStatusText(getMsg("ready", lang))
 	a.applySettingsToDOM(settings)
+	a.pushQueue()
 
 	// Inject detected GPU hardware info into DOM
 	gpu := enhancer.DetectPrimaryGPU()
@@ -806,6 +815,10 @@ func (a *App) ResumeProcessing() {
 }
 
 func (a *App) StopProcessing() {
+	// Stopping during a queue run halts the whole queue, not just this job.
+	if atomic.LoadInt32(&a.queueActive) == 1 {
+		atomic.StoreInt32(&a.queueAbort, 1)
+	}
 	if ctrl := a.getController(); ctrl != nil {
 		ctrl.Stop()
 		settings := a.loadSettings()
@@ -986,297 +999,480 @@ func (a *App) Start(params map[string]interface{}) {
 		defer atomic.StoreInt32(&a.isBusy, 0)
 		defer archive.CleanupAllTempDirs()
 
-		a.setLastOutput("")
-		a.setStartTime(time.Now())
-		a.setController(pipeline.NewController())
+		a.beginRun()
+		a.runJob(params, false)
+		a.endRun()
+	}()
+}
 
-		checkState := func() error {
-			if c := a.getController(); c != nil {
-				return c.CheckState()
+// beginRun resets the shared progress UI and gives the next job a fresh
+// controller and clock.
+func (a *App) beginRun() {
+	a.setLastOutput("")
+	a.setStartTime(time.Now())
+	a.setController(pipeline.NewController())
+	a.execJS("resetTimer(); startTimer(); if (typeof resetProgressUI === 'function') resetProgressUI();")
+	a.setButtonState("processing")
+}
+
+// endRun returns the shared progress UI to its idle state.
+func (a *App) endRun() {
+	a.setButtonState("idle")
+	a.execJS("stopTimer();")
+}
+
+// runJob processes one input (a folder, a parent of chapter folders, or a
+// ZIP/CBZ/PDF file) with the given settings and reports the outcome. It drives
+// the progress UI but leaves the idle/processing button state to its caller.
+// With inQueue set, the per-job success sound and toast are skipped and the
+// path field is left alone, since the queue reports on the batch as a whole.
+func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
+	failed := func(msg string) queue.Result {
+		return queue.Result{Status: queue.StatusFailed, Error: msg}
+	}
+	stopped := queue.Result{Status: queue.StatusStopped}
+
+	checkState := func() error {
+		if c := a.getController(); c != nil {
+			return c.CheckState()
+		}
+		return nil
+	}
+
+	settings := a.loadSettings()
+	lang, _ := settings["language"].(string)
+	if lang == "" {
+		lang = "fa"
+	}
+
+	dirAddress, _ := params["directory"].(string)
+	dirAddress = strings.TrimSpace(dirAddress)
+
+	if dirAddress == "" {
+		a.showError(getMsg("error_folder", lang), true)
+		a.changeStatusText(getMsg("error_valid_dir", lang))
+		return failed(getMsg("error_folder", lang))
+	}
+
+	originalInputPath := dirAddress
+
+	// Handle direct ZIP/CBZ/PDF input file
+	fi, err := os.Stat(dirAddress)
+	if err != nil {
+		a.showError(getMsg("path_not_exist", lang), true)
+		a.changeStatusText(getMsg("error_valid_dir", lang))
+		return failed(getMsg("path_not_exist", lang))
+	}
+
+	originalIsFile := !fi.IsDir()
+	var archiveTempDir string
+	if originalIsFile {
+		extLower := strings.ToLower(filepath.Ext(dirAddress))
+		if extLower == ".zip" || extLower == ".cbz" || extLower == ".pdf" {
+			a.updateStep("scan")
+			tempRoot, err := os.MkdirTemp("", "photoslicer_extract_")
+			if err != nil {
+				a.showError(err.Error(), true)
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				return failed(err.Error())
 			}
-			return nil
-		}
-
-		settings := a.loadSettings()
-		lang, _ := settings["language"].(string)
-		if lang == "" {
-			lang = "fa"
-		}
-
-		a.execJS("resetTimer(); startTimer(); if (typeof resetProgressUI === 'function') resetProgressUI();")
-		a.setButtonState("processing")
-
-		dirAddress, _ := params["directory"].(string)
-		dirAddress = strings.TrimSpace(dirAddress)
-
-		if dirAddress == "" {
+			archive.RegisterTempDir(tempRoot)
+			extracted, err := archive.ExtractInputFile(dirAddress, tempRoot, checkState)
+			if err != nil || extracted == "" {
+				errMsg := getMsg("error_no_images", lang)
+				if err != nil {
+					errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
+				}
+				a.showError(errMsg, true)
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				return failed(errMsg)
+			}
+			dirAddress = extracted
+			archiveTempDir = tempRoot
+		} else {
 			a.showError(getMsg("error_folder", lang), true)
 			a.changeStatusText(getMsg("error_valid_dir", lang))
-			a.setButtonState("idle")
-			a.execJS("stopTimer();")
-			return
+			return failed(getMsg("error_folder", lang))
 		}
+	}
 
-		originalInputPath := dirAddress
+	// Output base directory
+	saveLocation, _ := params["save_location"].(string)
+	saveLocation = strings.TrimSpace(saveLocation)
+	outputBase := "./Results"
+	if saveLocation != "" {
+		outputBase = saveLocation
+	}
 
-		// Handle direct ZIP/CBZ/PDF input file
-		fi, err := os.Stat(dirAddress)
-		if err != nil {
-			a.showError(getMsg("path_not_exist", lang), true)
+	saveNextSrc, _ := params["save_next_to_source"].(bool)
+	outputSuffix, _ := params["output_suffix"].(string)
+	outputSuffix = strings.TrimSpace(outputSuffix)
+	outputSuffix = strings.ReplaceAll(outputSuffix, "..", "")
+	outputSuffix = strings.ReplaceAll(outputSuffix, "/", "")
+	outputSuffix = strings.ReplaceAll(outputSuffix, "\\", "")
+	outputSuffix = strings.ReplaceAll(outputSuffix, ":", "")
+	if outputSuffix == "" {
+		outputSuffix = " [Stitched]"
+	} else if !strings.HasPrefix(outputSuffix, " ") {
+		outputSuffix = " " + outputSuffix
+	}
+
+	// Watermark check
+	wmEnabled, _ := params["watermark_enabled"].(bool)
+	wmPath, _ := params["watermark_path"].(string)
+	if wmEnabled {
+		if wmPath == "" {
+			a.showError(getMsg("error_watermark_path", lang), true)
 			a.changeStatusText(getMsg("error_valid_dir", lang))
-			a.setButtonState("idle")
-			a.execJS("stopTimer();")
-			return
+			return failed(getMsg("error_watermark_path", lang))
 		}
+		if _, err := os.Stat(wmPath); err != nil {
+			a.showError(getMsg("error_watermark_path", lang), true)
+			a.changeStatusText(getMsg("error_valid_dir", lang))
+			return failed(getMsg("error_watermark_path", lang))
+		}
+	}
 
-		originalIsFile := !fi.IsDir()
-		var archiveTempDir string
-		if originalIsFile {
-			extLower := strings.ToLower(filepath.Ext(dirAddress))
-			if extLower == ".zip" || extLower == ".cbz" || extLower == ".pdf" {
-				a.updateStep("scan")
-				tempRoot, err := os.MkdirTemp("", "photoslicer_extract_")
-				if err != nil {
-					a.showError(err.Error(), true)
-					a.changeStatusText(getMsg("error_valid_dir", lang))
-					a.setButtonState("idle")
-					a.execJS("stopTimer();")
-					return
-				}
-				archive.RegisterTempDir(tempRoot)
-				extracted, err := archive.ExtractInputFile(dirAddress, tempRoot, checkState)
-				if err != nil || extracted == "" {
-					errMsg := getMsg("error_no_images", lang)
-					if err != nil {
-						errMsg = fmt.Sprintf("%s: %s", errMsg, err.Error())
-					}
-					a.showError(errMsg, true)
-					a.changeStatusText(getMsg("error_valid_dir", lang))
-					a.setButtonState("idle")
-					a.execJS("stopTimer();")
-					return
-				}
-				dirAddress = extracted
-				archiveTempDir = tempRoot
+	// Update UI watermark step visibility
+	a.execJS(fmt.Sprintf("if (typeof setWatermarkStepVisible === 'function') setWatermarkStepVisible(%t);", wmEnabled))
+
+	// Parse parameters
+	isCustomWidth, _ := params["custom_width_checked"].(bool)
+	widthVal := int(getFloatOrInt(params["width"], 800))
+	heightLimitVal := int(getFloatOrInt(params["height_limit"], 16000))
+	saveQualityVal := int(getFloatOrInt(params["save_quality"], 100))
+	saveFormat, _ := params["save_format"].(string)
+	if saveFormat == "" {
+		saveFormat = "JPG"
+	}
+	isZip, _ := params["zip_checked"].(bool)
+	isPdf, _ := params["pdf_checked"].(bool)
+	isCbz, _ := params["cbz_checked"].(bool)
+	isEnhance, _ := params["enhance_checked"].(bool)
+	enhanceEngine, _ := params["enhance_engine"].(string)
+	if enhanceEngine == "" {
+		enhanceEngine = "fast"
+	}
+	isNoStitch, _ := params["no_stitch_checked"].(bool)
+	wmCount := int(getFloatOrInt(params["watermark_count"], 1))
+	wmEdge, _ := params["watermark_edge"].(string)
+	if wmEdge == "" {
+		wmEdge = "right"
+	}
+	wmMargin := int(getFloatOrInt(params["watermark_margin"], 0))
+	threadCount := int(getFloatOrInt(params["thread_count"], 4))
+	filenamePattern, _ := params["filename_pattern"].(string)
+	if filenamePattern == "" {
+		filenamePattern = "[number]"
+	}
+	filenameDigits := int(getFloatOrInt(params["filename_digits"], 3))
+
+	// Bounds validation
+	if saveQualityVal < 1 {
+		saveQualityVal = 1
+	} else if saveQualityVal > 100 {
+		saveQualityVal = 100
+	}
+	if widthVal < 10 {
+		widthVal = 10
+	} else if widthVal > 30000 {
+		widthVal = 30000
+	}
+	if heightLimitVal < 100 {
+		heightLimitVal = 100
+	} else if heightLimitVal > 100000 {
+		heightLimitVal = 100000
+	}
+	if threadCount < 1 {
+		threadCount = 1
+	} else if threadCount > 64 {
+		threadCount = 64
+	}
+	switch strings.ToUpper(saveFormat) {
+	case "PNG", "WEBP", "AVIF", "PSD":
+		saveFormat = strings.ToUpper(saveFormat)
+	default:
+		saveFormat = "JPG"
+	}
+	switch strings.ToLower(wmEdge) {
+	case "left", "center":
+		wmEdge = strings.ToLower(wmEdge)
+	default:
+		wmEdge = "right"
+	}
+	if filenameDigits < 1 {
+		filenameDigits = 1
+	} else if filenameDigits > 10 {
+		filenameDigits = 10
+	}
+
+	// Detect mode: check if directory contains supported images directly or subfolders
+	directImages, _ := sorting.GetAllImagesDirectory(dirAddress)
+	isSingleMode := len(directImages) > 0
+
+	stitchedSaveName := filepath.Base(dirAddress)
+	if saveNextSrc {
+		absSrc, err := filepath.Abs(originalInputPath)
+		if err == nil {
+			sourceParent := filepath.Dir(absSrc)
+			sourceName := filepath.Base(absSrc)
+			if originalIsFile {
+				sourceName = strings.TrimSuffix(sourceName, filepath.Ext(sourceName))
+			}
+			stitchedName := fmt.Sprintf("%s%s", sourceName, outputSuffix)
+			if isSingleMode {
+				outputBase = sourceParent
+				stitchedSaveName = stitchedName
 			} else {
-				a.showError(getMsg("error_folder", lang), true)
-				a.changeStatusText(getMsg("error_valid_dir", lang))
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
+				outputBase = filepath.Join(sourceParent, stitchedName)
 			}
 		}
+	}
+	_ = os.MkdirAll(outputBase, 0755)
 
-		// Output base directory
-		saveLocation, _ := params["save_location"].(string)
-		saveLocation = strings.TrimSpace(saveLocation)
-		outputBase := "./Results"
-		if saveLocation != "" {
-			outputBase = saveLocation
-		}
+	currentDate := time.Now().Format("2006-01-02 15-04-05")
 
-		saveNextSrc, _ := params["save_next_to_source"].(bool)
-		outputSuffix, _ := params["output_suffix"].(string)
-		outputSuffix = strings.TrimSpace(outputSuffix)
-		outputSuffix = strings.ReplaceAll(outputSuffix, "..", "")
-		outputSuffix = strings.ReplaceAll(outputSuffix, "/", "")
-		outputSuffix = strings.ReplaceAll(outputSuffix, "\\", "")
-		outputSuffix = strings.ReplaceAll(outputSuffix, ":", "")
-		if outputSuffix == "" {
-			outputSuffix = " [Stitched]"
-		} else if !strings.HasPrefix(outputSuffix, " ") {
-			outputSuffix = " " + outputSuffix
-		}
+	var result queue.Result
 
-		// Watermark check
-		wmEnabled, _ := params["watermark_enabled"].(bool)
-		wmPath, _ := params["watermark_path"].(string)
-		if wmEnabled {
-			if wmPath == "" {
-				a.showError(getMsg("error_watermark_path", lang), true)
-				a.changeStatusText(getMsg("error_valid_dir", lang))
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
-			}
-			if _, err := os.Stat(wmPath); err != nil {
-				a.showError(getMsg("error_watermark_path", lang), true)
-				a.changeStatusText(getMsg("error_valid_dir", lang))
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
-			}
-		}
+	if isSingleMode {
+		a.changeProgress(0)
+		a.updateStep("scan")
+		a.changeStatusOnly(getMsg("processing_single", lang))
+		a.updateStep("process")
 
-		// Update UI watermark step visibility
-		a.execJS(fmt.Sprintf("if (typeof setWatermarkStepVisible === 'function') setWatermarkStepVisible(%t);", wmEnabled))
-
-		// Parse parameters
-		isCustomWidth, _ := params["custom_width_checked"].(bool)
-		widthVal := int(getFloatOrInt(params["width"], 800))
-		heightLimitVal := int(getFloatOrInt(params["height_limit"], 16000))
-		saveQualityVal := int(getFloatOrInt(params["save_quality"], 100))
-		saveFormat, _ := params["save_format"].(string)
-		if saveFormat == "" {
-			saveFormat = "JPG"
-		}
-		isZip, _ := params["zip_checked"].(bool)
-		isPdf, _ := params["pdf_checked"].(bool)
-		isCbz, _ := params["cbz_checked"].(bool)
-		isEnhance, _ := params["enhance_checked"].(bool)
-		enhanceEngine, _ := params["enhance_engine"].(string)
-		if enhanceEngine == "" {
-			enhanceEngine = "fast"
-		}
-		isNoStitch, _ := params["no_stitch_checked"].(bool)
-		wmCount := int(getFloatOrInt(params["watermark_count"], 1))
-		wmEdge, _ := params["watermark_edge"].(string)
-		if wmEdge == "" {
-			wmEdge = "right"
-		}
-		wmMargin := int(getFloatOrInt(params["watermark_margin"], 0))
-		threadCount := int(getFloatOrInt(params["thread_count"], 4))
-		filenamePattern, _ := params["filename_pattern"].(string)
-		if filenamePattern == "" {
-			filenamePattern = "[number]"
-		}
-		filenameDigits := int(getFloatOrInt(params["filename_digits"], 3))
-
-		// Bounds validation
-		if saveQualityVal < 1 {
-			saveQualityVal = 1
-		} else if saveQualityVal > 100 {
-			saveQualityVal = 100
-		}
-		if widthVal < 10 {
-			widthVal = 10
-		} else if widthVal > 30000 {
-			widthVal = 30000
-		}
-		if heightLimitVal < 100 {
-			heightLimitVal = 100
-		} else if heightLimitVal > 100000 {
-			heightLimitVal = 100000
-		}
-		if threadCount < 1 {
-			threadCount = 1
-		} else if threadCount > 64 {
-			threadCount = 64
-		}
-		switch strings.ToUpper(saveFormat) {
-		case "PNG", "WEBP", "AVIF", "PSD":
-			saveFormat = strings.ToUpper(saveFormat)
-		default:
-			saveFormat = "JPG"
-		}
-		switch strings.ToLower(wmEdge) {
-		case "left", "center":
-			wmEdge = strings.ToLower(wmEdge)
-		default:
-			wmEdge = "right"
-		}
-		if filenameDigits < 1 {
-			filenameDigits = 1
-		} else if filenameDigits > 10 {
-			filenameDigits = 10
-		}
-
-		// Detect mode: check if directory contains supported images directly or subfolders
-		directImages, _ := sorting.GetAllImagesDirectory(dirAddress)
-		isSingleMode := len(directImages) > 0
-
-		stitchedSaveName := filepath.Base(dirAddress)
-		if saveNextSrc {
-			absSrc, err := filepath.Abs(originalInputPath)
-			if err == nil {
-				sourceParent := filepath.Dir(absSrc)
-				sourceName := filepath.Base(absSrc)
-				if originalIsFile {
-					sourceName = strings.TrimSuffix(sourceName, filepath.Ext(sourceName))
+		processFolder := dirAddress
+		if isEnhance {
+			a.updateStep("process")
+			if enhanceEngine == "fast" {
+				a.changeStatusOnly(getMsg("enhancing_fast_run", lang, len(directImages)))
+				enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, checkState, func(pct, curr, total int) {
+					a.changeProgress(float64(pct))
+					st := a.getStartTime()
+					elapsed := time.Since(st).Seconds()
+					eta := calculateEta(st, float64(pct))
+					a.changeProgressDetail(curr, total, getMsg("status_denoising", lang), formatDuration(elapsed), eta)
+				})
+				if err != nil {
+					if checkState() != nil {
+						a.changeStatusText(getMsg("stopped", lang))
+						a.updateStep("ready")
+						return stopped
+					}
+					enhanceMsg := fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error())
+					a.showError(enhanceMsg, true)
+					a.changeStatusText(getMsg("enhancing_fail", lang))
+					a.updateStep("ready")
+					return failed(enhanceMsg)
 				}
-				stitchedName := fmt.Sprintf("%s%s", sourceName, outputSuffix)
-				if isSingleMode {
-					outputBase = sourceParent
-					stitchedSaveName = stitchedName
+				if enhancedDir != "" {
+					processFolder = enhancedDir
+				}
+			} else {
+				exePath := enhancer.FindRealEsrganExecutable("")
+				if exePath == "" {
+					a.showError(getMsg("enhancer_missing", lang), true)
+					a.changeStatusText(getMsg("enhancing_fail", lang))
+					a.updateStep("ready")
+					return failed(getMsg("enhancer_missing", lang))
+				}
+				a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
+				enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", checkState, func(pct, curr, total int) {
+					a.changeProgress(float64(pct))
+					st := a.getStartTime()
+					elapsed := time.Since(st).Seconds()
+					eta := calculateEta(st, float64(pct))
+					a.changeProgressDetail(curr, total, getMsg("status_enhancing", lang), formatDuration(elapsed), eta)
+				})
+				if err != nil {
+					if checkState() != nil {
+						a.changeStatusText(getMsg("stopped", lang))
+						a.updateStep("ready")
+						return stopped
+					}
+					enhanceMsg := fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error())
+					a.showError(enhanceMsg, true)
+					a.changeStatusText(getMsg("enhancing_fail", lang))
+					a.updateStep("ready")
+					return failed(enhanceMsg)
+				}
+				if enhancedDir != "" {
+					processFolder = enhancedDir
+				}
+			}
+		}
+
+		a.updateStep("process")
+
+		opts := pipeline.PipelineOptions{
+			Mode:                  "single",
+			NewWidth:              widthVal,
+			IsCustomWidth:         isCustomWidth,
+			SaveFormat:            saveFormat,
+			SaveQuality:           saveQualityVal,
+			SaveDirectory:         stitchedSaveName,
+			HeightLimit:           heightLimitVal,
+			CurrentDate:           currentDate,
+			IsZip:                 isZip,
+			IsPdf:                 isPdf,
+			IsCbz:                 isCbz,
+			IsNoStitch:            isNoStitch,
+			OutputBase:            outputBase,
+			MaxWorkers:            threadCount,
+			AutoTuneWorkers:       true,
+			FilenamePattern:       filenamePattern,
+			FilenameDigits:        filenameDigits,
+			WatermarkEnabled:      wmEnabled,
+			WatermarkPath:         wmPath,
+			WatermarkCount:        wmCount,
+			WatermarkEdge:         wmEdge,
+			WatermarkWidthPercent: 0,
+			WatermarkMargin:       wmMargin,
+			Controller:            a.getController(),
+			ProgressCallback: func(pct float64, curr, total int, item string) {
+				a.changeProgress(pct)
+				st := a.getStartTime()
+				elapsed := time.Since(st).Seconds()
+				eta := calculateEta(st, pct)
+				displayItem := item
+				if displayItem == "" {
+					displayItem = filepath.Base(dirAddress)
 				} else {
-					outputBase = filepath.Join(sourceParent, stitchedName)
+					switch displayItem {
+					case "Slicing...":
+						displayItem = getMsg("status_slicing", lang)
+					case "Processing...":
+						displayItem = getMsg("status_processing", lang)
+					case "Stitching...":
+						displayItem = getMsg("status_stitching", lang)
+					}
 				}
+				a.changeProgressDetail(curr, total, displayItem, formatDuration(elapsed), eta)
+			},
+			WebpFallbackCallback: func() {
+				a.showError(getMsg("webp_nostitch_fallback", lang), false)
+			},
+		}
+
+		resPath, err := pipeline.MergerImages(processFolder, opts)
+		if err != nil {
+			if checkState() != nil {
+				a.changeStatusText(getMsg("stopped", lang))
+				a.updateStep("ready")
+				return stopped
+			}
+			a.showError(err.Error(), true)
+			a.changeStatusText(getMsg("error_unexpected", lang, err.Error()))
+			a.updateStep("ready")
+			return failed(err.Error())
+		} else {
+			a.updateStep("save")
+			a.setLastOutput(resPath)
+			a.showOpenFolderButton(resPath)
+			a.changeProgress(100)
+			a.updateStep("done")
+			a.changeStatusText(getMsg("idle_done", lang))
+			result = queue.Result{Status: queue.StatusDone, OutputPath: resPath, OK: 1, Total: 1}
+			if !inQueue {
+				playSound, _ := params["play_sound"].(bool)
+				if playSound {
+					a.playAudio("success.wav")
+				}
+				successMsg := getMsg("idle_done", lang)
+				if resPath != "" {
+					successMsg = fmt.Sprintf("%s (%s)", successMsg, filepath.Base(resPath))
+				}
+				a.showSuccess(successMsg)
+				a.clearSourceDirectory()
 			}
 		}
-		_ = os.MkdirAll(outputBase, 0755)
+	} else {
+		// Batch mode
+		a.changeProgress(0)
+		a.updateStep("scan")
+		subfolders, scanErr := archive.FastScanDirWithCheck(dirAddress, checkState)
+		if scanErr != nil {
+			a.showError(scanErr.Error(), true)
+			a.updateStep("ready")
+			if checkState() != nil {
+				return stopped
+			}
+			return failed(scanErr.Error())
+		}
+		var validFolders []string
+		for _, sf := range subfolders {
+			imgs, _ := sorting.GetAllImagesDirectory(sf)
+			if len(imgs) > 0 {
+				validFolders = append(validFolders, sf)
+			}
+		}
 
-		currentDate := time.Now().Format("2006-01-02 15-04-05")
+		if len(validFolders) == 0 {
+			a.showError(getMsg("no_subfolders", lang), true)
+			a.changeStatusText(getMsg("error_valid_dir", lang))
+			a.updateStep("ready")
+			return failed(getMsg("no_subfolders", lang))
+		}
 
-		if isSingleMode {
-			a.changeProgress(0)
-			a.updateStep("scan")
-			a.changeStatusOnly(getMsg("processing_single", lang))
+		totalFolders := len(validFolders)
+		var aiExePath string
+		if isEnhance && enhanceEngine != "fast" {
+			aiExePath = enhancer.FindRealEsrganExecutable("")
+			if aiExePath == "" {
+				a.showError(getMsg("enhancer_missing", lang), true)
+				a.changeStatusText(getMsg("enhancing_fail", lang))
+				a.updateStep("ready")
+				return failed(getMsg("enhancer_missing", lang))
+			}
+		}
+
+		successCount := 0
+		failCount := 0
+		firstErr := ""
+
+		for idx, fld := range validFolders {
+			if checkState() != nil {
+				break
+			}
+
+			fldName := filepath.Base(fld)
+			a.changeStatusOnly(getMsg("processing_multi", lang, fldName, idx+1, totalFolders))
 			a.updateStep("process")
 
-			processFolder := dirAddress
+			processFolder := fld
 			if isEnhance {
 				a.updateStep("process")
 				if enhanceEngine == "fast" {
-					a.changeStatusOnly(getMsg("enhancing_fast_run", lang, len(directImages)))
-					enhancedDir, err := enhancer.RunFastEnhancement(dirAddress, threadCount, checkState, func(pct, curr, total int) {
-						a.changeProgress(float64(pct))
+					enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, checkState, func(pct, curr, total int) {
+						overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
+						a.changeProgress(overallPct)
 						st := a.getStartTime()
 						elapsed := time.Since(st).Seconds()
-						eta := calculateEta(st, float64(pct))
-						a.changeProgressDetail(curr, total, getMsg("status_denoising", lang), formatDuration(elapsed), eta)
+						eta := calculateEta(st, overallPct)
+						a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 					})
 					if err != nil {
 						if checkState() != nil {
-							a.changeStatusText(getMsg("stopped", lang))
-							a.updateStep("ready")
-							a.setButtonState("idle")
-							a.execJS("stopTimer();")
-							return
+							break
 						}
-						a.showError(fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error()), true)
-						a.changeStatusText(getMsg("enhancing_fail", lang))
-						a.updateStep("ready")
-						a.setButtonState("idle")
-						a.execJS("stopTimer();")
-						return
-					}
-					if enhancedDir != "" {
+						a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
+					} else if enhancedDir != "" {
 						processFolder = enhancedDir
 					}
 				} else {
-					exePath := enhancer.FindRealEsrganExecutable("")
-					if exePath == "" {
-						a.showError(getMsg("enhancer_missing", lang), true)
-						a.changeStatusText(getMsg("enhancing_fail", lang))
-						a.updateStep("ready")
-						a.setButtonState("idle")
-						a.execJS("stopTimer();")
-						return
-					}
-					a.changeStatusOnly(getMsg("enhancing_run", lang, len(directImages)))
-					enhancedDir, err := enhancer.RunRealEsrganAI(exePath, dirAddress, "", checkState, func(pct, curr, total int) {
-						a.changeProgress(float64(pct))
+					enhancedDir, err := enhancer.RunRealEsrganAI(aiExePath, fld, "", checkState, func(pct, curr, total int) {
+						overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
+						a.changeProgress(overallPct)
 						st := a.getStartTime()
 						elapsed := time.Since(st).Seconds()
-						eta := calculateEta(st, float64(pct))
-						a.changeProgressDetail(curr, total, getMsg("status_enhancing", lang), formatDuration(elapsed), eta)
+						eta := calculateEta(st, overallPct)
+						a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 					})
 					if err != nil {
 						if checkState() != nil {
-							a.changeStatusText(getMsg("stopped", lang))
-							a.updateStep("ready")
-							a.setButtonState("idle")
-							a.execJS("stopTimer();")
-							return
+							break
 						}
-						a.showError(fmt.Sprintf("%s: %s", getMsg("enhancing_fail", lang), err.Error()), true)
-						a.changeStatusText(getMsg("enhancing_fail", lang))
-						a.updateStep("ready")
-						a.setButtonState("idle")
-						a.execJS("stopTimer();")
-						return
-					}
-					if enhancedDir != "" {
+						a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
+					} else if enhancedDir != "" {
 						processFolder = enhancedDir
 					}
 				}
@@ -1285,12 +1481,12 @@ func (a *App) Start(params map[string]interface{}) {
 			a.updateStep("process")
 
 			opts := pipeline.PipelineOptions{
-				Mode:                  "single",
+				Mode:                  "multi",
 				NewWidth:              widthVal,
 				IsCustomWidth:         isCustomWidth,
 				SaveFormat:            saveFormat,
 				SaveQuality:           saveQualityVal,
-				SaveDirectory:         stitchedSaveName,
+				SaveDirectory:         fldName,
 				HeightLimit:           heightLimitVal,
 				CurrentDate:           currentDate,
 				IsZip:                 isZip,
@@ -1310,246 +1506,75 @@ func (a *App) Start(params map[string]interface{}) {
 				WatermarkMargin:       wmMargin,
 				Controller:            a.getController(),
 				ProgressCallback: func(pct float64, curr, total int, item string) {
-					a.changeProgress(pct)
+					overallPct := (float64(idx)/float64(totalFolders))*100.0 + (pct / float64(totalFolders))
+					a.changeProgress(overallPct)
 					st := a.getStartTime()
 					elapsed := time.Since(st).Seconds()
-					eta := calculateEta(st, pct)
-					displayItem := item
-					if displayItem == "" {
-						displayItem = filepath.Base(dirAddress)
-					} else {
-						switch displayItem {
-						case "Slicing...":
-							displayItem = getMsg("status_slicing", lang)
-						case "Processing...":
-							displayItem = getMsg("status_processing", lang)
-						case "Stitching...":
-							displayItem = getMsg("status_stitching", lang)
-						}
-					}
-					a.changeProgressDetail(curr, total, displayItem, formatDuration(elapsed), eta)
-				},
-				WebpFallbackCallback: func() {
-					a.showError(getMsg("webp_nostitch_fallback", lang), false)
+					eta := calculateEta(st, overallPct)
+					a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
 				},
 			}
 
 			resPath, err := pipeline.MergerImages(processFolder, opts)
-			if err != nil {
-				if checkState() != nil {
-					a.changeStatusText(getMsg("stopped", lang))
-					a.updateStep("ready")
-					a.setButtonState("idle")
-					a.execJS("stopTimer();")
-					return
-				}
-				a.showError(err.Error(), true)
-				a.changeStatusText(getMsg("error_unexpected", lang, err.Error()))
-				a.updateStep("ready")
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
-			} else {
-				a.updateStep("save")
+			if err == nil {
 				a.setLastOutput(resPath)
-				a.showOpenFolderButton(resPath)
-				a.changeProgress(100)
-				a.updateStep("done")
-				a.changeStatusText(getMsg("idle_done", lang))
-				playSound, _ := params["play_sound"].(bool)
-				if playSound {
-					a.playAudio("success.wav")
+				successCount++
+			} else {
+				failCount++
+				if firstErr == "" {
+					firstErr = fmt.Sprintf("%s: %s", fldName, err.Error())
 				}
-				successMsg := getMsg("idle_done", lang)
-				if resPath != "" {
-					successMsg = fmt.Sprintf("%s (%s)", successMsg, filepath.Base(resPath))
-				}
-				a.showSuccess(successMsg)
-				a.clearSourceDirectory()
-			}
-		} else {
-			// Batch mode
-			a.changeProgress(0)
-			a.updateStep("scan")
-			subfolders, scanErr := archive.FastScanDirWithCheck(dirAddress, checkState)
-			if scanErr != nil {
-				a.showError(scanErr.Error(), true)
-				a.updateStep("ready")
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
-			}
-			var validFolders []string
-			for _, sf := range subfolders {
-				imgs, _ := sorting.GetAllImagesDirectory(sf)
-				if len(imgs) > 0 {
-					validFolders = append(validFolders, sf)
-				}
-			}
-
-			if len(validFolders) == 0 {
-				a.showError(getMsg("no_subfolders", lang), true)
-				a.changeStatusText(getMsg("error_valid_dir", lang))
-				a.updateStep("ready")
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
-			}
-
-			totalFolders := len(validFolders)
-			var aiExePath string
-			if isEnhance && enhanceEngine != "fast" {
-				aiExePath = enhancer.FindRealEsrganExecutable("")
-				if aiExePath == "" {
-					a.showError(getMsg("enhancer_missing", lang), true)
-					a.changeStatusText(getMsg("enhancing_fail", lang))
-					a.updateStep("ready")
-					a.setButtonState("idle")
-					a.execJS("stopTimer();")
-					return
-				}
-			}
-
-			successCount := 0
-			failCount := 0
-
-			for idx, fld := range validFolders {
 				if checkState() != nil {
 					break
 				}
-
-				fldName := filepath.Base(fld)
-				a.changeStatusOnly(getMsg("processing_multi", lang, fldName, idx+1, totalFolders))
-				a.updateStep("process")
-
-				processFolder := fld
-				if isEnhance {
-					a.updateStep("process")
-					if enhanceEngine == "fast" {
-						enhancedDir, err := enhancer.RunFastEnhancement(fld, threadCount, checkState, func(pct, curr, total int) {
-							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
-							a.changeProgress(overallPct)
-							st := a.getStartTime()
-							elapsed := time.Since(st).Seconds()
-							eta := calculateEta(st, overallPct)
-							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
-						})
-						if err != nil {
-							if checkState() != nil {
-								break
-							}
-							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
-						} else if enhancedDir != "" {
-							processFolder = enhancedDir
-						}
-					} else {
-						enhancedDir, err := enhancer.RunRealEsrganAI(aiExePath, fld, "", checkState, func(pct, curr, total int) {
-							overallPct := (float64(idx)/float64(totalFolders))*100.0 + (float64(pct) / float64(totalFolders))
-							a.changeProgress(overallPct)
-							st := a.getStartTime()
-							elapsed := time.Since(st).Seconds()
-							eta := calculateEta(st, overallPct)
-							a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
-						})
-						if err != nil {
-							if checkState() != nil {
-								break
-							}
-							a.showError(fmt.Sprintf("%s (%s): %s", getMsg("enhancing_fail", lang), fldName, err.Error()), true)
-						} else if enhancedDir != "" {
-							processFolder = enhancedDir
-						}
-					}
-				}
-
-				a.updateStep("process")
-
-				opts := pipeline.PipelineOptions{
-					Mode:                  "multi",
-					NewWidth:              widthVal,
-					IsCustomWidth:         isCustomWidth,
-					SaveFormat:            saveFormat,
-					SaveQuality:           saveQualityVal,
-					SaveDirectory:         fldName,
-					HeightLimit:           heightLimitVal,
-					CurrentDate:           currentDate,
-					IsZip:                 isZip,
-					IsPdf:                 isPdf,
-					IsCbz:                 isCbz,
-					IsNoStitch:            isNoStitch,
-					OutputBase:            outputBase,
-					MaxWorkers:            threadCount,
-					AutoTuneWorkers:       true,
-					FilenamePattern:       filenamePattern,
-					FilenameDigits:        filenameDigits,
-					WatermarkEnabled:      wmEnabled,
-					WatermarkPath:         wmPath,
-					WatermarkCount:        wmCount,
-					WatermarkEdge:         wmEdge,
-					WatermarkWidthPercent: 0,
-					WatermarkMargin:       wmMargin,
-					Controller:            a.getController(),
-					ProgressCallback: func(pct float64, curr, total int, item string) {
-						overallPct := (float64(idx)/float64(totalFolders))*100.0 + (pct / float64(totalFolders))
-						a.changeProgress(overallPct)
-						st := a.getStartTime()
-						elapsed := time.Since(st).Seconds()
-						eta := calculateEta(st, overallPct)
-						a.changeProgressDetail(idx+1, totalFolders, fldName, formatDuration(elapsed), eta)
-					},
-				}
-
-				resPath, err := pipeline.MergerImages(processFolder, opts)
-				if err == nil {
-					a.setLastOutput(resPath)
-					successCount++
-				} else {
-					failCount++
-					if checkState() != nil {
-						break
-					}
-					a.showError(fmt.Sprintf("%s (%s): %s", getMsg("error_folder", lang), fldName, err.Error()), true)
-				}
+				a.showError(fmt.Sprintf("%s (%s): %s", getMsg("error_folder", lang), fldName, err.Error()), true)
 			}
+		}
 
-			if checkState() != nil {
-				a.changeStatusText(getMsg("stopped", lang))
-				a.updateStep("ready")
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
+		if checkState() != nil {
+			a.changeStatusText(getMsg("stopped", lang))
+			a.updateStep("ready")
+			return queue.Result{Status: queue.StatusStopped, OK: successCount, Failed: failCount, Total: totalFolders}
+		}
+
+		if successCount == 0 {
+			batchErr := firstErr
+			if batchErr == "" {
+				batchErr = getMsg("no_images_process", lang)
 			}
+			a.changeStatusText(getMsg("no_images_process", lang))
+			a.updateStep("ready")
+			return queue.Result{Status: queue.StatusFailed, Error: batchErr, Failed: failCount, Total: totalFolders}
+		}
 
-			if successCount == 0 {
-				a.changeStatusText(getMsg("no_images_process", lang))
-				a.updateStep("ready")
-				a.setButtonState("idle")
-				a.execJS("stopTimer();")
-				return
+		a.updateStep("save")
+		a.changeProgress(100)
+		a.updateStep("done")
+		if failCount > 0 {
+			a.changeStatusText(fmt.Sprintf("%s (%d/%d)", getMsg("idle_done", lang), successCount, totalFolders))
+		} else {
+			a.changeStatusText(getMsg("idle_done", lang))
+		}
+
+		lastOut := a.getLastOutput()
+		if lastOut != "" {
+			openTarget := outputBase
+			dateTarget := filepath.Join(outputBase, currentDate)
+			if fi, err := os.Stat(dateTarget); err == nil && fi.IsDir() {
+				openTarget = dateTarget
 			}
-
-			a.updateStep("save")
-			a.changeProgress(100)
-			a.updateStep("done")
-			if failCount > 0 {
-				a.changeStatusText(fmt.Sprintf("%s (%d/%d)", getMsg("idle_done", lang), successCount, totalFolders))
+			if fi, err := os.Stat(openTarget); err == nil && fi.IsDir() {
+				a.showOpenFolderButton(openTarget)
 			} else {
-				a.changeStatusText(getMsg("idle_done", lang))
+				a.showOpenFolderButton(lastOut)
 			}
-
-			lastOut := a.getLastOutput()
-			if lastOut != "" {
-				openTarget := outputBase
-				dateTarget := filepath.Join(outputBase, currentDate)
-				if fi, err := os.Stat(dateTarget); err == nil && fi.IsDir() {
-					openTarget = dateTarget
-				}
-				if fi, err := os.Stat(openTarget); err == nil && fi.IsDir() {
-					a.showOpenFolderButton(openTarget)
-				} else {
-					a.showOpenFolderButton(lastOut)
-				}
-			}
+		}
+		result = queue.Result{Status: queue.StatusDone, OutputPath: lastOut, OK: successCount, Failed: failCount, Total: totalFolders}
+		if failCount > 0 {
+			result.Status = queue.StatusPartial
+			result.Error = firstErr
+		}
+		if !inQueue {
 			playSound, _ := params["play_sound"].(bool)
 			if playSound {
 				a.playAudio("success.wav")
@@ -1561,11 +1586,10 @@ func (a *App) Start(params map[string]interface{}) {
 			}
 			a.clearSourceDirectory()
 		}
+	}
 
-		a.setButtonState("idle")
-		a.execJS("stopTimer();")
-		_ = archiveTempDir
-	}()
+	_ = archiveTempDir
+	return result
 }
 
 func getFloatOrInt(v interface{}, def float64) float64 {
