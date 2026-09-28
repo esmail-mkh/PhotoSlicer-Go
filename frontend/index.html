@@ -165,6 +165,14 @@
                             <path d="M3.5 2A1.5 1.5 0 0 0 2 3.5v9A1.5 1.5 0 0 0 3.5 14h9a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 12.5 4H8.207a.5.5 0 0 1-.353-.146L7.147 3.147A1.5 1.5 0 0 0 6.086 2.5H3.5z"/>
                         </svg>
 
+                        <!-- What to do here, shown while the field is empty -->
+                        <span class="folder-hint" data-i18n="dropHint">Drop folder or PDF / ZIP / CBZ here</span>
+
+                        <!-- The chosen path as breadcrumbs: start and end stay visible however
+                             long it is (the field itself can only cut off its tail). Shown
+                             while the field is not being edited; see renderFolderValue(). -->
+                        <div class="folder-value" id="folder-value" dir="ltr" aria-hidden="true"></div>
+
                         <!-- Animated drop overlay (shown only while dragging a folder over the window).
                              Placed after the input+label so the `input + .floating-label`
                              adjacency that floats the label is preserved. -->
@@ -253,33 +261,36 @@
                         </div>
                     </div>
 
-                    <div class="control-card" data-tooltip-key="tipQuality">
+                    <div class="control-card card-quality" data-tooltip-key="tipQuality">
                         <div class="card-header">
                             <div class="label-with-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="label-icon" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M2.866 14.85c-.078.444.36.791.746.593l4.39-2.256 4.389 2.256c.386.198.824-.149.746-.592l-.83-4.73 3.522-3.356c.33-.314.16-.888-.282-.95l-4.898-.696L8.465.792a.513.513 0 0 0-.927 0L5.354 5.12l-4.898.696c-.441.062-.612.636-.283.95l3.523 3.356-.83 4.73zm4.905-2.767-3.686 1.894.694-3.957a.56.56 0 0 0-.163-.505L1.71 6.745l4.052-.576a.525.525 0 0 0 .393-.288L8 2.223l1.847 3.658a.525.525 0 0 0 .393.288l4.052.575-2.906 2.77a.56.56 0 0 0-.163.506l.694 3.957-3.686-1.894a.5.5 0 0 0-.461 0z"/>
                                 </svg>
-                                <label data-i18n="quality">Quality</label>
+                                <label id="quality-label" for="quality-input" data-i18n="quality">Quality</label>
                             </div>
                         </div>
                         <div class="input-with-unit">
                             <input type="number" id="quality-input" value="100" max="100" min="1">
                             <span>%</span>
                         </div>
+                        <input type="range" id="quality-slider" class="quality-slider" min="1" max="100" step="1" value="100" aria-labelledby="quality-label">
                     </div>
 
-                    <div class="control-card" data-tooltip-key="tipFormat">
+                    <div class="control-card card-format" data-tooltip-key="tipFormat">
                         <div class="card-header">
                             <div class="label-with-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="label-icon" fill="currentColor" viewBox="0 0 16 16">
                                     <path d="M4.502 9a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3"/>
                                     <path d="M14.002 13a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2V5A2 2 0 0 1 2 3a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v8a2 2 0 0 1-1.998 2M14 2H4a1 1 0 0 0-1 1h9.002a2 2 0 0 1 2 2v7A1 1 0 0 0 15 11V3a1 1 0 0 0-1-1M2.002 4a1 1 0 0 0-1 1v8l2.646-2.354a.5.5 0 0 1 .63-.062l2.66 1.726 3.755-3.756a.5.5 0 0 1 .577-.094l3.772 1.947V5a1 1 0 0 0-1-1h-10"/>
                                 </svg>
-                                <label data-i18n="format">Format</label>
+                                <label id="format-label" data-i18n="format">Format</label>
                             </div>
+                            <span class="format-desc" id="format-desc" aria-live="polite"></span>
                         </div>
+                        <!-- Native select kept as hidden data-store (read/written by app logic);
+                             the menu is built from its options by buildFormatMenu() -->
                         <div class="select-wrap format-dropdown" data-open="false">
-                            <!-- Native select kept as hidden data-store (read/written by app logic) -->
                             <select id="format-select" class="native-select" tabindex="-1" aria-hidden="true">
                                 <option value="JPG" selected>JPG</option>
                                 <option value="PNG">PNG</option>
@@ -287,13 +298,13 @@
                                 <option value="AVIF">AVIF</option>
                                 <option value="PSD">PSD</option>
                             </select>
-                            <button type="button" class="select-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                <span class="select-value">JPG</span>
-                                <svg class="select-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
-                                    <path d="M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z"/>
-                                </svg>
+                            <button type="button" class="fmt-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="format-label format-name">
+                                <span class="fmt-name" id="format-name">JPG</span>
+                                <span class="fmt-chevron" aria-hidden="true">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 6 4 4 4-4"/></svg>
+                                </span>
                             </button>
-                            <ul class="select-menu" role="listbox" aria-label="Output format"></ul>
+                            <ul class="select-menu" role="listbox" aria-labelledby="format-label"></ul>
                         </div>
                     </div>
                 </div>
@@ -323,6 +334,10 @@
 
                 <!-- Export format — three mutually-exclusive options as one connected selector -->
                 <div class="format-selector" role="group" aria-label="Export format">
+                    <div class="export-head">
+                        <span class="export-title" data-i18n="exportAs">Export as</span>
+                        <span class="export-current" id="export-current"></span>
+                    </div>
                     <div class="format-segments">
                         <div class="format-segment" data-tooltip-key="tipZip">
                             <input type="checkbox" id="is-zip" onclick="handleCheckboxClick(this)">
@@ -480,6 +495,14 @@
                             </div>
                             <span class="step-label" data-i18n="stepDone">Done</span>
                         </div>
+                    </div>
+
+                    <!-- Activity: what the run has done so far, newest at the bottom -->
+                    <div class="activity" id="activity">
+                        <div class="activity-head">
+                            <span class="activity-title" data-i18n="activityTitle">Activity</span>
+                        </div>
+                        <ol class="activity-list" id="activity-list"></ol>
                     </div>
 
                     <div class="progress-text" id="pr-text">0%</div>

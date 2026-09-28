@@ -2786,175 +2786,9 @@ select:focus {
         inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-/* ============================================
-   CUSTOM SELECT — Output format dropdown
-   ============================================ */
+/* Hidden data-store behind the output-format pills */
 .native-select {
     display: none;
-}
-
-.select-wrap {
-    position: relative;
-    width: 100%;
-}
-
-.select-trigger {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.3));
-    border: 1.5px solid var(--input-border);
-    color: var(--text-primary);
-    padding: 10px 14px;
-    border-radius: 10px;
-    cursor: pointer;
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 0.85rem;
-    letter-spacing: 0.2px;
-    transition: var(--transition-med);
-    box-shadow:
-        inset 0 2px 4px rgba(0, 0, 0, 0.3),
-        inset 0 -1px 0 rgba(255, 255, 255, 0.03);
-}
-
-.select-trigger:hover {
-    border-color: var(--glass-border-hover);
-    background-color: rgba(0, 0, 0, 0.36);
-}
-
-.select-wrap[data-open="true"] .select-trigger {
-    border-color: var(--theme-solid);
-    box-shadow:
-        0 0 0 3px var(--theme-glow-soft),
-        inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.select-value {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-}
-
-/* Themed status dot before the current value */
-.select-value::before {
-    content: '';
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--theme-solid);
-    box-shadow: 0 0 8px var(--theme-glow);
-    flex: none;
-}
-
-.select-arrow {
-    width: 12px;
-    height: 12px;
-    color: var(--text-tertiary);
-    transition: transform var(--transition-med), color var(--transition-med);
-    flex: none;
-}
-
-.select-wrap[data-open="true"] .select-arrow {
-    transform: rotate(180deg);
-    color: var(--theme-solid);
-}
-
-/* Popover menu */
-.select-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    left: 0;
-    right: 0;
-    margin: 0;
-    padding: 5px;
-    list-style: none;
-    background: linear-gradient(180deg, rgba(30, 32, 41, 0.98), rgba(20, 22, 28, 0.98));
-    border: 1px solid var(--glass-border);
-    border-radius: 12px;
-    box-shadow:
-        0 18px 40px -12px rgba(0, 0, 0, 0.7),
-        0 6px 16px rgba(0, 0, 0, 0.4),
-        inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    z-index: 60;
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-    transform-origin: top center;
-    pointer-events: none;
-    transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.select-wrap[data-open="true"] .select-menu {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-}
-
-.select-option {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 10px;
-    border-radius: 8px;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.select-option:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #fff;
-}
-
-.opt-name {
-    font-weight: 700;
-    font-size: 0.84rem;
-    flex: none;
-    min-width: 48px;
-}
-
-.opt-desc {
-    font-size: 0.7rem;
-    color: var(--text-tertiary);
-    font-weight: 500;
-    flex: 1;
-    text-align: left;
-}
-
-.opt-check {
-    width: 15px;
-    height: 15px;
-    color: var(--theme-solid);
-    opacity: 0;
-    transition: opacity var(--transition-fast);
-    flex: none;
-}
-
-.select-option[aria-selected="true"] {
-    background: linear-gradient(180deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.02));
-    color: #fff;
-}
-
-.select-option[aria-selected="true"] .opt-name {
-    color: var(--theme-solid);
-}
-
-.select-option[aria-selected="true"] .opt-check {
-    opacity: 1;
-}
-
-/* Let the popover escape the control-card's overflow: hidden */
-.control-card:has(.select-wrap[data-open="true"]) {
-    overflow: visible;
-    z-index: 40;
-}
-
-[dir="rtl"] .opt-desc {
-    text-align: right;
 }
 
 /* ============================================
@@ -3792,8 +3626,8 @@ select:focus {
     filter: drop-shadow(0 0 6px var(--theme-glow));
 }
 
-/* Focus */
-.checkbox-group:focus-within label {
+/* Focus (keyboard only, so a tile you just clicked off does not look pressed) */
+.checkbox-group input:focus-visible + label {
     border-color: var(--theme-solid);
     box-shadow:
         0 0 0 3px var(--theme-glow-soft),
@@ -5051,6 +4885,1075 @@ body.workspace-processing .workspace-controls {
     padding: 0;
     pointer-events: none;
     overflow: hidden;
+}
+
+/* ============================================
+   WORKSPACE LAYOUT
+   The Workspace fills the window like the other tabs do, so the frame keeps
+   its height when switching tabs and the start button stays where it is when
+   the controls fold away for a run.
+   ============================================ */
+body[data-tab="process"] .container {
+    flex: 1 1 auto;
+}
+
+#process.tab-content.active {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.workspace-controls {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.workspace-controls .options-row,
+.workspace-controls .format-selector {
+    margin-top: 0;
+}
+
+#process .status-area {
+    margin-top: auto;
+}
+
+/* While a job runs the progress card takes all the room the controls left;
+   its activity feed soaks up whatever height the rest does not need. */
+body.workspace-processing #process .status-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+body.workspace-processing #process .status-area > * {
+    flex: none;
+}
+
+body.workspace-processing #process .status-area > .activity {
+    flex: 1 1 0;
+}
+
+/* ============================================
+   WORKSPACE CARDS
+   Each control is a small glass module: an icon chip, a big glowing value and
+   a hairline ruler (or slider) underneath, in the spirit of the progress bar.
+   ============================================ */
+.workspace-controls .settings-grid {
+    gap: 10px;
+    grid-auto-rows: 1fr;
+}
+
+.settings-grid .control-card {
+    padding: 11px 14px 13px;
+    gap: 6px;
+    background:
+        radial-gradient(120% 90% at 50% -25%, var(--theme-glow-soft), transparent 62%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.015) 60%, transparent 100%);
+}
+
+.settings-grid .control-card:hover {
+    background:
+        radial-gradient(120% 90% at 50% -25%, var(--theme-glow), transparent 62%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.025) 60%, transparent 100%);
+}
+
+.card-header {
+    min-height: 26px;
+}
+
+/* Icon chip */
+.settings-grid .label-icon {
+    box-sizing: content-box;
+    width: 14px;
+    height: 14px;
+    padding: 6px;
+    border-radius: 9px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--theme-solid);
+    opacity: 0.85;
+}
+
+.settings-grid .control-card:hover .label-icon {
+    background: linear-gradient(160deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.03));
+    border-color: var(--theme-glow-soft);
+    transform: none;
+    opacity: 1;
+}
+
+/* Big value with a unit chip */
+.settings-grid .input-with-unit {
+    position: relative;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 0 0 12px;
+    background: none;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.settings-grid .control-card:focus-within .input-with-unit {
+    background: none;
+    box-shadow: none;
+}
+
+.settings-grid .input-with-unit input {
+    min-width: 0;
+    padding: 0;
+    font-size: 1.9rem;
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    text-align: start;
+    background: linear-gradient(180deg, #fff 12%, var(--theme-solid) 135%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    caret-color: var(--theme-solid);
+    filter: drop-shadow(0 0 12px var(--theme-glow-soft));
+}
+
+.settings-grid .control-card:focus-within .input-with-unit input {
+    color: transparent;
+    text-shadow: none;
+}
+
+.settings-grid .input-with-unit span {
+    flex: none;
+    margin-bottom: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-tertiary);
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+}
+
+[dir="rtl"] .settings-grid .input-with-unit span {
+    padding: 2px 8px;
+}
+
+.settings-grid .control-card:focus-within .input-with-unit span {
+    color: var(--theme-solid);
+    border-color: var(--theme-glow-soft);
+}
+
+/* Measuring-tape ruler under the number; it lights up while the field is edited */
+.settings-grid .input-with-unit::after,
+.settings-grid .fmt-trigger::after {
+    --tick: rgba(255, 255, 255, 0.14);
+    --tick-major: rgba(255, 255, 255, 0.28);
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 9px;
+    pointer-events: none;
+    background:
+        linear-gradient(90deg, var(--tick-major) 1px, transparent 1px) 0 100% / 40px 9px repeat-x,
+        linear-gradient(90deg, var(--tick) 1px, transparent 1px) 0 100% / 8px 5px repeat-x;
+    -webkit-mask-image: linear-gradient(90deg, #000 35%, transparent);
+    mask-image: linear-gradient(90deg, #000 35%, transparent);
+    transition: var(--transition-med);
+}
+
+[dir="rtl"] .settings-grid .input-with-unit::after,
+[dir="rtl"] .settings-grid .fmt-trigger::after {
+    background-position: 100% 100%, 100% 100%;
+    -webkit-mask-image: linear-gradient(270deg, #000 35%, transparent);
+    mask-image: linear-gradient(270deg, #000 35%, transparent);
+}
+
+.settings-grid .control-card:focus-within .input-with-unit::after,
+.settings-grid .control-card:focus-within .fmt-trigger::after {
+    --tick: var(--theme-glow);
+    --tick-major: var(--theme-solid);
+}
+
+/* --- Quality: the slider takes the ruler's place --- */
+.card-quality .input-with-unit {
+    padding-bottom: 0;
+}
+
+.card-quality .input-with-unit::after {
+    display: none;
+}
+
+.quality-slider {
+    --qf: 1;
+    --sd: 90deg;
+    --sp: 0%;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 8px;
+    margin: 3px 0 5px;
+    border-radius: 999px;
+    cursor: pointer;
+    outline: none;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow:
+        inset 0 1px 3px rgba(0, 0, 0, 0.55),
+        0 0 14px var(--theme-glow-soft);
+    background:
+        linear-gradient(var(--sd), transparent 24.6%, rgba(255, 255, 255, 0.16) 24.6% 25.3%, transparent 25.3%),
+        linear-gradient(var(--sd), transparent 49.6%, rgba(255, 255, 255, 0.16) 49.6% 50.3%, transparent 50.3%),
+        linear-gradient(var(--sd), transparent 74.6%, rgba(255, 255, 255, 0.16) 74.6% 75.3%, transparent 75.3%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 60%) var(--sp) 0 / calc(10px + (100% - 20px) * var(--qf)) 100% no-repeat,
+        linear-gradient(var(--sd), var(--theme-solid-2, var(--theme-solid)), var(--theme-solid)) var(--sp) 0 / calc(10px + (100% - 20px) * var(--qf)) 100% no-repeat,
+        linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.3));
+}
+
+[dir="rtl"] .quality-slider {
+    --sd: 270deg;
+    --sp: 100%;
+}
+
+.quality-slider::-webkit-slider-runnable-track {
+    height: 8px;
+    background: transparent;
+}
+
+.quality-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    margin-top: -7px;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle, #fff 0 38%, var(--theme-solid) 76%);
+    box-shadow:
+        0 0 10px 3px var(--theme-glow-strong),
+        0 0 3px 1px rgba(255, 255, 255, 0.8);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.quality-slider:hover::-webkit-slider-thumb {
+    transform: scale(1.1);
+}
+
+.quality-slider:active::-webkit-slider-thumb,
+.quality-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow:
+        0 0 16px 5px var(--theme-glow-strong),
+        0 0 4px 1px rgba(255, 255, 255, 0.9);
+    transform: scale(1.18);
+}
+
+/* --- Format: the chosen format as a big name that opens a menu of formats --- */
+.card-format {
+    gap: 6px;
+}
+
+.format-dropdown {
+    position: relative;
+}
+
+.fmt-trigger {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    width: 100%;
+    padding: 0 0 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+
+.fmt-trigger:focus-visible {
+    outline: 2px solid var(--theme-solid);
+    outline-offset: 3px;
+    border-radius: 10px;
+}
+
+.fmt-chevron {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    margin-bottom: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: var(--text-secondary);
+    transition: var(--transition-med);
+}
+
+.fmt-chevron svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fmt-trigger:hover .fmt-chevron,
+.format-dropdown[data-open="true"] .fmt-chevron {
+    color: var(--on-theme-text, #fff);
+    background: var(--theme-gradient);
+    border-color: transparent;
+    box-shadow: 0 4px 14px var(--theme-glow);
+}
+
+.format-dropdown[data-open="true"] .fmt-chevron svg {
+    transform: rotate(180deg);
+}
+
+/* Menu: full card width, opening downwards over the rows below */
+.select-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    inset-inline: -13px;
+    z-index: 30;
+    list-style: none;
+    margin: 0;
+    padding: 6px;
+    border-radius: 14px;
+    background: rgba(13, 17, 27, 0.95);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.55),
+        0 0 0 1px var(--theme-glow-soft),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-6px) scale(0.98);
+    transform-origin: top center;
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.2s;
+}
+
+.format-dropdown[data-open="true"] .select-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+}
+
+.select-option {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) 14px;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.select-option:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+}
+
+.opt-name {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.opt-desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-tertiary);
+    font-size: 0.68rem;
+    text-align: start;
+}
+
+.opt-check {
+    width: 13px;
+    height: 13px;
+    color: var(--theme-solid);
+    opacity: 0;
+}
+
+.select-option[aria-selected="true"] {
+    background: linear-gradient(90deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.02));
+    color: var(--text-primary);
+}
+
+[dir="rtl"] .select-option[aria-selected="true"] {
+    background: linear-gradient(270deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.02));
+}
+
+.select-option[aria-selected="true"] .opt-name {
+    color: var(--theme-solid);
+}
+
+.select-option[aria-selected="true"] .opt-check {
+    opacity: 1;
+}
+
+/* Let the menu escape the card's overflow: hidden and sit above the rows below */
+.control-card:has(.format-dropdown[data-open="true"]) {
+    overflow: visible;
+    z-index: 40;
+}
+
+.fmt-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.15;
+    text-align: center;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    background: linear-gradient(180deg, #fff 12%, var(--theme-solid) 135%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 12px var(--theme-glow-soft));
+}
+
+.fmt-name.swap {
+    animation: fmtPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fmtPop {
+    from { opacity: 0.2; transform: scale(0.8); }
+    to { opacity: 1; transform: none; }
+}
+
+/* What the chosen format is good for, at the right end of the card header */
+.format-desc {
+    max-width: 55%;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-secondary);
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.format-desc:empty {
+    display: none;
+}
+
+/* ============================================
+   ACTIVITY FEED (inside the progress card)
+   ============================================ */
+.activity {
+    display: none;
+    flex-direction: column;
+    min-height: 0;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+body.workspace-processing .activity {
+    display: flex;
+    animation: activityIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.activity-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: var(--text-tertiary);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+}
+
+.activity-head::before {
+    content: '';
+    width: 14px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--pg-a);
+    box-shadow: 0 0 8px var(--pg-glow);
+}
+
+.activity-head::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent);
+}
+
+[dir="rtl"] .activity-head::after {
+    background: linear-gradient(270deg, rgba(255, 255, 255, 0.08), transparent);
+}
+
+.activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.activity-list.is-clipped {
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 36px);
+    mask-image: linear-gradient(180deg, transparent 0, #000 36px);
+}
+
+.activity-item {
+    flex: none;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 10px;
+    padding: 7px 10px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    animation: activityIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes activityIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+
+.activity-item.is-run {
+    color: var(--text-primary);
+    border-color: var(--pg-soft);
+    background: linear-gradient(90deg, var(--pg-soft), rgba(255, 255, 255, 0.02));
+}
+
+[dir="rtl"] .activity-item.is-run {
+    background: linear-gradient(270deg, var(--pg-soft), rgba(255, 255, 255, 0.02));
+}
+
+.activity-mark {
+    position: relative;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+}
+
+.activity-item.is-run .activity-mark,
+.activity-item.is-done .activity-mark {
+    border-color: var(--pg-a);
+}
+
+.activity-item.is-done .activity-mark {
+    background: var(--pg-soft);
+}
+
+.activity-item.is-done .activity-mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 11px;
+    height: 11px;
+    background: var(--pg-a);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3.4 8.6l3.1 3.1 6.1-7.2'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round' d='M3.4 8.6l3.1 3.1 6.1-7.2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.activity-item.is-run .activity-mark::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 50%;
+    background: var(--pg-a);
+    box-shadow: 0 0 8px var(--pg-glow-strong);
+}
+
+body.is-processing .activity-item.is-run .activity-mark::after {
+    animation: statusDot 1.6s ease-in-out infinite;
+}
+
+.activity-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+.activity-meta {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-secondary);
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.62rem;
+    font-weight: 600;
+    white-space: nowrap;
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+.activity-time {
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.66rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-tertiary);
+    direction: ltr;
+    unicode-bidi: isolate;
+}
+
+.activity-empty {
+    margin: auto;
+    padding: 14px 0;
+    color: var(--text-tertiary);
+    font-size: 0.74rem;
+    text-align: center;
+    list-style: none;
+}
+
+/* ============================================
+   SOURCE CARD
+   The path field becomes a drop-zone card: dashed while empty, solid once a
+   source is chosen, with a glowing icon chip, a small caption and a hint line.
+   ============================================ */
+/* The field keeps direction: ltr even in Persian (paths are Latin text), so its
+   padding is physical: icon side, then the room the buttons need. */
+#directory-input {
+    min-height: 62px;
+    padding: 25px 142px 7px 74px !important;
+    border-radius: var(--radius-md);
+    border: 1.5px dashed rgba(255, 255, 255, 0.15);
+    background:
+        radial-gradient(90% 170% at 0% 0%, var(--theme-glow-soft), transparent 62%),
+        linear-gradient(180deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.28));
+    font-size: 0.86rem;
+    font-weight: 500;
+    text-overflow: ellipsis;
+}
+
+.folder-wrapper.has-value #directory-input {
+    padding-right: 184px !important;
+}
+
+.folder-wrapper.has-inspection #directory-input {
+    padding-right: 242px !important;
+}
+
+[dir="rtl"] .folder-wrapper #directory-input {
+    padding: 25px 74px 7px 142px !important;
+    text-align: right !important;
+}
+
+[dir="rtl"] .folder-wrapper.has-value #directory-input {
+    padding-right: 74px !important;
+    padding-left: 184px !important;
+}
+
+[dir="rtl"] .folder-wrapper.has-inspection #directory-input {
+    padding-right: 74px !important;
+    padding-left: 242px !important;
+}
+
+#directory-input:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+#directory-input:not(:placeholder-shown) {
+    border-style: solid;
+    border-color: var(--theme-glow);
+}
+
+#directory-input:focus {
+    border-style: solid;
+    border-color: var(--theme-solid);
+}
+
+/* Caption: always small, above the value; it lights up once there is one */
+.folder-wrapper .floating-label,
+.folder-wrapper input:focus + .floating-label,
+.folder-wrapper input:not(:placeholder-shown) + .floating-label,
+[dir="rtl"] .folder-wrapper .floating-label,
+[dir="rtl"] .folder-wrapper input:focus + .floating-label,
+[dir="rtl"] .folder-wrapper input:not(:placeholder-shown) + .floating-label {
+    top: 12px !important;
+    inset-inline-start: 74px !important;
+    inset-inline-end: auto !important;
+    transform: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    font-size: 0.58rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 1.4px !important;
+    text-transform: uppercase !important;
+    color: var(--text-tertiary);
+}
+
+.folder-wrapper input:focus + .floating-label,
+.folder-wrapper input:not(:placeholder-shown) + .floating-label {
+    color: var(--theme-solid);
+}
+
+/* Hint under the caption while the field is empty */
+.folder-hint {
+    position: absolute;
+    top: 28px;
+    inset-inline-start: 74px;
+    inset-inline-end: 142px;
+    z-index: 3;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+#directory-input:focus ~ .folder-hint,
+#directory-input:not(:placeholder-shown) ~ .folder-hint {
+    opacity: 0;
+}
+
+.folder-wrapper.drag-over .folder-hint {
+    opacity: 0;
+}
+
+/* The chosen path as breadcrumbs, laid over the field while it is not being
+   edited. It uses the same room as the field's text: the icon on one side, the
+   buttons (and badge) on the other. Paths are Latin-ordered, so it is always
+   ltr; only the alignment follows the page direction. */
+.folder-value {
+    position: absolute;
+    top: 27px;
+    left: 74px;
+    right: 142px;
+    height: 20px;
+    z-index: 3;
+    overflow: hidden;
+    white-space: nowrap;
+    direction: ltr;
+    text-align: left;
+    font-family: 'Poppins', 'Vazirmatn', sans-serif;
+    font-size: 0.86rem;
+    font-weight: 500;
+    line-height: 20px;
+    color: var(--text-secondary);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.folder-wrapper.has-value .folder-value {
+    right: 184px;
+    opacity: 1;
+}
+
+.folder-wrapper.has-inspection .folder-value {
+    right: 242px;
+}
+
+[dir="rtl"] .folder-wrapper .folder-value {
+    left: 142px;
+    right: 74px;
+    text-align: right;
+}
+
+[dir="rtl"] .folder-wrapper.has-value .folder-value {
+    left: 184px;
+}
+
+[dir="rtl"] .folder-wrapper.has-inspection .folder-value {
+    left: 242px;
+}
+
+/* The field's own text is hidden while the view is up, and back when editing */
+.folder-wrapper.has-value #directory-input:not(:focus) {
+    color: transparent !important;
+    text-shadow: none;
+}
+
+#directory-input:focus ~ .folder-value,
+.folder-wrapper.drag-over .folder-value {
+    opacity: 0;
+}
+
+.fv-seg {
+    color: var(--text-secondary);
+}
+
+.fv-seg.fv-last {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.fv-sep {
+    padding: 0 2px;
+    color: var(--text-tertiary);
+}
+
+.fv-gap {
+    color: var(--theme-solid);
+}
+
+/* Icon chip */
+.folder-wrapper .input-leading-icon,
+.folder-wrapper input:focus ~ .input-leading-icon,
+.folder-wrapper input:not(:placeholder-shown) ~ .input-leading-icon {
+    box-sizing: content-box;
+    width: 20px;
+    height: 20px;
+    padding: 12px;
+    left: 14px;
+    right: auto;
+    opacity: 1;
+    transform: translateY(-50%);
+    border-radius: 14px;
+    color: var(--theme-solid);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+[dir="rtl"] .folder-wrapper .input-leading-icon,
+[dir="rtl"] .folder-wrapper input:focus ~ .input-leading-icon,
+[dir="rtl"] .folder-wrapper input:not(:placeholder-shown) ~ .input-leading-icon {
+    left: auto;
+    right: 14px;
+}
+
+.folder-wrapper.has-value input ~ .input-leading-icon,
+[dir="rtl"] .folder-wrapper.has-value input ~ .input-leading-icon {
+    color: var(--on-theme-text, #fff);
+    background: var(--theme-gradient);
+    border-color: transparent;
+    box-shadow:
+        0 6px 18px var(--theme-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Actions: square glass buttons, vertically centred */
+.folder-wrapper .action-buttons {
+    right: 13px;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    gap: 6px;
+}
+
+[dir="rtl"] .folder-wrapper .action-buttons {
+    right: auto;
+    left: 13px;
+}
+
+.folder-wrapper .icon-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+}
+
+.folder-wrapper .dir-inspection-badge {
+    height: 34px;
+}
+
+/* ============================================
+   OPTION TILES
+   AI Enhance / No Stitch: toggle buttons with an icon chip.
+   ============================================ */
+.workspace-controls .options-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+}
+
+.checkbox-group {
+    min-width: 0;
+}
+
+.checkbox-group label {
+    height: 48px;
+    justify-content: flex-start;
+    gap: 9px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-md);
+    background:
+        radial-gradient(120% 150% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.2),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    font-size: 0.8rem;
+}
+
+.checkbox-group label svg {
+    box-sizing: content-box;
+    width: 15px;
+    height: 15px;
+    min-width: 15px;
+    padding: 8px;
+    border-radius: 11px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+    opacity: 0.85;
+}
+
+.checkbox-group label span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    text-align: start;
+}
+
+/* Pressed = lit: the chip fills with the theme colour and the tile glows.
+   These are toggle buttons, so there is no checkbox or switch drawn on them. */
+.checkbox-group input:checked + label {
+    color: #fff;
+}
+
+.checkbox-group input:checked + label svg {
+    background: var(--theme-gradient);
+    border-color: transparent;
+    color: var(--on-theme-text, #fff);
+    opacity: 1;
+    filter: none;
+    box-shadow:
+        0 4px 14px var(--theme-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.checkbox-group input:checked + label span {
+    font-weight: 700;
+}
+
+/* ============================================
+   EXPORT AS
+   ZIP / PDF / CBZ as three tiles under a small heading that names the choice.
+   ============================================ */
+.format-selector {
+    margin-top: 0;
+}
+
+.export-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    padding: 0 2px;
+    color: var(--text-tertiary);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+}
+
+.export-head::before {
+    content: '';
+    width: 14px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--theme-solid);
+    box-shadow: 0 0 8px var(--theme-glow);
+}
+
+.export-current {
+    margin-inline-start: auto;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--text-secondary);
+    font-size: 0.64rem;
+    letter-spacing: 0.3px;
+    text-transform: none;
+}
+
+.format-segments {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+}
+
+.format-segment label {
+    height: 42px;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 13px;
+    background:
+        radial-gradient(120% 150% at 0% 0%, rgba(255, 255, 255, 0.05), transparent 60%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.18),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    font-size: 0.74rem;
+}
+
+.format-segment label svg {
+    box-sizing: content-box;
+    width: 13px;
+    height: 13px;
+    min-width: 13px;
+    padding: 6px;
+    border-radius: 9px;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.format-segment label span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.format-segment input:not(:checked) + label:hover {
+    background:
+        radial-gradient(120% 150% at 0% 0%, rgba(255, 255, 255, 0.08), transparent 60%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
+    border-color: rgba(255, 255, 255, 0.16);
+    transform: translateY(-1px);
+}
+
+.format-segment input:checked + label {
+    border-color: var(--theme-solid);
+    background:
+        radial-gradient(120% 150% at 0% 0%, var(--theme-glow-soft), transparent 65%),
+        linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+    box-shadow:
+        0 4px 16px var(--theme-glow-soft),
+        inset 0 0 0 1px var(--theme-glow-soft),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.format-segment input:checked + label svg {
+    background: linear-gradient(160deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.03));
+    border-color: var(--theme-glow-soft);
 }
 
 /* Progress Meta Row: big percentage and file counter */

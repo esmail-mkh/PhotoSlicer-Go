@@ -166,6 +166,10 @@ const translations = {
         stepWatermark: "Watermark",
         stepSave: "Save",
         stepDone: "Done",
+        activityTitle: "Activity",
+        activityWaiting: "Waiting for the first step...",
+        exportAs: "Export as",
+        exportFolder: "Folder",
         stepTipReady: "Preparing to start processing",
         stepTipScan: "Scanning folders for images",
         stepTipProcess: "Processing and stitching images",
@@ -422,6 +426,10 @@ const translations = {
         stepWatermark: "واترمارک",
         stepSave: "ذخیره",
         stepDone: "انجام شد",
+        activityTitle: "فعالیت‌ها",
+        activityWaiting: "در انتظار اولین مرحله...",
+        exportAs: "ذخیره به‌صورت",
+        exportFolder: "پوشه تصاویر",
         stepTipReady: "آماده‌سازی برای شروع پردازش",
         stepTipScan: "اسکن پوشه‌ها برای یافتن تصاویر",
         stepTipProcess: "پردازش و چسباندن تصاویر",
@@ -536,8 +544,13 @@ function setLanguage(lang) {
         if (sel.id) selectValues[sel.id] = sel.value;
     });
 
-    document.body.setAttribute('dir', lang === 'fa' ? 'rtl' : 'ltr');
-    
+    // Both elements: the [dir="rtl"] rules match on any ancestor, so a stale
+    // dir on <html> (set by theme-preload at load) would keep RTL styles alive
+    // after switching to English.
+    const dir = lang === 'fa' ? 'rtl' : 'ltr';
+    document.documentElement.setAttribute('dir', dir);
+    document.body.setAttribute('dir', dir);
+
     const langIcon = document.getElementById('lang-icon');
     if (langIcon) langIcon.textContent = lang === 'fa' ? 'EN' : 'FA';
 
@@ -577,6 +590,7 @@ function setLanguage(lang) {
 
     // Queue cards are built in JS, so rebuild them in the new language
     if (typeof renderQueue === 'function') renderQueue();
+    if (typeof renderActivity === 'function') renderActivity();
 
     // Re-position tab indicator after text changes shift tab widths
     positionTabIndicator();
@@ -1122,6 +1136,7 @@ function refreshDirectoryState() {
     if (!input || !wrapper) return;
     const hasValue = input.value.trim().length > 0;
     wrapper.classList.toggle('has-value', hasValue);
+    renderFolderValue();
     refreshStartButton();
     input.title = hasValue ? input.value : '';
 
@@ -1141,6 +1156,95 @@ function refreshDirectoryState() {
         updateDirectoryInspection(input.value);
     }, 60);
 }
+
+/* ============================================
+   PATH VIEW
+   The path field shows what is typed, but a long path only has room for its
+   first part, and the folder name at the end is what matters. While the field
+   is not being edited, the path is drawn as breadcrumbs instead: the drive,
+   an ellipsis and as many of the last folders as fit. Each folder name is its
+   own bidi isolate, so Persian names keep their letters in order while the
+   folders still run left to right like the path does.
+   ============================================ */
+function renderFolderValue() {
+    const input = document.getElementById('directory-input');
+    const view = document.getElementById('folder-value');
+    if (!input || !view) return;
+    view.textContent = '';
+    const value = input.value.trim();
+    if (!value || !view.clientWidth) return;   // hidden tab: the observer calls back when it has a size
+
+    const tokens = value.split(/([\\/])/);
+    const segs = [];
+    const seps = [];
+    tokens.forEach((t, i) => (i % 2 ? seps : segs).push(t));
+    while (segs.length > 1 && segs[segs.length - 1] === '') { segs.pop(); seps.pop(); }
+    const sep = seps[0] || '\\';
+
+    // parts: [text, kind] with kind seg | sep | gap; draws them and says whether they fit
+    function draw(parts) {
+        view.textContent = '';
+        parts.forEach((p, i) => {
+            const el = document.createElement(p[1] === 'seg' ? 'bdi' : 'span');
+            el.className = 'fv-' + p[1];
+            el.textContent = p[0];
+            view.appendChild(el);
+        });
+        const last = view.lastElementChild;
+        if (last && last.className === 'fv-seg') last.classList.add('fv-last');
+        return view.scrollWidth <= view.clientWidth + 0.5;
+    }
+    function tail(k) {   // the last k segments with the separators between them
+        const parts = [];
+        for (let i = segs.length - k; i < segs.length; i++) {
+            if (i > segs.length - k) parts.push([seps[i - 1] || sep, 'sep']);
+            parts.push([segs[i], 'seg']);
+        }
+        return parts;
+    }
+    function shorten(text, keep) {   // keep + an ellipsis in the middle, favouring the end
+        if (text.length <= keep) return text;
+        const back = Math.ceil(keep * 0.65);
+        return text.slice(0, keep - back) + '…' + text.slice(text.length - back);
+    }
+
+    if (draw(tail(segs.length))) return;
+
+    const first = segs.length > 1 ? [[segs[0], 'seg'], [sep, 'sep'], ['…', 'gap'], [sep, 'sep']] : [];
+    for (let k = segs.length - 2; k >= 1 && first.length; k--) {
+        if (draw(first.concat(tail(k)))) return;
+    }
+
+    // The last folder alone is too wide with the drive in front. Prefer keeping
+    // its whole name (dropping the drive, then the ellipsis) over cutting the name.
+    const lastName = segs[segs.length - 1];
+    const leads = first.length ? [first, [['…', 'gap'], [sep, 'sep']], []] : [[]];
+    for (const lead of leads) {
+        if (draw(lead.concat([[lastName, 'seg']]))) return;
+    }
+
+    // Even alone it does not fit: cut the middle of its name, keeping its ending,
+    // with as much of the path in front as still leaves a readable name
+    for (const lead of leads) {
+        let lo = 2, hi = lastName.length, best = 0;
+        while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (draw(lead.concat([[shorten(lastName, mid), 'seg']]))) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
+        }
+        if (best >= Math.min(14, lastName.length) || lead === leads[leads.length - 1]) {
+            draw(lead.concat([[shorten(lastName, Math.max(2, best)), 'seg']]));
+            return;
+        }
+    }
+}
+
+(function initFolderValue() {
+    const view = document.getElementById('folder-value');
+    if (!view) return;
+    if (window.ResizeObserver) new ResizeObserver(() => renderFolderValue()).observe(view);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(renderFolderValue);
+    renderFolderValue();
+})();
 
 function clearDirectory(shouldFocus = true) {
     const input = document.getElementById('directory-input');
@@ -2380,9 +2484,10 @@ function initTooltipSystem() {
 })();
 
 /* ============================================
-   Custom output-format dropdown
-   Drives the hidden <select id="format-select">,
-   which stays the single source of truth.
+   Output-format dropdown
+   A big format name that opens a menu of formats with a line on what each is
+   good for. Driven by the hidden <select id="format-select">, which stays the
+   single source of truth.
    ============================================ */
 const FORMAT_DESC_KEYS = {
     JPG: 'formatJpgDesc',
@@ -2402,46 +2507,87 @@ function buildFormatMenu() {
     const select = wrap.querySelector('#format-select');
     const menu = wrap.querySelector('.select-menu');
     const texts = translations[currentLang] || {};
-    menu.innerHTML = '';
+    menu.textContent = '';
 
     Array.from(select.options).forEach(opt => {
         const descKey = FORMAT_DESC_KEYS[opt.value];
-        const desc = (descKey && texts[descKey]) ? texts[descKey] : '';
         const li = document.createElement('li');
         li.className = 'select-option';
         li.setAttribute('role', 'option');
         li.dataset.value = opt.value;
         li.setAttribute('aria-selected', String(opt.value === select.value));
-        li.innerHTML =
-            `<span class="opt-name">${opt.value}</span>` +
-            `<span class="opt-desc">${desc}</span>` +
-            `<svg class="opt-check" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">` +
-            `<path d="M13.485 1.929a1 1 0 0 1 .087 1.32l-.087.094L6.4 10.486 2.515 6.6a1 1 0 0 1 1.32-1.5l.094.086L6.4 7.657l5.671-5.671a1 1 0 0 1 1.414-.057z"/></svg>`;
+
+        const name = document.createElement('span');
+        name.className = 'opt-name';
+        name.textContent = opt.value;
+        const desc = document.createElement('span');
+        desc.className = 'opt-desc';
+        desc.textContent = (descKey && texts[descKey]) || '';
+        const check = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        check.setAttribute('class', 'opt-check');
+        check.setAttribute('viewBox', '0 0 16 16');
+        check.setAttribute('fill', 'currentColor');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', 'M13.485 1.929a1 1 0 0 1 .087 1.32l-.087.094L6.4 10.486 2.515 6.6a1 1 0 0 1 1.32-1.5l.094.086L6.4 7.657l5.671-5.671a1 1 0 0 1 1.414-.057z');
+        check.appendChild(path);
+
+        li.appendChild(name);
+        li.appendChild(desc);
+        li.appendChild(check);
         li.addEventListener('click', () => selectFormat(opt.value));
         menu.appendChild(li);
     });
+    syncFormatDropdown();
 }
 
 function syncFormatDropdown() {
     const wrap = getFormatWrap();
-    if (!wrap) return;
-    const select = wrap.querySelector('#format-select');
-    if (!select) return;
-    if (select.value) {
-        const valUpper = select.value.toUpperCase();
-        const match = Array.from(select.options).find(o => o.value.toUpperCase() === valUpper);
-        if (match && select.value !== match.value) {
-            select.value = match.value;
+    if (wrap) {
+        const select = wrap.querySelector('#format-select');
+        if (select) {
+            if (select.value) {
+                const valUpper = select.value.toUpperCase();
+                const match = Array.from(select.options).find(o => o.value.toUpperCase() === valUpper);
+                if (match && select.value !== match.value) {
+                    select.value = match.value;
+                }
+            }
+            if (select.selectedIndex < 0 && select.options.length) {
+                select.selectedIndex = 0;
+            }
+            wrap.querySelectorAll('.select-option').forEach(li => {
+                li.setAttribute('aria-selected', String(li.dataset.value === select.value));
+            });
+            const nameEl = document.getElementById('format-name');
+            if (nameEl && nameEl.textContent !== select.value) {
+                nameEl.textContent = select.value;
+                // replay the small pop so a change is noticed
+                nameEl.classList.remove('swap');
+                void nameEl.offsetWidth;
+                nameEl.classList.add('swap');
+            }
+            const texts = translations[currentLang] || {};
+            const descKey = FORMAT_DESC_KEYS[select.value];
+            const descEl = document.getElementById('format-desc');
+            if (descEl) descEl.textContent = (descKey && texts[descKey]) || '';
         }
     }
-    if (select.selectedIndex < 0 && select.options.length) {
-        select.selectedIndex = 0;
-    }
-    const valueEl = wrap.querySelector('.select-value');
-    if (valueEl) valueEl.textContent = select.value;
-    wrap.querySelectorAll('.select-option').forEach(li => {
-        li.setAttribute('aria-selected', String(li.dataset.value === select.value));
+    syncQualitySlider();
+    refreshExportCaption();
+}
+
+// Names the export choice next to its heading ("Folder" when none is ticked)
+function refreshExportCaption() {
+    const el = document.getElementById('export-current');
+    if (!el) return;
+    const texts = translations[currentLang] || {};
+    let label = '';
+    ['is-zip', 'is-pdf', 'is-cbz'].forEach(id => {
+        const box = document.getElementById(id);
+        const span = box && box.checked ? document.querySelector(`label[for="${id}"] span`) : null;
+        if (span) label = span.textContent;
     });
+    el.textContent = label || texts.exportFolder || 'Folder';
 }
 
 function selectFormat(value) {
@@ -2460,25 +2606,39 @@ function openFormatDropdown() {
     const wrap = getFormatWrap();
     if (!wrap) return;
     wrap.dataset.open = 'true';
-    wrap.querySelector('.select-trigger').setAttribute('aria-expanded', 'true');
+    wrap.querySelector('.fmt-trigger').setAttribute('aria-expanded', 'true');
 }
 
 function closeFormatDropdown() {
     const wrap = getFormatWrap();
     if (!wrap) return;
     wrap.dataset.open = 'false';
-    wrap.querySelector('.select-trigger').setAttribute('aria-expanded', 'false');
+    wrap.querySelector('.fmt-trigger').setAttribute('aria-expanded', 'false');
 }
 
 function initFormatDropdown() {
     const wrap = getFormatWrap();
     if (!wrap) return;
     buildFormatMenu();
-    syncFormatDropdown();
 
-    wrap.querySelector('.select-trigger').addEventListener('click', (e) => {
+    const trigger = wrap.querySelector('.fmt-trigger');
+    trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         (wrap.dataset.open === 'true') ? closeFormatDropdown() : openFormatDropdown();
+    });
+
+    // Up / Down change the format right away, like a native select
+    trigger.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        const select = wrap.querySelector('#format-select');
+        const n = select.options.length;
+        const next = Math.max(0, Math.min(n - 1, select.selectedIndex + (e.key === 'ArrowDown' ? 1 : -1)));
+        if (next !== select.selectedIndex) {
+            select.value = select.options[next].value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            syncFormatDropdown();
+        }
     });
 
     document.addEventListener('click', (e) => {
@@ -2487,9 +2647,42 @@ function initFormatDropdown() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') closeFormatDropdown();
     });
+
+    ['is-zip', 'is-pdf', 'is-cbz'].forEach(id => {
+        const box = document.getElementById(id);
+        if (box) box.addEventListener('change', refreshExportCaption);
+    });
 }
 
 initFormatDropdown();
+
+/* ============================================
+   Quality slider
+   Mirrors the number field (which stays the source of truth) and paints its fill.
+   ============================================ */
+function syncQualitySlider() {
+    const slider = document.getElementById('quality-slider');
+    const field = document.getElementById('quality-input');
+    if (!slider || !field) return;
+    const min = Number(slider.min) || 1;
+    const max = Number(slider.max) || 100;
+    const value = Math.max(min, Math.min(max, parseInt(field.value, 10) || max));
+    slider.value = String(value);
+    slider.style.setProperty('--qf', String((value - min) / (max - min)));
+}
+
+(function initQualitySlider() {
+    const slider = document.getElementById('quality-slider');
+    const field = document.getElementById('quality-input');
+    if (!slider || !field) return;
+    slider.addEventListener('input', () => {
+        field.value = slider.value;
+        syncQualitySlider();
+    });
+    field.addEventListener('input', syncQualitySlider);
+    field.addEventListener('change', syncQualitySlider);
+    syncQualitySlider();
+})();
 
 /* ============================================
    PRESETS
@@ -3128,6 +3321,107 @@ function resetProgressUI() {
     if (typeof setTabsProgress === 'function') setTabsProgress(0);
     resetProgressInfo();
     resetStepIndicator();
+    resetActivity();
+}
+
+/* ============================================
+   ACTIVITY FEED
+   A running list of what this job has done: each stage it enters and, for
+   batches, each folder it picks up. Built from the same calls that already
+   drive the steps and the info tiles, so the backend needs nothing new.
+   ============================================ */
+var _activity = [];
+var _activityStep = '';
+var ACTIVITY_MAX = 40;
+
+function activityTime() {
+    var el = document.getElementById('timer');
+    return (el && el.textContent) || '00:00:00';
+}
+
+function activityPush(key, text, meta, state) {
+    var last = _activity[_activity.length - 1];
+    if (last && last.key === key) {
+        if (meta !== undefined) last.meta = meta;
+        renderActivity();
+        return;
+    }
+    if (last && last.state === 'run') last.state = 'done';
+    _activity.push({ key: key, text: text, meta: meta || '', time: activityTime(), state: state || 'run', el: null });
+    if (_activity.length > ACTIVITY_MAX) _activity.shift();
+    renderActivity();
+}
+
+// A stage counts once: the backend re-announces "process" for every folder of a batch
+function activityStage(stage, text, state) {
+    if (stage === _activityStep) return;
+    _activityStep = stage;
+    activityPush('step:' + stage, text, '', state);
+}
+
+function resetActivity() {
+    _activity = [];
+    _activityStep = '';
+    renderActivity();
+}
+
+function activityNode(entry) {
+    var li = document.createElement('li');
+    var mark = document.createElement('span');
+    mark.className = 'activity-mark';
+    var text = document.createElement('span');
+    text.className = 'activity-text';
+    var meta = document.createElement('span');
+    meta.className = 'activity-meta';
+    var time = document.createElement('span');
+    time.className = 'activity-time';
+    li.appendChild(mark);
+    li.appendChild(text);
+    li.appendChild(meta);
+    li.appendChild(time);
+    return li;
+}
+
+// Rows are kept and updated in place, so only a new row animates in.
+function renderActivity() {
+    var list = document.getElementById('activity-list');
+    if (!list) return;
+    var waiting = list.querySelector('.activity-empty');
+
+    if (!_activity.length) {
+        list.textContent = '';
+        list.classList.remove('is-clipped');
+        var wait = document.createElement('li');
+        wait.className = 'activity-empty';
+        wait.textContent = (translations[currentLang] || {}).activityWaiting || 'Waiting for the first step...';
+        list.appendChild(wait);
+        return;
+    }
+    if (waiting) waiting.remove();
+
+    Array.prototype.slice.call(list.children).forEach(function(node) {
+        if (!_activity.some(function(entry) { return entry.el === node; })) node.remove();
+    });
+
+    _activity.forEach(function(entry) {
+        if (!entry.el) {
+            entry.el = activityNode(entry);
+            list.appendChild(entry.el);
+        }
+        var li = entry.el;
+        li.className = 'activity-item is-' + entry.state;
+        var text = li.querySelector('.activity-text');
+        text.textContent = entry.text;
+        text.title = entry.text;
+        var meta = li.querySelector('.activity-meta');
+        meta.textContent = entry.meta;
+        meta.hidden = !entry.meta;
+        li.querySelector('.activity-time').textContent = entry.time;
+    });
+
+    // Newest row stays in view; the fade at the top only shows once older rows are clipped
+    list.scrollTop = list.scrollHeight;
+    list.classList.toggle('is-clipped', list.scrollTop > 1);
 }
 
 // Moves the Workspace bar to `pct` (0-100). The bar itself eases through its CSS
@@ -3270,6 +3564,17 @@ function updateProgressInfo(current, total, currentFile, elapsed, eta) {
     var etaEl = document.getElementById('pi-eta');
     if (etaEl) etaEl.textContent = eta || '-';
     if (typeof updateQueueInfo === 'function') updateQueueInfo(current, total, displayFile, eta);
+
+    // Feed: a stage name annotates the stage in progress, a folder or file name is its own line
+    if (isStatus) {
+        var open = _activity[_activity.length - 1];
+        if (open && open.state === 'run' && open.key.indexOf('step:') === 0) {
+            open.meta = displayFile;
+            renderActivity();
+        }
+    } else if (currentFile && currentFile !== '-') {
+        activityPush('item:' + current + ':' + currentFile, displayFile, total > 1 ? current + '/' + total : '');
+    }
 }
 
 function resetProgressInfo() {
@@ -3332,6 +3637,14 @@ function updateStepIndicator(step) {
     if (targetIndex === -1) {
         console.warn('Unknown or inactive step in updateStepIndicator:', step);
         return;
+    }
+
+    if (targetStep === 'done') {
+        _activity.forEach(function(entry) { entry.state = 'done'; });
+        activityStage('done', (translations[currentLang] || {}).stepDone || 'Done', 'done');
+    } else if (targetStep !== 'ready') {
+        var label = (translations[currentLang] || {})['step' + targetStep.charAt(0).toUpperCase() + targetStep.slice(1)];
+        activityStage(targetStep, label || targetStep);
     }
 
     visibleSteps.forEach(function(s, idx) {
