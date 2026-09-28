@@ -882,21 +882,25 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
 }
 
 .tab {
-    flex: 1;
+    /* Sized by content rather than equal shares, so the longer labels get the
+       room they need with four tabs and the font can stay full size */
+    flex: 1 1 auto;
     background: transparent;
     border: none;
-    color: var(--text-tertiary);
-    padding: 11px 12px;
+    /* --text-tertiary was 2.9:1 on the glass bar; --text-secondary is 6.5:1 */
+    color: var(--text-secondary);
+    padding: 11px 9px;
     font-family: inherit;
     font-size: 0.85rem;
     font-weight: 600;
+    white-space: nowrap;
     cursor: pointer;
     border-radius: var(--radius-sm);
     transition: var(--transition-med);
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 7px;
     position: relative;
     z-index: 2;
     letter-spacing: 0.2px;
@@ -1554,7 +1558,7 @@ input#save-location-input[readonly] {
    COLOR PICKER MODAL
    ============================================ */
 .color-picker-dialog {
-    width: min(360px, 88vw);
+    width: min(360px, 88%);
     text-align: center;
 }
 
@@ -1567,7 +1571,7 @@ input#save-location-input[readonly] {
 }
 
 .color-wheel-dialog {
-    width: min(420px, 92vw);
+    width: min(420px, 92%);
     text-align: center;
 }
 
@@ -3168,7 +3172,7 @@ select:focus {
    PRESETS MODAL (list + actions)
    ============================================ */
 .presets-modal {
-    width: min(440px, 92vw);
+    width: min(440px, 92%);
     overflow: visible;
 }
 
@@ -3181,7 +3185,7 @@ select:focus {
     list-style: none;
     margin: 0 0 16px;
     padding: 5px;
-    max-height: 46vh;
+    max-height: calc(46vh / var(--ui-zoom, 1));
     overflow-y: auto;
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.25));
     border: 1px solid rgba(255, 255, 255, 0.06);
@@ -3316,8 +3320,15 @@ select:focus {
     pointer-events: auto;
 }
 
+/* Overlays sit outside #main-viewport, so they take the same zoom (see
+   handleResize in script.js). Widths above are percentages because viewport
+   units get multiplied by the zoom too. */
+.modal-overlay > * {
+    zoom: var(--ui-zoom, 1);
+}
+
 .modal {
-    width: min(360px, 86vw);
+    width: min(360px, 86%);
     background:
         linear-gradient(160deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 40%, transparent 60%),
         linear-gradient(180deg, rgba(32, 34, 44, 0.98), rgba(18, 20, 28, 0.98));
@@ -4800,17 +4811,19 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 /* ============================================
-   RESPONSIVE FINE-TUNING
+   COMPACT LAYOUT
    ============================================ */
-@media (max-width: 600px) {
-    .container {
-        border-radius: var(--radius-lg);
-        padding: 12px;
-    }
+/* The UI is drawn on a fixed 520px design canvas that script.js zooms to fit
+   the window, so these are the layout at every window size. They used to sit
+   in a `max-width: 600px` media query, which is measured against the real
+   window and switched them off whenever the window grew past 600px. */
+.container {
+    border-radius: var(--radius-lg);
+    padding: 12px;
+}
 
-    #title-text {
-        font-size: 1.3rem;
-    }
+#title-text {
+    font-size: 1.3rem;
 }
 
 /* ============================================
@@ -5143,6 +5156,7 @@ body.workspace-processing .progress-text {
    GLASSMORPHIC TOOLTIP SYSTEM
    ============================================ */
 .custom-tooltip-popup {
+    zoom: var(--ui-zoom, 1);
     position: fixed;
     z-index: 10000;
     max-width: 260px;
@@ -5183,13 +5197,42 @@ body.workspace-processing .progress-text {
 /* ============================================
    JOB QUEUE
    ============================================ */
-/* Four tabs share the header bar, so tighten each one a little */
-@media (max-width: 560px) {
-    .tab {
-        padding: 11px 6px;
-        gap: 6px;
-        font-size: 0.8rem;
-    }
+/* Overall progress under the tab bar, so a running job stays visible while the
+   Settings, Queue or Info tab is open. The Workspace has its own big bar. */
+.tabs-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.05);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 3;
+    transition: opacity 0.3s ease;
+}
+
+.tabs-progress-fill {
+    width: var(--tabs-progress, 0%);
+    height: 100%;
+    background: var(--theme-gradient);
+    box-shadow: 0 0 8px var(--theme-glow);
+    transition: width 0.35s ease;
+}
+
+body.job-active:not([data-tab="process"]) .tabs-progress {
+    opacity: 1;
+}
+
+body.is-paused .tabs-progress-fill {
+    background: #fbbf24;
+    box-shadow: none;
+}
+
+/* The queue list scrolls inside a fixed-height card like Settings does, so
+   switching to it from another tab does not shrink the whole window content. */
+body[data-tab="queue"] .container {
+    flex: 1 1 auto;
 }
 
 .tab-badge {

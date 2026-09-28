@@ -644,16 +644,40 @@ function showTab(tabName) {
     document.getElementById(tabName).classList.add('active');
 
     const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => tab.classList.remove('active'));
+    tabs.forEach(tab => {
+        tab.classList.remove('active');
+        tab.setAttribute('aria-selected', 'false');
+        tab.tabIndex = -1;
+    });
     const tabElement = document.querySelector(`#tab-${tabName}`);
     if (tabElement) {
         tabElement.classList.add('active');
+        tabElement.setAttribute('aria-selected', 'true');
+        tabElement.tabIndex = 0;
     }
 
     positionTabIndicator();
     updateSettings();
     if (tabName === 'queue') refreshQueue();
 }
+
+// Arrow keys / Home / End move between tabs, mirrored in right-to-left mode
+document.querySelector('.tabs').addEventListener('keydown', function(e) {
+    const tabs = Array.from(document.querySelectorAll('.tab'));
+    const current = tabs.indexOf(document.activeElement);
+    if (current < 0) return;
+    const rtl = document.body.getAttribute('dir') === 'rtl';
+    let next = null;
+    if (e.key === 'ArrowRight') next = current + (rtl ? -1 : 1);
+    else if (e.key === 'ArrowLeft') next = current + (rtl ? 1 : -1);
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = tabs.length - 1;
+    if (next === null) return;
+    e.preventDefault();
+    next = (next + tabs.length) % tabs.length;
+    tabs[next].focus();
+    tabs[next].click();
+});
 
 function positionTabIndicator() {
     const tabsContainer = document.querySelector('.tabs');
@@ -2032,8 +2056,9 @@ function initTooltipSystem() {
                 left = window.innerWidth - 14 - popupRect.width;
             }
 
-            _tooltipPopupEl.style.top = `${Math.round(top)}px`;
-            _tooltipPopupEl.style.left = `${Math.round(left)}px`;
+            const zoom = currentUiZoom();
+            _tooltipPopupEl.style.top = `${Math.round(top / zoom)}px`;
+            _tooltipPopupEl.style.left = `${Math.round(left / zoom)}px`;
         }, 150);
     }
 
@@ -2767,6 +2792,7 @@ function setButtonState(state) {
     document.body.classList.toggle('is-processing', state === 'processing' || state === 'busy');
     // Show the Stop button for any active job (processing / paused / busy)
     document.body.classList.toggle('job-active', state !== 'idle');
+    document.body.classList.toggle('is-paused', state === 'paused');
     // Collapse/expand workspace controls and progress details
     document.body.classList.toggle('workspace-processing', state === 'processing' || state === 'busy' || state === 'paused');
     const stopBtn = document.getElementById('stop-button');
@@ -2809,6 +2835,7 @@ function resetProgressUI() {
     if (steps) steps.classList.remove('visible');
     var pr = document.getElementById('pr');
     if (pr) pr.style.width = '0%';
+    if (typeof setTabsProgress === 'function') setTabsProgress(0);
     var prText = document.getElementById('pr-text');
     if (prText) prText.textContent = '0%';
     resetProgressInfo();
@@ -3180,6 +3207,12 @@ function handleResize() {
     if (viewport) {
         viewport.style.zoom = zoomLevel;
     }
+    // Dialogs, toasts and the tooltip live outside #main-viewport; they read this
+    document.documentElement.style.setProperty('--ui-zoom', zoomLevel);
+}
+
+function currentUiZoom() {
+    return parseFloat(document.documentElement.style.getPropertyValue('--ui-zoom')) || 1;
 }
 
 function applyAppVersion(version) {
@@ -3770,8 +3803,14 @@ function renderQueue() {
 }
 
 // Called from the backend on every progress tick while a job is running.
+function setTabsProgress(pct) {
+    const tabs = document.querySelector('.tabs');
+    if (tabs) tabs.style.setProperty('--tabs-progress', Math.max(0, Math.min(100, pct)) + '%');
+}
+
 function updateQueueProgress(pct) {
     _queuePct = pct;
+    setTabsProgress(pct);
     const fill = document.getElementById('queue-running-fill');
     if (fill) fill.style.width = pct + '%';
     const label = document.getElementById('queue-running-pct');

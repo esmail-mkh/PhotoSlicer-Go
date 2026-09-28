@@ -36,16 +36,18 @@
    CONTAINER POSITIONING
    ============================================ */
 .notification-container {
+  zoom: var(--ui-zoom, 1); /* set by handleResize in script.js */
   position: fixed;
   z-index: 3000;
   font-family: 'Vazirmatn', 'Poppins', sans-serif;
   pointer-events: none;
 }
 
-.notification-container.top-left       { left: 1.2vw;  top: 2vh; }
-.notification-container.top-right      { right: 1.2vw; top: 2vh; }
-.notification-container.bottom-left    { left: 1.2vw;  bottom: 2vh; }
-.notification-container.bottom-right   { right: 1.2vw; bottom: 2vh; }
+/* vw/vh are multiplied by the zoom, so divide it back out to keep the margins */
+.notification-container.top-left       { left: calc(1.2vw / var(--ui-zoom, 1));  top: calc(2vh / var(--ui-zoom, 1)); }
+.notification-container.top-right      { right: calc(1.2vw / var(--ui-zoom, 1)); top: calc(2vh / var(--ui-zoom, 1)); }
+.notification-container.bottom-left    { left: calc(1.2vw / var(--ui-zoom, 1));  bottom: calc(2vh / var(--ui-zoom, 1)); }
+.notification-container.bottom-right   { right: calc(1.2vw / var(--ui-zoom, 1)); bottom: calc(2vh / var(--ui-zoom, 1)); }
 .notification-container.center {
   top: 30%;
   left: 50%;
@@ -58,7 +60,7 @@
 .notification {
   position: relative;
   width: var(--notif-width);
-  max-width: 94vw;
+  max-width: calc(94vw / var(--ui-zoom, 1));
   margin-bottom: var(--notif-gap);
   border-radius: var(--notif-radius);
   background: var(--notif-bg);
@@ -481,6 +483,7 @@
    SUBTLE MELLOW TOAST (Dynamic Theme Aware)
    ============================================ */
 .subtle-toast-container {
+    zoom: var(--ui-zoom, 1);
     position: fixed;
     bottom: 30px;
     left: 50%;
