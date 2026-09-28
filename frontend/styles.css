@@ -5243,20 +5243,38 @@ body.workspace-processing #process .status-area > .activity {
     transform: none;
 }
 
+/* Base row for menus. The preset list reuses this class (see renderPresetMenu),
+   so the format menu's own layout below is scoped to .format-dropdown. */
 .select-option {
-    display: grid;
-    grid-template-columns: 54px minmax(0, 1fr) 14px;
+    display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 9px 10px;
-    border-radius: 10px;
-    color: var(--text-secondary);
+    border-radius: 8px;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    color: var(--text-secondary);
+    transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .select-option:hover {
     background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+}
+
+.select-option[aria-selected="true"] {
+    background: linear-gradient(180deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.02));
+    color: #fff;
+}
+
+.format-dropdown .select-option {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) 14px;
+    gap: 8px;
+    border-radius: 10px;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.format-dropdown .select-option:hover {
     color: var(--text-primary);
 }
 
@@ -5282,12 +5300,12 @@ body.workspace-processing #process .status-area > .activity {
     opacity: 0;
 }
 
-.select-option[aria-selected="true"] {
+.format-dropdown .select-option[aria-selected="true"] {
     background: linear-gradient(90deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.02));
     color: var(--text-primary);
 }
 
-[dir="rtl"] .select-option[aria-selected="true"] {
+[dir="rtl"] .format-dropdown .select-option[aria-selected="true"] {
     background: linear-gradient(270deg, var(--theme-glow-soft), rgba(255, 255, 255, 0.02));
 }
 
@@ -6952,7 +6970,7 @@ body[data-tab="queue"] .container {
    region (Windows 10, see window_shape_windows.go). --window-radius must match
    windowCornerRadius in window_shape.go. */
 :root {
-    --titlebar-h: 40px;
+    --titlebar-h: 48px;
     --window-radius: 8px;
 }
 
@@ -7034,23 +7052,28 @@ body {
 .titlebar-start {
     display: flex;
     align-items: center;
-    gap: 9px;
+    gap: 10px;
     min-width: 0;
-    padding-inline: 12px 8px;
+    padding-inline: 14px 8px;
 }
 
 .titlebar-badge {
     flex: 0 0 auto;
-    width: 22px;
-    height: 22px;
+    width: 27px;
+    height: 27px;
     display: grid;
     place-items: center;
-    border-radius: 7px;
+    border-radius: 8px;
     background: var(--theme-gradient);
     color: var(--on-theme-text, #fff);
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.4),
         0 0 12px var(--theme-glow);
+}
+
+.titlebar-badge svg {
+    width: 15px;
+    height: 15px;
 }
 
 .titlebar-title {
@@ -7059,7 +7082,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.82rem;
+    font-size: 0.92rem;
     font-weight: 700;
     letter-spacing: 0.3px;
     color: var(--text-primary);
@@ -7068,7 +7091,7 @@ body {
 .titlebar-sep {
     flex: 0 0 auto;
     color: var(--text-tertiary);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
 }
 
 .titlebar-section {
@@ -7077,7 +7100,7 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.76rem;
+    font-size: 0.86rem;
     font-weight: 500;
     color: var(--theme-solid);
 }
@@ -7110,17 +7133,17 @@ body {
     position: relative;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    height: 24px;
-    min-width: 96px;
-    padding: 0 13px;
+    gap: 9px;
+    height: 29px;
+    min-width: 108px;
+    padding: 0 15px;
     justify-content: center;
     overflow: hidden;
     border-radius: 999px;
     border: 1px solid rgba(255, 255, 255, 0.09);
     background: rgba(255, 255, 255, 0.045);
     color: var(--text-secondary);
-    font-size: 0.72rem;
+    font-size: 0.78rem;
     font-weight: 600;
     white-space: nowrap;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
@@ -7150,8 +7173,8 @@ body {
 
 .status-dot {
     flex: 0 0 auto;
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: var(--accent);
     transition: background 0.3s ease, box-shadow 0.3s ease;
@@ -7223,7 +7246,7 @@ body {
 /* Windows 11 style: full-height buttons flush with the window edge */
 .win-btn {
     --wails-draggable: no-drag;
-    width: 46px;
+    width: 56px;
     height: 100%;
     display: grid;
     place-items: center;
@@ -7240,6 +7263,9 @@ body {
 }
 
 .win-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 1.1; /* the glyphs are drawn on a 12-unit grid: keep the line fine at this size */
     transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -7251,7 +7277,7 @@ body {
 }
 
 /* Each glyph reacts in its own way */
-.win-min:hover svg { transform: translateY(2.5px); }
+.win-min:hover svg { transform: translateY(3px); }
 .win-max:hover svg { transform: scale(1.22); }
 .win-close:hover svg { transform: rotate(90deg) scale(1.15); }
 .win-btn:active svg { transform: scale(0.88); }

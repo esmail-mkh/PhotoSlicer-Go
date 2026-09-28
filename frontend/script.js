@@ -3853,7 +3853,7 @@ function resetCustomTheme() {
 
 const DESIGN_WIDTH = 520;
 const DESIGN_HEIGHT = 810;
-const DESIGN_TITLEBAR = 40; // keep in step with --titlebar-h in styles.css
+const DESIGN_TITLEBAR = 48; // keep in step with --titlebar-h in styles.css
 
 function handleResize() {
     const widthRatio = window.innerWidth / DESIGN_WIDTH;

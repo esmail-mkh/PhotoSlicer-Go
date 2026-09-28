@@ -15,7 +15,9 @@ type windowLayout struct {
 
 // baseWindowLayout is what the app is designed around and what it opens with
 // on a 1080-pixel-high screen. Every other screen gets this layout scaled.
-var baseWindowLayout = windowLayout{Width: 510, Height: 830, MinWidth: 420, MinHeight: 600}
+// The height is the content's 810 px plus the 48 px custom title bar (see
+// DESIGN_HEIGHT and DESIGN_TITLEBAR in script.js), scaled like the width.
+var baseWindowLayout = windowLayout{Width: 510, Height: 838, MinWidth: 420, MinHeight: 608}
 
 const (
 	// referenceScreenHeight is the logical screen height at which the window
