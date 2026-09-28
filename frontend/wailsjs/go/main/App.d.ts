@@ -65,3 +65,5 @@ export function StartQueue():Promise<void>;
 export function StopProcessing():Promise<void>;
 
 export function ToggleMaximiseWindow():Promise<void>;
+
+export function UpdateWindowShape():Promise<void>;

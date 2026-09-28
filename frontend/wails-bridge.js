@@ -59,6 +59,7 @@
         minimize_window: () => window.go?.main?.App?.MinimizeWindow(),
         toggle_maximise_window: () => window.go?.main?.App?.ToggleMaximiseWindow(),
         is_window_maximised: () => window.go?.main?.App?.IsWindowMaximised(),
+        update_window_shape: () => window.go?.main?.App?.UpdateWindowShape(),
         close_window: () => window.go?.main?.App?.CloseWindow(),
         get_clipboard_text: () => window.go?.main?.App?.GetClipboardText(),
         isDirectory: (path) => window.go?.main?.App?.IsDirectory(path),

@@ -73,7 +73,7 @@ It automates the entire webtoon production workflow: seamless vertical stitching
 * **6 Built-in Neon Themes:** Switch instantly between **Cyber Blue**, **Electric Purple**, **Ruby Red**, **Sunset Orange**, **Luxury Gold**, and **Neo Emerald**.
 * **Custom Theme Creator:** Built-in modal with a live color wheel, saturation slider, hex input, and a 10×10 curated palette with real-time preview and adaptive text contrast.
 * **Bilingual Support:** Instant live switching between **English (EN)** and **Persian (FA)** without app restart.
-* **Custom Title Bar:** A frameless window with a rounded glass title bar (drag to move, double-click to maximize, minimize / maximize / close buttons) that matches the app's liquid-glass style.
+* **Custom Title Bar & Rounded Window:** A frameless window with a full-width glass title bar (drag to move, double-click to maximize, minimize / maximize / close buttons) and rounded window corners, in the app's liquid-glass style.
 * **Adapts to Your Screen:** The window opens at a size proportional to your monitor (unchanged on 1080p, smaller on laptops, larger on 1440p/4K) and the whole interface scales with it, so nothing is ever cut off.
 * **Drag & Drop:** Drop folders directly onto the application with an animated glowing drop-zone overlay.
 * **Directory Quick Actions:** Clear path, paste from clipboard, or browse with native dialogs.

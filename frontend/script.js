@@ -664,6 +664,17 @@ function refreshMaximisedState() {
     }, 120);
 }
 
+// The window's rounded corners are cut by the OS; on Windows 10 that is a window
+// region the backend has to recompute whenever the size or maximised state changes.
+let _windowShapeTimer = null;
+
+function updateWindowShape() {
+    clearTimeout(_windowShapeTimer);
+    _windowShapeTimer = setTimeout(() => {
+        window.pywebview?.api?.update_window_shape?.();
+    }, 60);
+}
+
 // Double-clicking the bar (but not its buttons) maximises or restores the window
 document.getElementById('titlebar').addEventListener('dblclick', e => {
     if (!e.target.closest('.win-btn')) toggleMaximiseWindow();
@@ -3374,7 +3385,7 @@ function resetCustomTheme() {
 
 const DESIGN_WIDTH = 520;
 const DESIGN_HEIGHT = 810;
-const DESIGN_TITLEBAR = 36; // keep in step with --titlebar-h in styles.css
+const DESIGN_TITLEBAR = 40; // keep in step with --titlebar-h in styles.css
 
 function handleResize() {
     const widthRatio = window.innerWidth / DESIGN_WIDTH;
@@ -3433,6 +3444,7 @@ window.addEventListener('resize', function() {
     handleResize();
     positionTabIndicator();
     refreshMaximisedState();
+    updateWindowShape();
 });
 
 let lastOutputPath = "";

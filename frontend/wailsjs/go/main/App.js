@@ -129,3 +129,7 @@ export function StopProcessing() {
 export function ToggleMaximiseWindow() {
   return window['go']['main']['App']['ToggleMaximiseWindow']();
 }
+
+export function UpdateWindowShape() {
+  return window['go']['main']['App']['UpdateWindowShape']();
+}

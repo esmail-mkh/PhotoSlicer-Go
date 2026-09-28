@@ -572,6 +572,7 @@ func (a *App) AppReady() {
 	if a.ctx != nil {
 		wailsRuntime.WindowShow(a.ctx) // no-op if already visible; see fitWindowToScreen
 	}
+	a.UpdateWindowShape()
 	a.execJS(fmt.Sprintf(`if (typeof applyAppVersion === 'function') applyAppVersion('%s');`, constants.Version))
 	settings := a.loadSettings()
 	lang, _ := settings["language"].(string)
