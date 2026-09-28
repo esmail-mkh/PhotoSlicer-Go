@@ -351,7 +351,7 @@ const translations = {
         queueRemove: "حذف",
         queueRetry: "اجرای دوباره",
         queueOpenOutput: "باز کردن پوشه‌ی خروجی",
-        queuePause: "توقف موقت",
+        queuePause: "مکث",
         queueResume: "ادامه",
         queueStop: "توقف صف",
         queueInterrupted: "با بسته شدن برنامه قطع شد",
@@ -538,7 +538,7 @@ function setLanguage(lang) {
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
         const key = el.getAttribute('data-i18n-title');
         if (texts[key]) el.title = texts[key];
-        if (key === 'selectInputFile' && texts[key]) el.setAttribute('aria-label', texts[key]);
+        if ((key === 'selectInputFile' || key === 'btnAddQueueTip') && texts[key]) el.setAttribute('aria-label', texts[key]);
     });
 
     // Restore select values so option re-translation never resets user selections
@@ -3785,7 +3785,7 @@ function updateQueueInfo(current, total, file, eta) {
     const parts = [];
     if (total > 1) parts.push(current + '/' + total);
     if (file) parts.push(file);
-    if (eta) parts.push('ETA ' + eta);
+    if (eta) parts.push(queueText('etaLabel') + ' ' + eta);
     info.textContent = parts.join(' · ') || queueText('queueRunningNow');
 }
 
