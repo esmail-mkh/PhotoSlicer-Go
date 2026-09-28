@@ -19,10 +19,11 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 const outDir = process.env.SHOT_OUT || path.join(root, 'assets');
 const theme = process.env.SHOT_THEME || '#e60000';
 
-// The UI is drawn on a 520x810 canvas (DESIGN_WIDTH/HEIGHT in script.js), so
-// that viewport renders it at exactly 100%. Twice the pixel density keeps text
-// sharp when GitHub scales the image down.
-const viewport = { width: 520, height: 810 };
+// The UI is drawn on a 520x810 canvas below a 36px title bar (DESIGN_WIDTH,
+// DESIGN_HEIGHT and DESIGN_TITLEBAR in script.js), so this viewport renders it
+// at exactly 100%, title bar included. Twice the pixel density keeps text sharp
+// when GitHub scales the image down.
+const viewport = { width: 520, height: 810 + 36 };
 const variants = [
   { lang: 'fa', file: 'app-fa.jpg' },
   { lang: 'en', file: 'app-en.jpg' },

@@ -893,6 +893,16 @@ func (a *App) CloseWindow() {
 	wailsRuntime.Quit(a.ctx)
 }
 
+// ToggleMaximiseWindow maximises the window, or restores it if it already is.
+func (a *App) ToggleMaximiseWindow() {
+	wailsRuntime.WindowToggleMaximise(a.ctx)
+}
+
+// IsWindowMaximised reports whether the window is currently maximised.
+func (a *App) IsWindowMaximised() bool {
+	return wailsRuntime.WindowIsMaximised(a.ctx)
+}
+
 func (a *App) IsDirectory(path string) bool {
 	fi, err := os.Stat(path)
 	return err == nil && fi.IsDir()

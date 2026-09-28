@@ -26,6 +26,9 @@ func main() {
 		// Shown by App.fitWindowToScreen once it has sized the window for the
 		// monitor, so the window never opens at one size and jumps to another.
 		StartHidden: true,
+		// The native frame is replaced by the title bar in frontend/index.html.
+		// Wails keeps the drop shadow and, on Windows 11, the rounded corners.
+		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

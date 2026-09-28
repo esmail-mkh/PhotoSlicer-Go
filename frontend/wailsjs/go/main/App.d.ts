@@ -32,6 +32,8 @@ export function InspectDirectory(arg1:string):Promise<Record<string, any>>;
 
 export function IsDirectory(arg1:string):Promise<boolean>;
 
+export function IsWindowMaximised():Promise<boolean>;
+
 export function MinimizeWindow():Promise<void>;
 
 export function MoveQueueJob(arg1:string,arg2:number):Promise<void>;
@@ -61,3 +63,5 @@ export function Start(arg1:Record<string, any>):Promise<void>;
 export function StartQueue():Promise<void>;
 
 export function StopProcessing():Promise<void>;
+
+export function ToggleMaximiseWindow():Promise<void>;

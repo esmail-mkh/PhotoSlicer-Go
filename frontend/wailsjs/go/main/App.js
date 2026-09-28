@@ -62,6 +62,10 @@ export function IsDirectory(arg1) {
   return window['go']['main']['App']['IsDirectory'](arg1);
 }
 
+export function IsWindowMaximised() {
+  return window['go']['main']['App']['IsWindowMaximised']();
+}
+
 export function MinimizeWindow() {
   return window['go']['main']['App']['MinimizeWindow']();
 }
@@ -120,4 +124,8 @@ export function StartQueue() {
 
 export function StopProcessing() {
   return window['go']['main']['App']['StopProcessing']();
+}
+
+export function ToggleMaximiseWindow() {
+  return window['go']['main']['App']['ToggleMaximiseWindow']();
 }

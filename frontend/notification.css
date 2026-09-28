@@ -44,8 +44,9 @@
 }
 
 /* vw/vh are multiplied by the zoom, so divide it back out to keep the margins */
-.notification-container.top-left       { left: calc(1.2vw / var(--ui-zoom, 1));  top: calc(2vh / var(--ui-zoom, 1)); }
-.notification-container.top-right      { right: calc(1.2vw / var(--ui-zoom, 1)); top: calc(2vh / var(--ui-zoom, 1)); }
+/* the top ones also clear the custom title bar (--titlebar-h, styles.css) */
+.notification-container.top-left       { left: calc(1.2vw / var(--ui-zoom, 1));  top: calc(2vh / var(--ui-zoom, 1) + var(--titlebar-h, 0px)); }
+.notification-container.top-right      { right: calc(1.2vw / var(--ui-zoom, 1)); top: calc(2vh / var(--ui-zoom, 1) + var(--titlebar-h, 0px)); }
 .notification-container.bottom-left    { left: calc(1.2vw / var(--ui-zoom, 1));  bottom: calc(2vh / var(--ui-zoom, 1)); }
 .notification-container.bottom-right   { right: calc(1.2vw / var(--ui-zoom, 1)); bottom: calc(2vh / var(--ui-zoom, 1)); }
 .notification-container.center {

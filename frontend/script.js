@@ -82,6 +82,10 @@ const translations = {
         btnPause: "PAUSE",
         btnResume: "RESUME",
         btnStop: "STOP",
+        winMinimize: "Minimize",
+        winMaximize: "Maximize",
+        winRestore: "Restore",
+        winClose: "Close",
         tabQueue: "Queue",
         btnAddQueue: "Queue",
         btnAddQueueTip: "Add to queue",
@@ -328,6 +332,10 @@ const translations = {
         btnPause: "مکث",
         btnResume: "ادامـه",
         btnStop: "توقف",
+        winMinimize: "کوچک کردن",
+        winMaximize: "بزرگ کردن",
+        winRestore: "بازگردانی",
+        winClose: "بستن",
         tabQueue: "صف",
         btnAddQueue: "صف",
         btnAddQueueTip: "افزودن به صف",
@@ -559,6 +567,7 @@ function setLanguage(lang) {
 
     // Re-position tab indicator after text changes shift tab widths
     positionTabIndicator();
+    if (typeof refreshMaximisedState === 'function') refreshMaximisedState();
 
     // Refresh the presets dropdown/labels for the new language
     if (typeof renderPresetMenu === 'function') {
@@ -627,6 +636,38 @@ function minimizeWindow() {
 function closeWindow() {
     pywebview.api.close_window();
 }
+
+function toggleMaximiseWindow() {
+    const request = window.pywebview?.api?.toggle_maximise_window?.();
+    Promise.resolve(request).then(refreshMaximisedState);
+}
+
+// The window can be maximised from the button, a double-click on the bar, a
+// keyboard shortcut or by dragging to a screen edge, so ask the backend
+// whenever the size changes and mirror the answer in the button.
+let _maximisedTimer = null;
+
+function refreshMaximisedState() {
+    clearTimeout(_maximisedTimer);
+    _maximisedTimer = setTimeout(async () => {
+        const request = window.pywebview?.api?.is_window_maximised?.();
+        const maximised = !!(await Promise.resolve(request));
+        document.body.classList.toggle('is-maximised', maximised);
+        const button = document.getElementById('win-max');
+        if (button) {
+            const label = (translations[currentLang] || {})[maximised ? 'winRestore' : 'winMaximize'];
+            if (label) {
+                button.title = label;
+                button.setAttribute('aria-label', label);
+            }
+        }
+    }, 120);
+}
+
+// Double-clicking the bar (but not its buttons) maximises or restores the window
+document.getElementById('titlebar').addEventListener('dblclick', e => {
+    if (!e.target.closest('.win-btn')) toggleMaximiseWindow();
+});
 
 function animateLogo() {
     const logo = document.querySelector('.logo-icon');
@@ -3333,10 +3374,12 @@ function resetCustomTheme() {
 
 const DESIGN_WIDTH = 520;
 const DESIGN_HEIGHT = 810;
+const DESIGN_TITLEBAR = 36; // keep in step with --titlebar-h in styles.css
 
 function handleResize() {
     const widthRatio = window.innerWidth / DESIGN_WIDTH;
-    const heightRatio = window.innerHeight / DESIGN_HEIGHT;
+    // the frameless window's title bar is part of the design canvas, above the 810px
+    const heightRatio = window.innerHeight / (DESIGN_HEIGHT + DESIGN_TITLEBAR);
     let zoomLevel = Math.min(widthRatio, heightRatio);
     const viewport = document.getElementById('main-viewport');
     if (viewport) {
@@ -3389,6 +3432,7 @@ window.addEventListener('DOMContentLoaded', function() {
 window.addEventListener('resize', function() {
     handleResize();
     positionTabIndicator();
+    refreshMaximisedState();
 });
 
 let lastOutputPath = "";

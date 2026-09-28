@@ -57,6 +57,8 @@
         retry_queue_job: (id) => window.go?.main?.App?.RetryQueueJob(id),
         clear_finished_jobs: () => window.go?.main?.App?.ClearFinishedJobs(),
         minimize_window: () => window.go?.main?.App?.MinimizeWindow(),
+        toggle_maximise_window: () => window.go?.main?.App?.ToggleMaximiseWindow(),
+        is_window_maximised: () => window.go?.main?.App?.IsWindowMaximised(),
         close_window: () => window.go?.main?.App?.CloseWindow(),
         get_clipboard_text: () => window.go?.main?.App?.GetClipboardText(),
         isDirectory: (path) => window.go?.main?.App?.IsDirectory(path),
