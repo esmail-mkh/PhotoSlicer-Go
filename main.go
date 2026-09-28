@@ -19,10 +19,13 @@ func main() {
 
 	err := wails.Run(&options.App{
 		Title:     "PhotoSlicer v" + constants.Version,
-		Width:     510,
-		Height:    830,
-		MinWidth:  420,
-		MinHeight: 600,
+		Width:     baseWindowLayout.Width,
+		Height:    baseWindowLayout.Height,
+		MinWidth:  baseWindowLayout.MinWidth,
+		MinHeight: baseWindowLayout.MinHeight,
+		// Shown by App.fitWindowToScreen once it has sized the window for the
+		// monitor, so the window never opens at one size and jumps to another.
+		StartHidden: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

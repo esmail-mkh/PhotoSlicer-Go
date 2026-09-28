@@ -233,6 +233,7 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.fitWindowToScreen(ctx)
 	wailsRuntime.WindowExecJS(ctx, fmt.Sprintf("window.__APP_VERSION__ = '%s'; if (typeof applyAppVersion === 'function') applyAppVersion('%s');", constants.Version, constants.Version))
 	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
 		if len(paths) > 0 {
@@ -242,6 +243,26 @@ func (a *App) startup(ctx context.Context) {
 			}
 		}
 	})
+}
+
+// fitWindowToScreen resizes the window for the monitor it is on. The window is
+// created hidden (see main.go) so that this never shows as a jump, which means
+// it has to be shown again on every path out of here.
+func (a *App) fitWindowToScreen(ctx context.Context) {
+	defer wailsRuntime.WindowShow(ctx)
+
+	screens, _ := wailsRuntime.ScreenGetAll(ctx)
+	screen, ok := pickScreen(screens)
+	if !ok {
+		return
+	}
+	layout := windowLayoutFor(screen.Size.Width, screen.Size.Height)
+	if layout == baseWindowLayout {
+		return
+	}
+	wailsRuntime.WindowSetMinSize(ctx, layout.MinWidth, layout.MinHeight)
+	wailsRuntime.WindowSetSize(ctx, layout.Width, layout.Height)
+	wailsRuntime.WindowCenter(ctx)
 }
 
 // GetAppVersion returns the current application version string.
@@ -548,6 +569,9 @@ func (a *App) clearSourceDirectory() {
 
 // AppReady is called when the frontend DOM and Wails runtime are ready.
 func (a *App) AppReady() {
+	if a.ctx != nil {
+		wailsRuntime.WindowShow(a.ctx) // no-op if already visible; see fitWindowToScreen
+	}
 	a.execJS(fmt.Sprintf(`if (typeof applyAppVersion === 'function') applyAppVersion('%s');`, constants.Version))
 	settings := a.loadSettings()
 	lang, _ := settings["language"].(string)
