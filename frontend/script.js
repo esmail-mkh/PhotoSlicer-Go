@@ -795,9 +795,15 @@ document.getElementById('titlebar').addEventListener('dblclick', e => {
 
 function animateLogo() {
     const logo = document.querySelector('.logo-icon');
-    logo.classList.remove('logo-spin');
-    void logo.offsetWidth;
+    // ignore clicks while a spin is running: restarting mid-turn would jump back to 0deg
+    if (logo.classList.contains('logo-spin')) return;
     logo.classList.add('logo-spin');
+    const done = e => {
+        if (e.target !== logo) return;
+        logo.classList.remove('logo-spin');
+        logo.removeEventListener('animationend', done);
+    };
+    logo.addEventListener('animationend', done);
 }
 
 function showTab(tabName) {
