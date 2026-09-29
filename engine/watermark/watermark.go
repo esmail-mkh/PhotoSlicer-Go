@@ -129,6 +129,8 @@ type Placement struct {
 	X     int
 	Y     int
 	Name  string
+	Score float64 // 100 = flat background under the mark; lower = more important content covered
+	Info  string  // how the spot was found (panel_start/panel_end/line_below/line_above/scan/fallback)
 }
 
 // DefaultWatermarkPlacements gives deterministic fallback positions:
@@ -168,7 +170,10 @@ func DefaultWatermarkPlacements(canvasW, canvasH, count int, wmSize image.Point,
 	return placements
 }
 
-// ComputeWatermarkPlacements computes optimal non-overlapping placements using Content-Aware Panel Detection.
+// ComputeWatermarkPlacements finds where the watermark goes, one per vertical segment of the
+// image (count segments), using the content-aware PlacementDetector: at the chosen page edge,
+// inside a panel just under its top line or just over its bottom line, away from speech
+// bubbles, line art and faces; free space only when no panel edge is usable.
 func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int, edge string, widthPercent int, margin int) ([]Placement, *image.RGBA) {
 	if count <= 0 {
 		count = 1
@@ -186,14 +191,17 @@ func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int
 	wmW := wm.Bounds().Dx()
 	wmH := wm.Bounds().Dy()
 
-	// Extract grayscale and saturation for content-aware analysis
-	gray, sat, w, h := ExtractGrayAndSaturation(img)
+	right := edge != "left"
+	var xPos int
+	if right {
+		xPos = canvasW - margin - wmW
+	} else {
+		xPos = margin
+	}
+	xPos = clampInt(xPos, 0, maxInt(0, canvasW-wmW))
 
-	// Whole-image connected bubble mask (built once, shared across all segments)
-	bubbleMask, maskW, maskH := BuildBubbleMask(gray, sat, w, h)
-
-	// Whole-image gutters (built once, shared across all segments)
-	gutters := FindGutters(gray, sat, w, h)
+	// Per-pixel maps are built once and shared by every segment
+	det := newPlacementDetector(img, right)
 
 	segmentHeight := float64(canvasH) / float64(count)
 	var placements []Placement
@@ -206,17 +214,21 @@ func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int
 			continue
 		}
 
-		xPos, yPos, _ := FindBestWatermarkPosition(
-			gray, sat, w, h, wmW, wmH, segStart, segEnd, edge, margin,
-			bubbleMask, maskW, maskH, gutters,
-		)
+		var yPos int
+		var score float64
+		var info string
+		if best, ok := det.find(xPos, wmW, wmH, segStart, segEnd); ok {
+			yPos, score, info = best.y, placementScore(best.cost), best.info
+		} else {
+			yPos, score, info = segStart+detMargin, -100, "fallback(top)"
+		}
 
 		// Clamp yPos inside segment
-		if yPos < segStart {
-			yPos = segStart
-		}
 		if yPos > segEnd-wmH {
 			yPos = segEnd - wmH
+		}
+		if yPos < segStart {
+			yPos = segStart
 		}
 
 		placements = append(placements, Placement{
@@ -224,6 +236,8 @@ func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int
 			X:     xPos,
 			Y:     yPos,
 			Name:  "Watermark",
+			Score: score,
+			Info:  info,
 		})
 	}
 
@@ -236,6 +250,7 @@ func ComputeWatermarkPlacements(img image.Image, watermarkPath string, count int
 				X:     pt.X,
 				Y:     pt.Y,
 				Name:  "Watermark",
+				Info:  "fallback(center)",
 			})
 		}
 	}

@@ -60,7 +60,8 @@ It automates the entire webtoon production workflow: seamless vertical stitching
 
 ### 🖼️ Smart Watermarking System
 
-* **Segment-Distributed Placement:** Automatically calculates balanced placements across vertical segments of each slice.
+* **Panel-Edge Placement:** The watermark goes inside a panel, flush under its top line or over its bottom line (gutters, drawn borders and faded panels are all recognised). It steers clear of speech bubbles, line art, faces and skin tones, and only falls back to free space when a page has no usable panel edge.
+* **Segment-Distributed Placement:** With several watermarks per slice, each one is placed independently inside its own vertical segment.
 * **Edge Alignment & Margins:** Align watermarks to the **Left Edge** or **Right Edge** with customizable pixel margin offsets (`0–200 px`).
 * **Multi-Instance Support:** Place between `1` and `10` watermark instances per output slice.
 * **Original PNG Fidelity:** Renders crisp transparent PNG logos scaled proportionally to canvas width with Lanczos filtering.

@@ -202,28 +202,96 @@ func TestWatermarkPlacements(t *testing.T) {
 	})
 }
 
-func TestExtractGrayAndSaturationSubImage(t *testing.T) {
-	parent := image.NewRGBA(image.Rect(0, 0, 200, 200))
-	draw.Draw(parent, parent.Bounds(), image.White, image.Point{}, draw.Src)
-
-	// In the bottom right corner (100, 100) to (200, 200), fill with red
-	redRect := image.Rect(100, 100, 200, 200)
-	draw.Draw(parent, redRect, image.NewUniform(color.RGBA{R: 255, G: 0, B: 0, A: 255}), image.Point{}, draw.Src)
-
-	// Take a SubImage of the red area
-	sub := parent.SubImage(redRect)
-	gray, sat, w, h := ExtractGrayAndSaturation(sub)
-	if w != 100 || h != 100 {
-		t.Fatalf("Expected 100x100, got %dx%d", w, h)
+// pagePanels draws mid-tone panels (with a little line work) on a white page.
+func pagePanels(w, h int, panels ...[2]int) *image.RGBA {
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(img, img.Bounds(), image.White, image.Point{}, draw.Src)
+	for _, p := range panels {
+		r := image.Rect(0, p[0], w, p[1])
+		draw.Draw(img, r, image.NewUniform(color.RGBA{R: 110, G: 130, B: 160, A: 255}), image.Point{}, draw.Src)
+		// far-away strokes so the panel is not perfectly flat
+		for x := 300; x < w; x += 97 {
+			for y := p[0] + 40; y < p[1]-40; y += 3 {
+				img.SetRGBA(x, y, color.RGBA{R: 20, G: 20, B: 30, A: 255})
+			}
+		}
 	}
+	return img
+}
 
-	// Red pixel in grayscale is (255*77) >> 8 = 76
-	// Saturation is 255
-	if gray[0] != 76 {
-		t.Errorf("Expected gray[0] == 76 for SubImage, got %d", gray[0])
-	}
-	if sat[0] != 255 {
-		t.Errorf("Expected sat[0] == 255 for SubImage, got %d", sat[0])
+func TestPlacementSitsInsidePanelAtItsEdge(t *testing.T) {
+	wmPath := createTestWatermark(t, t.TempDir(), 200, 50)
+	page := pagePanels(800, 2400, [2]int{500, 1500})
+
+	for _, edge := range []string{"left", "right"} {
+		placements, _ := ComputeWatermarkPlacements(page, wmPath, 1, edge, 0, 0)
+		if len(placements) != 1 {
+			t.Fatalf("%s: expected 1 placement, got %d", edge, len(placements))
+		}
+		y := placements[0].Y
+		underTop := y >= 500 && y <= 505
+		overBottom := y+50 >= 1495 && y+50 <= 1500
+		if !underTop && !overBottom {
+			t.Errorf("%s: expected the watermark flush inside the panel (top 500 / bottom 1500), got Y=%d (%s)",
+				edge, y, placements[0].Info)
+		}
 	}
 }
 
+func TestRightEdgeMirrorsLeftEdge(t *testing.T) {
+	wmPath := createTestWatermark(t, t.TempDir(), 200, 50)
+	page := pagePanels(800, 3000, [2]int{300, 1100}, [2]int{1250, 2600})
+	flipped := image.NewRGBA(page.Bounds())
+	for y := 0; y < 3000; y++ {
+		for x := 0; x < 800; x++ {
+			flipped.SetRGBA(799-x, y, page.RGBAAt(x, y))
+		}
+	}
+	left, _ := ComputeWatermarkPlacements(flipped, wmPath, 1, "left", 0, 0)
+	right, _ := ComputeWatermarkPlacements(page, wmPath, 1, "right", 0, 0)
+	if len(left) != 1 || len(right) != 1 {
+		t.Fatalf("expected one placement each, got %d and %d", len(left), len(right))
+	}
+	if left[0].Y != right[0].Y {
+		t.Errorf("right edge on the page (Y=%d) should match left edge on the flipped page (Y=%d)", right[0].Y, left[0].Y)
+	}
+	if right[0].X != 600 {
+		t.Errorf("expected right-edge X=600, got %d", right[0].X)
+	}
+}
+
+func TestMultipleWatermarksStayInTheirSegments(t *testing.T) {
+	wmPath := createTestWatermark(t, t.TempDir(), 200, 50)
+	page := pagePanels(800, 3000, [2]int{300, 1300}, [2]int{1700, 2700})
+	placements, _ := ComputeWatermarkPlacements(page, wmPath, 2, "left", 0, 0)
+	if len(placements) != 2 {
+		t.Fatalf("expected 2 placements, got %d", len(placements))
+	}
+	for i, p := range placements {
+		segStart, segEnd := i*1500, (i+1)*1500
+		if p.Y < segStart || p.Y+50 > segEnd {
+			t.Errorf("placement %d at Y=%d leaves its segment [%d,%d]", i, p.Y, segStart, segEnd)
+		}
+	}
+}
+
+func TestPixelMapsSeparateBubblePaperFromTintedBackground(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 4, 1))
+	img.SetRGBA(0, 0, color.RGBA{R: 255, G: 255, B: 255, A: 255}) // bubble paper
+	img.SetRGBA(1, 0, color.RGBA{R: 255, G: 245, B: 235, A: 255}) // tinted bright background
+	img.SetRGBA(2, 0, color.RGBA{R: 10, G: 10, B: 10, A: 255})    // dark
+	img.SetRGBA(3, 0, color.RGBA{R: 220, G: 160, B: 130, A: 255}) // skin
+	_, flags, skinSat, _, _ := pixelMaps(img, false)
+	if flags[0]&flagBubble == 0 || flags[0]&flagWhite == 0 {
+		t.Errorf("neutral white must be bubble paper, flags=%b", flags[0])
+	}
+	if flags[1]&flagWhite == 0 || flags[1]&flagBubble != 0 {
+		t.Errorf("tinted bright pixel must be white but not bubble paper, flags=%b", flags[1])
+	}
+	if flags[2]&flagDark == 0 {
+		t.Errorf("near-black pixel must be dark, flags=%b", flags[2])
+	}
+	if flags[3]&flagSkin == 0 || skinSat[3] == 0 {
+		t.Errorf("skin tone must be flagged with a saturation, flags=%b sat=%d", flags[3], skinSat[3])
+	}
+}
