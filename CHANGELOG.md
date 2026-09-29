@@ -1,8 +1,25 @@
-[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۴-پشتیبانی-از-pdf-بررسی-خودکار-آپدیت-و-بهینه‌سازی-سرعت) | [🇬🇧 **English**](#-photoslicer-v54-pdf-input-auto-updates--performance)
+[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۵-صف-کار-خروجی-avif-واترمارک-پنل‌محور-و-رابط-جدید) | [🇬🇧 **English**](#-photoslicer-v55-job-queue-avif-output-panel-edge-watermark--new-ui)
 
 ---
 
 <div dir="rtl">
+
+# 🚀 فوتو اسلایسر نسخه ۵.۵: صف کار، خروجی AVIF، واترمارک پنل‌محور و رابط جدید
+
+**نسخه ۵.۵ منتشر شد!** این نسخه صف کار ماندگار برای پردازش پشت‌سرهم چند فصل، خروجی AVIF، موتور جدید بهبود کیفیت روی CPU، الگوریتم کاملاً تازه‌ی جانمایی واترمارک روی لبه‌ی پنل‌ها و بازطراحی گسترده‌ی رابط کاربری را همراه دارد.
+
+### 🌟 تغییرات جدید (نسخه ۵.۵)
+
+* **📋 صف کار (Job Queue):** چند پوشه، آرشیو یا PDF را از دکمه‌ی **Queue** به صف اضافه کنید تا یکی‌یکی و هرکدام با تنظیمات خودش (عرض، فرمت یا واترمارک متفاوت) اجرا شوند. ترتیب کارها را عوض کنید، کارهای متوقف یا ناموفق را دوباره اجرا کنید و بعد از راه‌اندازی مجدد برنامه از همان‌جا ادامه دهید. صف از دکمه‌ی شروع Workspace هم اجرا می‌شود و کارهای تمام‌شده با شروع کار جدید پاک می‌شوند.
+* **🖼️ خروجی AVIF:** فرمت جدید خروجی با انکود سریع‌تر و مصرف رم کمتر؛ تعداد انکودهای هم‌زمان محدود شده تا حافظه پر نشود.
+* **🧠 بازسازی و آپ‌اسکیل واقعی روی CPU:** موتور Fast Clean حالا بازسازی و بزرگ‌کردن ۲ برابری انجام می‌دهد و دانه‌ی کاغذ و تُن سایه‌ها (Screentone) را حفظ می‌کند.
+* **✂️ واترمارک پنل‌محور (الگوریتم جدید):** واترمارک داخل پنل، چسبیده به زیر خط بالایی یا روی خط پایینی آن قرار می‌گیرد؛ گاترهای سفید و سیاه، کادرهای کشیده‌شده، پنل‌های محو‌شونده و گاترهای بافت‌دار تشخیص داده می‌شوند. از حباب گفتگو، خطوط طراحی، چهره و رنگ پوست دوری می‌کند و فقط وقتی لبه‌ی قابل‌استفاده‌ای نیست به فضای آزاد می‌رود. لبه‌ی راست آینه‌ی دقیق لبه‌ی چپ است و در حالت چند واترمارک، هرکدام مستقل در بخش عمودی خودش جانمایی می‌شود.
+* **🪟 بازطراحی رابط کاربری:** نوار عنوان سفارشی با گوشه‌های گرد و نمایش زنده‌ی وضعیت، دکمه‌های بزرگ‌تر پنجره، لنز شیشه‌ای (Liquid Glass) روی تب‌ها، کنترل‌های تازه‌ی Workspace، نوار پیشرفت و نمای در حال اجرا.
+* **📐 اندازه‌ی پنجره بر اساس مانیتور:** پنجره متناسب با مانیتوری که روی آن باز می‌شود اندازه می‌گیرد و چیدمان در همه‌ی اندازه‌ها یکسان می‌ماند.
+* **✨ انیمیشن روان لوگو:** چرخش آیکون قیچی بدون پرش در پایان، همراه با حرکت «چیدن» قیچی.
+* **🐛 رفع باگ‌ها:** پرش هنگام شروع برنامه، دکمه‌ی حداکثر‌سازی، اسکرول پریست‌ها و متن‌های ناقص فارسی در صف.
+
+---
 
 # 🚀 فوتو اسلایسر نسخه ۵.۴: پشتیبانی از PDF، بررسی خودکار آپدیت و بهینه‌سازی سرعت
 
@@ -152,6 +169,23 @@
 فایل **ZIP** آخرین نسخه را از صفحه [Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest) دانلود کنید، اکسترکت کنید و `PhotoSlicer.exe` را اجرا کنید. لذت ببرید!
 
 </div>
+
+---
+
+# 🚀 PhotoSlicer v5.5: Job Queue, AVIF Output, Panel-Edge Watermark & New UI
+
+**Version 5.5 is here!** This release brings a persistent job queue for running several chapters back to back, AVIF output, a new CPU restore engine, a completely new panel-edge watermark placement algorithm, and a broad UI redesign.
+
+### 🌟 What's New (v5.5)
+
+* **📋 Job Queue:** Line up several folders, archives or PDFs from the **Queue** button and run them one after another, each with the settings it was added with (different width, format or watermark per job). Reorder waiting jobs, re-run stopped or failed ones, and pick up where you left off after a restart. The queue also starts from the Workspace start button, and finished jobs are cleared when something new begins.
+* **🖼️ AVIF Output:** New output format with much faster encoding and a lighter memory footprint; concurrent encodes are bounded to prevent RAM exhaustion.
+* **🧠 Real Restore & 2x Upscale on CPU:** The Fast Clean engine now restores and upscales 2x while keeping paper grain and screentone tone.
+* **✂️ Panel-Edge Watermark (new algorithm):** The watermark goes inside a panel, flush under its top line or over its bottom line. White and black gutters, drawn borders, faded panels and textured gutters are all recognised. It steers clear of speech bubbles, line art, faces and skin tones and only falls back to free space when no usable panel edge exists. The right edge is the exact mirror of the left, and with several watermarks per slice each one is placed independently inside its own vertical segment.
+* **🪟 UI Redesign:** Custom rounded title bar with live status, larger window buttons, a liquid-glass hover lens on the tab bar, and redesigned Workspace controls, progress bar and running view.
+* **📐 Monitor-Aware Window Size:** The window is sized for the monitor it opens on, and the layout stays identical at every size.
+* **✨ Smoother Logo Animation:** The scissors logo spin no longer snaps at the end and now snips as it turns.
+* **🐛 Fixes:** Startup flicker, maximise button, presets scroll, and unfinished Persian wording in the queue.
 
 ---
 
