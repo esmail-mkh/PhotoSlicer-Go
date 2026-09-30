@@ -62,8 +62,17 @@
                 <div class="header-left">
                     <!-- Interactive Logo -->
                     <div class="logo-icon" onclick="animateLogo()" title="Click to spin!">
+                        <!-- One scissors shape cut into its two blades (each tip goes with the
+                             ring across the pivot), so the click animation can open and close them -->
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M3.5 3.5c-.614-.884-.074-1.962.858-2.5L8 7.226 11.642 1c.932.538 1.472 1.616.858 2.5L8.81 8.61l1.556 2.661a2.5 2.5 0 1 1-.794.637L8 9.73l-1.572 2.177a2.5 2.5 0 1 1-.794-.637L7.19 8.61zm2.5 10a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0m7 0a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0"/>
+                            <defs>
+                                <clipPath id="logo-blade-a-clip"><path d="M0 0h8v8.6h8V16H8V8.6H0z"/></clipPath>
+                                <clipPath id="logo-blade-b-clip"><path d="M8 0h8v8.6H8V16H0V8.6h8z"/></clipPath>
+                                <path id="logo-scissors" d="M3.5 3.5c-.614-.884-.074-1.962.858-2.5L8 7.226 11.642 1c.932.538 1.472 1.616.858 2.5L8.81 8.61l1.556 2.661a2.5 2.5 0 1 1-.794.637L8 9.73l-1.572 2.177a2.5 2.5 0 1 1-.794-.637L7.19 8.61zm2.5 10a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0m7 0a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0"/>
+                            </defs>
+                            <g class="logo-blade logo-blade-a"><use href="#logo-scissors" clip-path="url(#logo-blade-a-clip)"/></g>
+                            <g class="logo-blade logo-blade-b"><use href="#logo-scissors" clip-path="url(#logo-blade-b-clip)"/></g>
+                            <circle cx="8" cy="8.6" r="0.6"/>
                         </svg>
                     </div>
                     <span id="title-text" data-i18n="appTitle">PhotoSlicer</span>
