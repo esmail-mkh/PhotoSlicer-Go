@@ -183,8 +183,10 @@ body::after {
     inset: 0;
     pointer-events: none;
     z-index: 9999;
-    opacity: 0.035;
-    mix-blend-mode: overlay;
+    /* Plain blending at a lower opacity looks the same as overlay at 0.035,
+       but a blend mode over the whole window made every animation anywhere
+       re-blend the full frame */
+    opacity: 0.025;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -263,8 +265,10 @@ body::after {
         linear-gradient(160deg, rgba(255,255,255,0.04) 0%, transparent 40%),
         var(--glass-panel);
     border: 1px solid var(--glass-border);
-    backdrop-filter: blur(44px) saturate(180%);
-    -webkit-backdrop-filter: blur(44px) saturate(180%);
+    /* No backdrop-filter: all that sits behind the panel is the page background
+       and the two already blurred glows, so a 44px blur looked the same but was
+       recomputed over the whole panel on every frame any animation inside it
+       ran (the idle pulse of the Start button among them). */
     border-radius: var(--radius-xl);
     padding: 16px;
     gap: 16px;
@@ -550,10 +554,28 @@ body:not([data-tab="process"]) .header-presets {
 .version-badge.has-update {
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.22), rgba(5, 150, 105, 0.3));
     color: #34d399;
-    border-color: rgba(52, 211, 153, 0.55);
+    border-color: rgba(52, 211, 153, 0.45);
     cursor: pointer;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-    animation: updateBadgePulse 2.5s infinite ease-in-out;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* The pulse is a brighter rim and glow fading in and out on top, so only
+   opacity animates instead of repainting box-shadow and border every frame */
+.version-badge.has-update::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    border: 1px solid rgba(52, 211, 153, 0.8);
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    opacity: 0;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .version-badge.has-update::after {
+        animation: updateBadgePulse 2.5s infinite ease-in-out;
+    }
 }
 
 .version-badge.has-update:hover {
@@ -608,14 +630,8 @@ body:not([data-tab="process"]) .header-presets {
 }
 
 @keyframes updateBadgePulse {
-    0%, 100% {
-        box-shadow: 0 0 10px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-        border-color: rgba(52, 211, 153, 0.45);
-    }
-    50% {
-        box-shadow: 0 0 16px rgba(16, 185, 129, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-        border-color: rgba(52, 211, 153, 0.8);
-    }
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
 }
 
 @keyframes updateRingPulse {
@@ -845,8 +861,8 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
     border-radius: var(--radius-md);
     border: 1px solid rgba(255, 255, 255, 0.08);
     position: relative;
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    /* No backdrop-filter: the bar sits on the plain panel, so blurring it
+       changed nothing but cost a pass on every animated frame */
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.08),
         0 8px 32px rgba(0, 0, 0, 0.25),
@@ -893,8 +909,8 @@ body.has-update-active .theme-toggles:hover .theme-dots-group.is-dropdown {
         radial-gradient(90px 44px at var(--hx) var(--hy), rgba(255, 255, 255, var(--spec)), rgba(255, 255, 255, 0) 70%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045) 55%, rgba(255, 255, 255, 0.085));
     border: 1px solid rgba(255, 255, 255, 0.16);
-    backdrop-filter: blur(12px) saturate(160%);
-    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    /* No backdrop-filter: the tab labels sit above the pill, so all it could
+       blur was the bar's own flat background */
     box-shadow:
         0 0 0 var(--ring) var(--theme-solid),
         inset 0 1px 0 rgba(255, 255, 255, 0.4),
@@ -2204,6 +2220,14 @@ input#save-location-input[readonly] {
     100% { box-shadow: 0 0 0 0 transparent; }
 }
 
+/* The overlay is hidden until something is dragged over the field; its loops
+   only run while it can be seen */
+.folder-wrapper:not(.drag-over) .drop-glow-ring,
+.folder-wrapper:not(.drag-over) .drop-overlay::before,
+.folder-wrapper:not(.drag-over) .drop-icon {
+    animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .drop-glow-ring, .drop-overlay::before, .drop-icon { animation: none; }
     .folder-wrapper.drag-over input { transform: none; }
@@ -3008,9 +3032,10 @@ select:focus {
     -webkit-backdrop-filter: blur(20px);
     z-index: 65;
     opacity: 0;
+    visibility: hidden;
     transform: translateY(-6px);
     pointer-events: none;
-    transition: opacity 0.16s ease, transform 0.16s ease;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
     display: flex;
     flex-direction: column;
     gap: 2px;
@@ -3019,6 +3044,8 @@ select:focus {
 
 .preset-export-menu.open {
     opacity: 1;
+    visibility: visible;
+    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s;
     transform: translateY(0);
     pointer-events: auto;
 }
@@ -3196,12 +3223,18 @@ select:focus {
     z-index: 2000;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s ease;
+    /* Hidden once the fade-out ends: at opacity 0 the overlay is still drawn,
+       and its full-window backdrop blur would be recomputed on every frame
+       any animation below it runs. */
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s;
 }
 
 .modal-overlay[data-open="true"] {
     opacity: 1;
     pointer-events: auto;
+    visibility: visible;
+    transition: opacity 0.3s ease, visibility 0s;
 }
 
 /* Overlays sit outside #main-viewport, so they take the same zoom (see
@@ -4133,7 +4166,10 @@ body.is-processing .progress-fill::after {
     padding: 15px 20px;
     border: none;
     border-radius: var(--radius-md);
-    background: var(--theme-gradient);
+    /* Top gloss, then the theme colour */
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 50%),
+        var(--theme-gradient);
     color: var(--on-theme-text, #fff);
     font-size: 1rem;
     font-weight: 700;
@@ -4141,7 +4177,7 @@ body.is-processing .progress-fill::after {
     text-transform: uppercase;
     cursor: pointer;
     position: relative;
-    overflow: hidden;
+    /* Not clipped: ::after carries the pulse glow outside the button */
     transition: var(--transition-spring);
     box-shadow:
         0 10px 32px var(--theme-glow),
@@ -4153,29 +4189,39 @@ body.is-processing .progress-fill::after {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
-/* Button shine sweep effect */
+/* Button shine sweep effect. The streak (60% wide) is a background moved
+   across the button's own box, so the button needs no overflow clipping:
+   -250% puts its left edge at -100% of the width, 300% at 120%. */
 .start-button::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 60%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
-    transition: left 0.7s ease;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent) no-repeat;
+    background-size: 60% 100%;
+    background-position: -250% 0;
+    transition: background-position 0.7s ease;
     pointer-events: none;
 }
 
 .start-button:hover::before {
-    left: 120%;
+    background-position: 300% 0;
 }
 
+/* The ready pulse: a stronger glow that only fades in and out. Animating
+   opacity is left to the compositor, while animating box-shadow repainted
+   the button on every frame for as long as the app sat idle. An outer
+   shadow is never drawn inside the box, so it cannot cover the label. */
 .start-button::after {
     content: '';
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    background: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, transparent 50%);
+    box-shadow:
+        0 14px 40px var(--theme-glow-strong),
+        0 4px 14px var(--theme-glow),
+        0 0 18px var(--theme-solid);
+    opacity: 0;
     pointer-events: none;
 }
 
@@ -4204,27 +4250,30 @@ body.is-processing .progress-fill::after {
     filter: grayscale(0.3);
 }
 
-/* Button Pulse Ready Animation */
-.start-button.btn-ready:not(:disabled) {
-    animation: startPulse 2.2s infinite ease-in-out;
-}
-
-@keyframes startPulse {
-    0%, 100% {
+/* Button Pulse Ready Animation: the button's own shadow drops to the calm
+   end of the pulse and ::after brings in the bright end */
+@media (prefers-reduced-motion: no-preference) {
+    .start-button.btn-ready:not(:disabled) {
         box-shadow:
             0 8px 24px var(--theme-glow),
             0 2px 6px rgba(0, 0, 0, 0.25),
             inset 0 1px 0 rgba(255, 255, 255, 0.35);
-        transform: translateY(0);
+        animation: startPulse 2.2s infinite ease-in-out;
     }
-    50% {
-        box-shadow:
-            0 14px 40px var(--theme-glow-strong),
-            0 4px 14px var(--theme-glow),
-            0 0 18px var(--theme-solid),
-            inset 0 1px 0 rgba(255, 255, 255, 0.5);
-        transform: translateY(-1.5px);
+
+    .start-button.btn-ready:not(:disabled)::after {
+        animation: startPulseGlow 2.2s infinite ease-in-out;
     }
+}
+
+@keyframes startPulse {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1.5px); }
+}
+
+@keyframes startPulseGlow {
+    0%, 100% { opacity: 0; }
+    50% { opacity: 1; }
 }
 
 /* Start + Stop sit on one row; Stop only appears while a job is active */
@@ -7021,8 +7070,8 @@ body {
         radial-gradient(360px 80px at 50% -30px, var(--theme-glow-soft), transparent 72%),
         linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.03)),
         rgba(9, 11, 18, 0.74);
-    backdrop-filter: blur(24px) saturate(170%);
-    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    /* No backdrop-filter: only the page background lies under the bar, and the
+       blur was recomputed on every frame the status dot or the sheen moved */
     box-shadow:
         inset 0 1px 0 rgba(255, 255, 255, 0.12),
         0 8px 24px rgba(0, 0, 0, 0.28);
