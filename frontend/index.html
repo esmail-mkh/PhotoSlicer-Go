@@ -280,10 +280,10 @@
                             </div>
                         </div>
                         <div class="input-with-unit">
-                            <input type="number" id="quality-input" value="100" max="100" min="1">
+                            <input type="number" id="quality-input" value="95" max="100" min="1">
                             <span>%</span>
                         </div>
-                        <input type="range" id="quality-slider" class="quality-slider" min="1" max="100" step="1" value="100" aria-labelledby="quality-label">
+                        <input type="range" id="quality-slider" class="quality-slider" min="1" max="100" step="1" value="95" aria-labelledby="quality-label">
                     </div>
 
                     <div class="control-card card-format" data-tooltip-key="tipFormat">
@@ -683,10 +683,10 @@
                         <div class="filename-guide">
                             <span class="guide-title" data-i18n="filenameGuideTitle">Placeholders Guide:</span>
                             <div class="guide-items">
-                                <div class="guide-item"><code>[number]</code> <span data-i18n="guideNumber">Sequential number (e.g. 001) - Required</span></div>
-                                <div class="guide-item"><code>[folder]</code> <span data-i18n="guideFolder">Source folder name</span></div>
-                                <div class="guide-item"><code>[date]</code> <span data-i18n="guideDate">Current date (YYYY-MM-DD)</span></div>
-                                <div class="guide-item"><code>[total]</code> <span data-i18n="guideTotal">Total slice count</span></div>
+                                <button type="button" class="guide-item" data-placeholder="[number]"><code>[number]</code> <span data-i18n="guideNumber">Sequential number (e.g. 001) - Required</span></button>
+                                <button type="button" class="guide-item" data-placeholder="[folder]"><code>[folder]</code> <span data-i18n="guideFolder">Source folder name</span></button>
+                                <button type="button" class="guide-item" data-placeholder="[date]"><code>[date]</code> <span data-i18n="guideDate">Current date (YYYY-MM-DD)</span></button>
+                                <button type="button" class="guide-item" data-placeholder="[total]"><code>[total]</code> <span data-i18n="guideTotal">Total slice count</span></button>
                             </div>
                         </div>
                     </div>

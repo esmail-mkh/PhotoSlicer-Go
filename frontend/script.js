@@ -33,7 +33,7 @@ const translations = {
         archivePackage: "Packaging & Archive",
         tipWidth: "Resize all pages to a uniform width while maintaining aspect ratio",
         tipHeight: "Maximum vertical height per slice (16000px safe limit for WebP and browser canvas)",
-        tipQuality: "Output compression quality from 1 to 100 (100 is lossless/highest)",
+        tipQuality: "Output compression quality from 1 to 100. 90-95 looks identical to 100 at 30-40% smaller file size",
         tipFormat: "Output image format (JPG, PNG, compressed WebP, or layered PSD)",
         tipAiEnhance: "Quality enhancement via CPU restore & 2x upscale or Real-ESRGAN GPU upscaler",
         tipNoStitch: "Process, resize, and watermark files individually without stitching into a tall strip",
@@ -206,7 +206,7 @@ const translations = {
         filenameDigits: "Digits",
         filenameDigitsUnit: "pad",
         filenamePreview: "Preview:",
-        filenameGuideTitle: "Placeholders Guide:",
+        filenameGuideTitle: "Placeholders Guide (click to insert):",
         guideNumber: "Sequential number (e.g. 001) - Required",
         guideFolder: "Source folder name",
         guideDate: "Current date (YYYY-MM-DD)",
@@ -293,7 +293,7 @@ const translations = {
         archivePackage: "بسته‌بندی و خروجی آرشیو",
         tipWidth: "تغییر عرض تمام صفحات به یک اندازه مشخص با حفظ نسبت ابعاد",
         tipHeight: "حداکثر ارتفاع هر برش (پیش‌فرض ۱۶۰۰۰ پیکسل برای ایمنی WebP و روان بودن مرورگر)",
-        tipQuality: "کیفیت فشرده‌سازی خروجی از ۱ تا ۱۰۰ (۱۰۰ برای بالاترین وضوح)",
+        tipQuality: "کیفیت فشرده‌سازی خروجی از ۱ تا ۱۰۰. کیفیت ۹۰ تا ۹۵ از نظر بصری با ۱۰۰ یکسان است و حجم فایل را ۳۰ تا ۴۰ درصد کم می‌کند",
         tipFormat: "انتخاب فرمت خروجی تصویر (JPG, PNG, WebP فشرده، یا PSD لایه‌باز)",
         tipAiEnhance: "ارتقای هوشمند کیفیت با دو موتور: بازسازی و بزرگ‌نمایی ۲ برابر با پردازنده (CPU) یا هوش مصنوعی Real-ESRGAN (GPU)",
         tipNoStitch: "پردازش، ریسایز و واترمارک مجزای فایل‌ها بدون چسباندن آن‌ها در یک نوار بلند وب‌تون",
@@ -466,7 +466,7 @@ const translations = {
         filenameDigits: "تعداد ارقام",
         filenameDigitsUnit: "رقم",
         filenamePreview: "پیش‌نمایش:",
-        filenameGuideTitle: "راهنمای متغیرها:",
+        filenameGuideTitle: "راهنمای متغیرها (برای افزودن کلیک کنید):",
         guideNumber: "شمارنده ترتیبی (مثال: 001) - الزامی",
         guideFolder: "نام پوشه منبع",
         guideDate: "تاریخ فعلی (YYYY-MM-DD)",
@@ -1946,6 +1946,26 @@ function pickWheelColor(e) {
     patternInput.addEventListener('input', refreshPreview);
     digitsInput.addEventListener('input', refreshPreview);
     if (formatSelect) formatSelect.addEventListener('change', refreshPreview);
+
+    // Clicking a guide chip appends its placeholder to the pattern, separated
+    // by a space unless the pattern already ends with a separator.
+    document.querySelectorAll('.filename-guide .guide-item[data-placeholder]').forEach(function(item) {
+        item.addEventListener('click', function() {
+            const placeholder = item.dataset.placeholder;
+            let value = patternInput.value;
+            if (value.includes(placeholder)) {
+                patternInput.focus();
+                return;
+            }
+            if (value && !/[\s_\-.]$/.test(value)) value += ' ';
+            patternInput.value = value + placeholder;
+            patternInput.focus();
+            patternInput.setSelectionRange(patternInput.value.length, patternInput.value.length);
+            refreshPreview();
+            updateSettings();
+        });
+    });
+
     window.refreshFilenamePreview = refreshPreview;
     refreshPreview();
 })();
@@ -2303,7 +2323,7 @@ function updateSettings() {
         custom_width_checked: document.getElementById('custom-width').checked,
         width: parseInt(document.getElementById('width-input').value) || 800,
         height_limit: parseInt(document.getElementById('height-input').value) || 16000,
-        save_quality: parseInt(document.getElementById('quality-input').value) || 100,
+        save_quality: parseInt(document.getElementById('quality-input').value) || 95,
         save_format: (document.getElementById('format-select')?.value || 'JPG').toUpperCase(),
         zip_checked: document.getElementById('is-zip').checked,
         pdf_checked: document.getElementById('is-pdf').checked,
@@ -2703,7 +2723,7 @@ const PRESET_FIELD_DEFS = [
     { key: 'custom_width_checked', id: 'custom-width', type: 'check', def: true },
     { key: 'width', id: 'width-input', type: 'int', def: 800 },
     { key: 'height_limit', id: 'height-input', type: 'int', def: 16000 },
-    { key: 'save_quality', id: 'quality-input', type: 'int', def: 100 },
+    { key: 'save_quality', id: 'quality-input', type: 'int', def: 95 },
     { key: 'save_format', id: 'format-select', type: 'value', def: 'JPG' },
     { key: 'zip_checked', id: 'is-zip', type: 'check', def: false },
     { key: 'pdf_checked', id: 'is-pdf', type: 'check', def: false },
