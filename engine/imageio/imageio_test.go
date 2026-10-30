@@ -249,6 +249,36 @@ func TestAVIFEncodesSubImageSlice(t *testing.T) {
 	}
 }
 
+// The slicer hands the JPEG encoder SubImage slices of one tall stitched
+// strip, so the encoder must read each row at the parent's stride. A row's
+// grey value encodes its own Y, making a misread row visible.
+func TestJPEGEncodesSubImageSlice(t *testing.T) {
+	strip := image.NewRGBA(image.Rect(0, 0, 32, 96))
+	for y := 0; y < 96; y++ {
+		v := uint8(y * 2)
+		for x := 0; x < 32; x++ {
+			strip.SetRGBA(x, y, color.RGBA{R: v, G: v, B: v, A: 255})
+		}
+	}
+	slice := strip.SubImage(image.Rect(0, 32, 32, 64))
+
+	path := filepath.Join(t.TempDir(), "slice.jpg")
+	if err := SaveOpaqueJPEG(slice, path, 95); err != nil {
+		t.Fatalf("encode failed: %v", err)
+	}
+	dec, err := OpenImageRobust(path)
+	if err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if b := dec.Bounds(); b.Dx() != 32 || b.Dy() != 32 {
+		t.Fatalf("expected 32x32, got %v", b)
+	}
+	// Row 0 of the slice is row 32 of the strip: grey 64, not 0.
+	if r, _, _, _ := dec.At(16, 0).RGBA(); int(r>>8) < 56 || int(r>>8) > 72 {
+		t.Fatalf("wrong rows encoded: row 0 grey = %d, want ~64", r>>8)
+	}
+}
+
 func TestPixelLimiterBounds(t *testing.T) {
 	l := newPixelLimiter(100, 3)
 	var (

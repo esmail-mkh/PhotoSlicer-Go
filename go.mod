@@ -1,6 +1,6 @@
 module photoslicer
 
-go 1.25.0
+go 1.26.4
 
 require (
 	github.com/atotto/clipboard v0.1.4
@@ -8,6 +8,7 @@ require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/gen2brain/avif v0.6.0
 	github.com/gen2brain/jpeg v0.1.0
+	github.com/gen2brain/jpegn v0.6.2
 	github.com/klippa-app/go-pdfium v1.15.0
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/wailsapp/wails/v2 v2.15.0
