@@ -13,7 +13,7 @@ const (
 	JpegMaxDimension  = 65500
 	DefaultWidth      = 800
 	DefaultHeight     = 16000
-	DefaultQuality    = 100
+	DefaultQuality    = 95
 	MinEnhanceHeight  = 32
 	MaxEnhanceHeight  = 30000
 )

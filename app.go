@@ -282,7 +282,7 @@ func (a *App) defaultSettings() map[string]interface{} {
 		"custom_width_checked": true,
 		"width":                800,
 		"height_limit":         16000,
-		"save_quality":         100,
+		"save_quality":         95,
 		"save_format":          "JPG",
 		"zip_checked":          false,
 		"pdf_checked":          false,
@@ -657,7 +657,7 @@ func (a *App) applySettingsToDOM(settings map[string]interface{}) {
 			setChecked('custom-width', s.custom_width_checked !== false);
 			setVal('width-input', s.width || 800);
 			setVal('height-input', s.height_limit || 16000);
-			setVal('quality-input', s.save_quality || 100);
+			setVal('quality-input', s.save_quality || 95);
 			setVal('format-select', (s.save_format || 'JPG').toUpperCase());
 			setChecked('is-zip', s.zip_checked);
 			setChecked('is-pdf', s.pdf_checked);
@@ -1214,7 +1214,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 	isCustomWidth, _ := params["custom_width_checked"].(bool)
 	widthVal := int(getFloatOrInt(params["width"], 800))
 	heightLimitVal := int(getFloatOrInt(params["height_limit"], 16000))
-	saveQualityVal := int(getFloatOrInt(params["save_quality"], 100))
+	saveQualityVal := int(getFloatOrInt(params["save_quality"], 95))
 	saveFormat, _ := params["save_format"].(string)
 	if saveFormat == "" {
 		saveFormat = "JPG"

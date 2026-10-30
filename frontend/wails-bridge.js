@@ -6,7 +6,7 @@
             custom_width_checked: !!document.getElementById('custom-width')?.checked,
             width: parseInt(document.getElementById('width-input')?.value, 10) || 800,
             height_limit: parseInt(document.getElementById('height-input')?.value, 10) || 16000,
-            save_quality: parseInt(document.getElementById('quality-input')?.value, 10) || 100,
+            save_quality: parseInt(document.getElementById('quality-input')?.value, 10) || 95,
             save_format: document.getElementById('format-select')?.value || 'JPG',
             zip_checked: !!document.getElementById('is-zip')?.checked,
             pdf_checked: !!document.getElementById('is-pdf')?.checked,
