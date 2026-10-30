@@ -1,8 +1,22 @@
-[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۵-صف-کار-خروجی-avif-واترمارک-پنل‌محور-و-رابط-جدید) | [🇬🇧 **English**](#-photoslicer-v55-job-queue-avif-output-panel-edge-watermark--new-ui)
+[🇮🇷 **فارسی**](#-فوتو-اسلایسر-نسخه-۵۶-خروجی-jpeg-سبک‌تر-الگوی-نام‌گذاری-کلیک‌پذیر-و-رفع-باگ‌ها) | [🇬🇧 **English**](#-photoslicer-v56-smaller-jpeg-output-clickable-filename-placeholders--fixes)
 
 ---
 
 <div dir="rtl">
+
+# 🚀 فوتو اسلایسر نسخه ۵.۶: خروجی JPEG سبک‌تر، الگوی نام‌گذاری کلیک‌پذیر و رفع باگ‌ها
+
+**نسخه ۵.۶ منتشر شد!** این نسخه خروجی JPEG را با جدول هافمن بهینه تا حدود ۱۳٪ سبک‌تر و انکود را حدود ۲.۵ برابر سریع‌تر می‌کند، متغیرهای الگوی نام‌گذاری را کلیک‌پذیر می‌کند و چند باگ رابط کاربری را برطرف می‌سازد.
+
+### 🌟 تغییرات جدید (نسخه ۵.۶)
+
+* **🗜️ JPEG سبک‌تر و سریع‌تر:** جدول‌های هافمن بهینه، حجم خروجی را حدود ۱۳٪ کم و سرعت انکود را حدود ۲.۵ برابر می‌کنند.
+* **🖱️ الگوی نام‌گذاری کلیک‌پذیر:** در تنظیمات، با کلیک روی هر متغیر (`[number]`، `[folder]`، `[date]`، `[total]`) با فاصله‌ی مناسب به الگو اضافه می‌شود و پیش‌نمایش فوری به‌روز می‌شود.
+* **🎚️ کیفیت پیش‌فرض ۹۵:** خروجی پیش‌فرض JPG حالا با کیفیت ۹۵ ذخیره می‌شود؛ تفاوت ظاهری ناچیز با حجم کمتر.
+* **🌐 رفع باگ دکمه‌ی بروزرسانی:** متن دکمه در حالت فارسی ترجمه می‌شود و با کلیک، اندازه‌ی دکمه ثابت می‌ماند (پرش و خط اضافه حذف شد).
+* **✨ انیمیشن لوگو و مصرف کمتر:** کلیک روی لوگو انیمیشن قیچی را اجرا می‌کند و هزینه‌ی رندر در حالت بیکار کاهش یافته است.
+
+---
 
 # 🚀 فوتو اسلایسر نسخه ۵.۵: صف کار، خروجی AVIF، واترمارک پنل‌محور و رابط جدید
 
@@ -169,6 +183,20 @@
 فایل **ZIP** آخرین نسخه را از صفحه [Releases](https://github.com/esmail-mkh/PhotoSlicer-Go/releases/latest) دانلود کنید، اکسترکت کنید و `PhotoSlicer.exe` را اجرا کنید. لذت ببرید!
 
 </div>
+
+---
+
+# 🚀 PhotoSlicer v5.6: Smaller JPEG Output, Clickable Filename Placeholders & Fixes
+
+**Version 5.6 is here!** This release makes JPEG output roughly 13% smaller with about 2.5x faster encoding via optimal Huffman tables, makes the filename pattern placeholders clickable, and fixes a few UI issues.
+
+### 🌟 What's New (v5.6)
+
+* **🗜️ Smaller, Faster JPEG:** Optimal Huffman tables cut output size by about 13% and speed up encoding by roughly 2.5x.
+* **🖱️ Clickable Filename Placeholders:** In Settings, click any placeholder (`[number]`, `[folder]`, `[date]`, `[total]`) to add it to the pattern with the right spacing; the preview updates instantly.
+* **🎚️ Default Quality 95:** New JPG output defaults to quality 95 — visually near-identical with smaller files.
+* **🌐 Update Pill Fix:** The update button is now localized in Persian and keeps a fixed size when clicked, so it no longer shifts or adds a line.
+* **✨ Logo Animation & Lower Idle Cost:** Clicking the logo plays the scissors animation, and idle rendering costs less.
 
 ---
 
