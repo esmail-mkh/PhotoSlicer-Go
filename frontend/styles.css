@@ -4686,6 +4686,8 @@ body.job-active .stop-button {
     color: var(--text-secondary);
     transition: var(--transition-fast);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .about-stat-pill:hover {
@@ -4705,6 +4707,12 @@ body.job-active .stop-button {
 .about-stat-value {
     color: var(--text-primary);
     font-weight: 700;
+}
+
+/* Fixed width keeps the update pill from resizing as the status text changes. */
+#about-update-status {
+    min-width: 60px;
+    text-align: center;
 }
 
 #about-update-pill {
