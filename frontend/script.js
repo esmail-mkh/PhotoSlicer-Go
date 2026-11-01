@@ -3969,9 +3969,9 @@ window.addEventListener('pywebviewready', function() {
 });
 
 // ===== DRAG & DROP =====
-// The actual absolute-path delivery happens on the Python side (main.py:
-// on_folder_dropped), which calls window.handleDroppedPaths. This JS only
-// manages preventDefault + the drag-over highlight.
+// Absolute paths come from the Wails runtime (OnFileDrop, registered in
+// setupDragAndDrop below), which calls window.handleDroppedPaths. The window
+// listeners here manage preventDefault + the drag-over highlight.
 let _dragDepth = 0;
 function _isFileDrag(e) {
     if (!e.dataTransfer) return false;
@@ -4004,6 +4004,13 @@ function setupDragAndDrop() {
         _dragDepth = 0;
         if (wrapper) wrapper.classList.remove('drag-over');
     });
+
+    // Wails only resolves the absolute paths of dropped files (and reports them)
+    // once the frontend registers here; the drop target CSS check is skipped so
+    // the whole window accepts the drop.
+    if (window.runtime && typeof window.runtime.OnFileDrop === 'function') {
+        window.runtime.OnFileDrop((x, y, paths) => window.handleDroppedPaths(paths), false);
+    }
 }
 
 // Called from Python with the resolved absolute path(s) of the dropped items.

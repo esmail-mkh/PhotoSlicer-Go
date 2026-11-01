@@ -240,14 +240,9 @@ func (a *App) startup(ctx context.Context) {
 	// (see ShowWindow). Show it regardless if that never happens.
 	time.AfterFunc(startupShowDeadline, a.showWindowOnce)
 	wailsRuntime.WindowExecJS(ctx, fmt.Sprintf("window.__APP_VERSION__ = '%s'; if (typeof applyAppVersion === 'function') applyAppVersion('%s');", constants.Version, constants.Version))
-	wailsRuntime.OnFileDrop(ctx, func(x, y int, paths []string) {
-		if len(paths) > 0 {
-			pathsJSON, err := json.Marshal(paths)
-			if err == nil {
-				wailsRuntime.WindowExecJS(ctx, fmt.Sprintf("if (typeof window.handleDroppedPaths === 'function') window.handleDroppedPaths(%s);", string(pathsJSON)))
-			}
-		}
-	})
+	// File drops are registered by the frontend (setupDragAndDrop in script.js):
+	// Wails only resolves dropped file paths on Windows once the JS runtime's
+	// OnFileDrop has installed its drag listeners, which Go's OnFileDrop does not.
 }
 
 // startupShowDeadline is how long the hidden window may wait for the frontend
