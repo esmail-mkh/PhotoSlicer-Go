@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
 	"photoslicer/engine/constants"
@@ -123,7 +125,27 @@ func CountImagesInArchive(archivePath string) (int, error) {
 	return count, nil
 }
 
-// ExtractImagesFromZip extracts supported images that are directly in the ZIP archive root.
+// zipImageEntry is one supported image inside a ZIP/CBZ, with its cleaned path.
+type zipImageEntry struct {
+	file  *zip.File
+	parts []string
+}
+
+// compareArchivePaths orders archive entries folder by folder, so every page
+// of "Ch1/" comes before "Ch2/" even when both folders hold a 001.jpg.
+func compareArchivePaths(a, b []string) int {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		if c := sorting.CompareNatural(a[i], b[i]); c != 0 {
+			return c
+		}
+	}
+	return len(a) - len(b)
+}
+
+// ExtractImagesFromZip extracts the supported images of a ZIP/CBZ, including
+// those in subfolders, into one flat chapter folder. Each file gets a number
+// prefix that keeps the page order of the archive's folders, so pages from
+// different subfolders never interleave.
 // Returns the path to the directory containing extracted images, or an error.
 func ExtractImagesFromZip(zipPath string, extractBaseDir string) (output string, err error) {
 	r, err := zip.OpenReader(zipPath)
@@ -131,6 +153,51 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (output string,
 		return "", err
 	}
 	defer r.Close()
+
+	var entries []zipImageEntry
+	for _, f := range r.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+
+		var parts []string
+		for _, p := range strings.Split(filepath.ToSlash(f.Name), "/") {
+			if p != "" && p != "." && p != ".." {
+				parts = append(parts, p)
+			}
+		}
+		if len(parts) == 0 {
+			continue
+		}
+
+		// Skip hidden files, macOS metadata, and system trash
+		hidden := false
+		for _, p := range parts {
+			if strings.HasPrefix(p, ".") || p == "__MACOSX" {
+				hidden = true
+				break
+			}
+		}
+		if hidden {
+			continue
+		}
+
+		ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(parts[len(parts)-1]), "."))
+		if !constants.SupportedExtensions[ext] {
+			continue
+		}
+		entries = append(entries, zipImageEntry{file: f, parts: parts})
+	}
+
+	if len(entries) == 0 {
+		return "", fmt.Errorf("no valid images found in zip archive")
+	}
+	if len(entries) > MaxArchiveFiles {
+		return "", fmt.Errorf("archive contains too many files (limit: %d)", MaxArchiveFiles)
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		return compareArchivePaths(entries[i].parts, entries[j].parts) < 0
+	})
 
 	// An owned parent keeps archives with the same name (like 1.zip and 1.cbz)
 	// from extracting into one shared folder. The chapter folder inside it
@@ -157,64 +224,20 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (output string,
 		return "", err
 	}
 
+	width := len(strconv.Itoa(len(entries)))
+	if width < 4 {
+		width = 4
+	}
+
 	var extractedCount int
 	var totalExtractedBytes int64
 
-	for _, f := range r.File {
-		if extractedCount >= MaxArchiveFiles {
-			return "", fmt.Errorf("archive contains too many files (limit: %d)", MaxArchiveFiles)
-		}
-
-		if f.FileInfo().IsDir() {
-			continue
-		}
-
-		cleanName := filepath.ToSlash(f.Name)
-		parts := strings.Split(cleanName, "/")
-		var validParts []string
-		for _, p := range parts {
-			if p != "" && p != "." && p != ".." {
-				validParts = append(validParts, p)
-			}
-		}
-
-		if len(validParts) == 0 {
-			continue
-		}
-
-		// Skip hidden files, macOS metadata, and system trash
-		hasHidden := false
-		for _, p := range validParts {
-			if strings.HasPrefix(p, ".") || p == "__MACOSX" {
-				hasHidden = true
-				break
-			}
-		}
-		if hasHidden {
-			continue
-		}
-
-		rawName := validParts[len(validParts)-1]
-		ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(rawName), "."))
-		if !constants.SupportedExtensions[ext] {
-			continue
-		}
-
-		filename := sanitizeArchiveComponent(rawName)
+	for i, entry := range entries {
+		rawName := entry.parts[len(entry.parts)-1]
+		filename := fmt.Sprintf("%0*d_%s", width, i+1, sanitizeArchiveComponent(rawName))
 		destPath := filepath.Join(outputDir, filename)
 
-		counter := 0
-		stem := strings.TrimSuffix(filename, filepath.Ext(filename))
-		suffix := filepath.Ext(filename)
-		for {
-			if _, err := os.Stat(destPath); os.IsNotExist(err) {
-				break
-			}
-			counter++
-			destPath = filepath.Join(outputDir, fmt.Sprintf("%s_%d%s", stem, counter, suffix))
-		}
-
-		rc, err := f.Open()
+		rc, err := entry.file.Open()
 		if err != nil {
 			continue
 		}
@@ -256,54 +279,89 @@ func ExtractImagesFromZip(zipPath string, extractBaseDir string) (output string,
 	return outputDir, nil
 }
 
-// FastScanDir scans subdirectories and extracts ZIP/CBZ/PDF inputs into temporary directories.
-func FastScanDir(dirname string) ([]string, error) {
-	return FastScanDirWithCheck(dirname, nil)
+// ScanFailure is a ZIP/CBZ/PDF in a batch folder that could not be read.
+type ScanFailure struct {
+	Name string
+	Err  error
 }
 
-func FastScanDirWithCheck(dirname string, checkState func() error) ([]string, error) {
-	entries, err := os.ReadDir(dirname)
+func (f ScanFailure) Error() string {
+	return fmt.Sprintf("%s: %v", f.Name, f.Err)
+}
+
+// FastScanDir scans subdirectories and extracts ZIP/CBZ/PDF inputs into
+// temporary directories. Any archive that cannot be read is an error.
+func FastScanDir(dirname string) ([]string, error) {
+	dirs, failures, err := ScanBatchDir(dirname, nil)
 	if err != nil {
 		return nil, err
 	}
+	if len(failures) > 0 {
+		return nil, failures[0]
+	}
+	return dirs, nil
+}
 
+// ScanBatchDir lists the chapter folders of a batch folder and extracts its
+// ZIP/CBZ/PDF files into temporary folders. An archive that cannot be read is
+// reported in failures, and the rest of the batch still goes ahead; err is
+// only for a folder that cannot be read or a stop from checkState.
+//
+// Chapters are ordered by their source names, so same-name chapters (a folder
+// "1", then "1.cbz", then "1.zip") always come in the same order.
+func ScanBatchDir(dirname string, checkState func() error) (dirs []string, failures []ScanFailure, err error) {
+	entries, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	type chapter struct {
+		source string
+		path   string
+	}
+	var chapters []chapter
 	var tempRoot string
-	var result []string
 
 	for _, entry := range entries {
 		if checkState != nil {
 			if err := checkState(); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
-		fullPath := filepath.Join(dirname, entry.Name())
 		if entry.IsDir() {
-			result = append(result, fullPath)
+			chapters = append(chapters, chapter{entry.Name(), filepath.Join(dirname, entry.Name())})
 			continue
 		}
 
 		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if ext == ".zip" || ext == ".cbz" || ext == ".pdf" {
-			if tempRoot == "" {
-				tempRoot, err = os.MkdirTemp("", "photoslicer_extract_")
-				if err == nil {
-					RegisterTempDir(tempRoot)
-				}
-				if err != nil {
-					return nil, err
-				}
-			}
-			if tempRoot != "" {
-				extracted, err := ExtractInputFile(fullPath, tempRoot, checkState)
-				if err != nil && ext == ".pdf" {
-					return nil, fmt.Errorf("%s: %w", entry.Name(), err)
-				}
-				if err == nil && extracted != "" {
-					result = append(result, extracted)
-				}
-			}
+		if ext != ".zip" && ext != ".cbz" && ext != ".pdf" {
+			continue
 		}
+		if tempRoot == "" {
+			tempRoot, err = os.MkdirTemp("", "photoslicer_extract_")
+			if err != nil {
+				return nil, nil, err
+			}
+			RegisterTempDir(tempRoot)
+		}
+		extracted, err := ExtractInputFile(filepath.Join(dirname, entry.Name()), tempRoot, checkState)
+		if err != nil {
+			if checkState != nil {
+				if stopErr := checkState(); stopErr != nil {
+					return nil, nil, stopErr
+				}
+			}
+			failures = append(failures, ScanFailure{Name: entry.Name(), Err: err})
+			continue
+		}
+		chapters = append(chapters, chapter{entry.Name(), extracted})
 	}
 
-	return sorting.SortKeyImproved(result), nil
+	sort.SliceStable(chapters, func(i, j int) bool {
+		return sorting.CompareNatural(chapters[i].source, chapters[j].source) < 0
+	})
+	for _, c := range chapters {
+		dirs = append(dirs, c.path)
+	}
+	return dirs, failures, nil
 }

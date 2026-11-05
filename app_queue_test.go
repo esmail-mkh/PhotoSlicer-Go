@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -264,6 +265,31 @@ func TestRunJobBatchReportsPartialFailure(t *testing.T) {
 	}
 	if res.Error == "" {
 		t.Fatal("a partial result should say which chapter failed")
+	}
+}
+
+// A broken ZIP/CBZ in a batch folder counts as a failed chapter instead of
+// being left out without a word.
+func TestRunJobBatchReportsBrokenArchive(t *testing.T) {
+	app := newQueueTestApp(t)
+	root := t.TempDir()
+	series := filepath.Join(root, "series")
+	writeChapter(t, series, "ch-1")
+	if err := os.WriteFile(filepath.Join(series, "ch-2.zip"), []byte("not a zip"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	app.beginRun()
+	res := app.runJob(queueParams(series, filepath.Join(root, "out")), true)
+
+	if res.Total != 2 || res.OK != 1 || res.Failed != 1 {
+		t.Fatalf("counts ok/failed/total = %d/%d/%d, want 1/1/2 (status %s, error %q)", res.OK, res.Failed, res.Total, res.Status, res.Error)
+	}
+	if res.Status != queue.StatusPartial {
+		t.Fatalf("status = %s, want partial", res.Status)
+	}
+	if !strings.Contains(res.Error, "ch-2.zip") {
+		t.Fatalf("error should name the broken archive, got %q", res.Error)
 	}
 }
 

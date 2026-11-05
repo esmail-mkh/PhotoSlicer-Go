@@ -102,11 +102,17 @@ type PipelineOptions struct {
 	Controller            *Controller
 }
 
-func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions) (string, error) {
-	savePath, err := slicing.ReserveOutputDir(savePath)
+func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions) (result string, err error) {
+	savePath, err = slicing.ReserveOutputDir(savePath)
 	if err != nil {
 		return "", err
 	}
+	var startedArchives []string
+	defer func() {
+		if err != nil {
+			slicing.DiscardFailedOutput(savePath, startedArchives)
+		}
+	}()
 
 	total := len(images)
 	if total == 0 {
@@ -252,6 +258,7 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 		if err != nil {
 			return "", err
 		}
+		startedArchives = append(startedArchives, zipPath)
 		if err := archive.CreateZip(zipPath, files); err != nil {
 			return "", fmt.Errorf("failed to create zip archive: %w", err)
 		}
@@ -264,6 +271,7 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 		if err != nil {
 			return "", err
 		}
+		startedArchives = append(startedArchives, cbzPath)
 		if err := archive.CreateCbz(cbzPath, files); err != nil {
 			return "", fmt.Errorf("failed to create cbz archive: %w", err)
 		}
@@ -276,6 +284,7 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 		if err != nil {
 			return "", err
 		}
+		startedArchives = append(startedArchives, pdfPath)
 		if err := archive.CreatePdfFromImages(pdfPath, files); err != nil {
 			return "", fmt.Errorf("failed to create pdf archive: %w", err)
 		}

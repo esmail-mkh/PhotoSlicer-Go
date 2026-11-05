@@ -381,3 +381,44 @@ func TestMergerImagesConcurrentRunsUseDistinctDirs(t *testing.T) {
 		t.Errorf("expected 2 distinct output directories, got %d", len(seen))
 	}
 }
+
+// A run that fails on a broken image must not leave a half-written folder,
+// so the next run keeps the plain chapter name.
+func TestNoStitchFailedRunLeavesNothing(t *testing.T) {
+	src := filepath.Join(t.TempDir(), "1")
+	if err := os.Mkdir(src, 0755); err != nil {
+		t.Fatal(err)
+	}
+	createTestImages(t, src, 2, 50, 80)
+	broken := filepath.Join(src, "009.jpg")
+	if err := os.WriteFile(broken, []byte("broken"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	out := t.TempDir()
+	opts := PipelineOptions{
+		Mode:        "single",
+		SaveFormat:  "JPG",
+		SaveQuality: 90,
+		IsPdf:       true,
+		IsNoStitch:  true,
+		OutputBase:  out,
+		MaxWorkers:  1,
+	}
+	if _, err := MergerImages(src, opts); err == nil {
+		t.Fatal("expected the broken image to fail the run")
+	}
+	if entries, _ := os.ReadDir(out); len(entries) != 0 {
+		t.Fatalf("failed run left output behind: %v", entries)
+	}
+
+	if err := os.Remove(broken); err != nil {
+		t.Fatal(err)
+	}
+	res, err := MergerImages(src, opts)
+	if err != nil {
+		t.Fatalf("rerun failed: %v", err)
+	}
+	if filepath.Base(res) != "1.pdf" {
+		t.Fatalf("rerun should reuse the name, got %s", filepath.Base(res))
+	}
+}

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"photoslicer/engine/sorting"
 )
 
 func createSampleJpeg(t *testing.T, path string, w, h int) {
@@ -359,5 +361,139 @@ func TestFastScanDirSameNameArchivesStaySeparate(t *testing.T) {
 	}
 	if !counts[2] || !counts[3] {
 		t.Errorf("expected one folder with 2 images and one with 3, got sizes %v", counts)
+	}
+}
+
+// Pages in different subfolders of one ZIP must keep folder order, even when
+// both folders use the same file names.
+func TestExtractImagesFromZipKeepsSubfolderOrder(t *testing.T) {
+	tempDir := t.TempDir()
+	img := filepath.Join(tempDir, "page.jpg")
+	createSampleJpeg(t, img, 10, 10)
+	imgData, err := os.ReadFile(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	zipPath := filepath.Join(tempDir, "volume.zip")
+	f, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := zip.NewWriter(f)
+	// Written out of order on purpose; Ch10 must come after Ch2.
+	names := []string{"Ch2/002.jpg", "Ch10/001.jpg", "Ch2/001.jpg", "Ch1/002.jpg", "Ch1/001.jpg", "Ch2/010.jpg"}
+	for _, n := range names {
+		ew, err := w.Create(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Tag each image with its entry name so the order can be checked.
+		if _, err := ew.Write(append(append([]byte{}, imgData...), []byte(n)...)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	outDir, err := ExtractImagesFromZip(zipPath, filepath.Join(tempDir, "extract"))
+	if err != nil {
+		t.Fatalf("ExtractImagesFromZip failed: %v", err)
+	}
+	imgs, err := sorting.GetAllImagesDirectory(outDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Ch1/001.jpg", "Ch1/002.jpg", "Ch2/001.jpg", "Ch2/002.jpg", "Ch2/010.jpg", "Ch10/001.jpg"}
+	if len(imgs) != len(want) {
+		t.Fatalf("expected %d images, got %d", len(want), len(imgs))
+	}
+	for i, p := range imgs {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := string(data[len(imgData):]); got != want[i] {
+			t.Errorf("page %d: got %s, want %s", i+1, got, want[i])
+		}
+	}
+}
+
+// A broken archive in a batch folder is reported instead of being skipped
+// silently, and the other chapters still come through.
+func TestScanBatchDirReportsBrokenArchives(t *testing.T) {
+	defer CleanupAllTempDirs()
+	root := t.TempDir()
+	chapter := filepath.Join(root, "Chapter 1")
+	if err := os.Mkdir(chapter, 0755); err != nil {
+		t.Fatal(err)
+	}
+	createSampleJpeg(t, filepath.Join(chapter, "01.jpg"), 10, 10)
+	for _, name := range []string{"Chapter 2.zip", "Chapter 3.cbz"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("not a zip"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	dirs, failures, err := ScanBatchDir(root, nil)
+	if err != nil {
+		t.Fatalf("ScanBatchDir failed: %v", err)
+	}
+	if len(dirs) != 1 || dirs[0] != chapter {
+		t.Fatalf("expected only the good chapter, got %v", dirs)
+	}
+	if len(failures) != 2 || failures[0].Name != "Chapter 2.zip" || failures[1].Name != "Chapter 3.cbz" {
+		t.Fatalf("expected both broken archives reported, got %v", failures)
+	}
+	if _, err := FastScanDir(root); err == nil {
+		t.Fatal("FastScanDir hid a broken archive")
+	}
+}
+
+// Same-name chapters come in a fixed order by source name: the folder, then
+// the archives by extension.
+func TestScanBatchDirOrdersSameNameChapters(t *testing.T) {
+	defer CleanupAllTempDirs()
+	root := t.TempDir()
+	img := filepath.Join(t.TempDir(), "01.jpg")
+	createSampleJpeg(t, img, 10, 10)
+	if err := os.Mkdir(filepath.Join(root, "1"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	createSampleJpeg(t, filepath.Join(root, "1", "01.jpg"), 10, 10)
+	img2 := filepath.Join(filepath.Dir(img), "02.jpg")
+	createSampleJpeg(t, img2, 10, 10)
+	// 1.cbz holds one page and 1.zip two, so the two "1" chapters can be told apart.
+	archives := map[string][]string{"1.cbz": {img}, "1.zip": {img, img2}, "2.zip": {img}}
+	for name, files := range archives {
+		if err := CreateZip(filepath.Join(root, name), files); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for run := 0; run < 5; run++ {
+		dirs, failures, err := ScanBatchDir(root, nil)
+		if err != nil || len(failures) != 0 {
+			t.Fatalf("ScanBatchDir: %v, %v", failures, err)
+		}
+		if len(dirs) != 4 {
+			t.Fatalf("expected 4 chapters, got %v", dirs)
+		}
+		if dirs[0] != filepath.Join(root, "1") {
+			t.Fatalf("folder should come first, got %v", dirs)
+		}
+		if filepath.Base(dirs[1]) != "1" || filepath.Base(dirs[2]) != "1" || filepath.Base(dirs[3]) != "2" {
+			t.Fatalf("unexpected order: %v", dirs)
+		}
+		cbzImgs, _ := sorting.GetAllImagesDirectory(dirs[1])
+		zipImgs, _ := sorting.GetAllImagesDirectory(dirs[2])
+		if len(cbzImgs) != 1 || len(zipImgs) != 2 {
+			t.Fatalf("expected 1.cbz before 1.zip, got %d then %d pages", len(cbzImgs), len(zipImgs))
+		}
+		CleanupAllTempDirs()
 	}
 }

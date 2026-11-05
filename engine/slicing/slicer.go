@@ -67,6 +67,17 @@ func ReserveOutputDir(original string) (string, error) {
 	}
 }
 
+// DiscardFailedOutput removes what a failed or stopped run made: its reserved
+// output folder and any archive it started writing. The name is then free
+// again, so a rerun gets "1.pdf" instead of "1 (1).pdf".
+func DiscardFailedOutput(savePath string, archives []string) {
+	_ = os.RemoveAll(savePath)
+	for _, p := range archives {
+		_ = os.Remove(p)
+	}
+	archive.NotifyShellChange(filepath.Dir(savePath))
+}
+
 func outputPathTaken(stem string) bool {
 	for _, p := range []string{stem, stem + ".zip", stem + ".cbz", stem + ".pdf"} {
 		if _, err := os.Stat(p); err == nil || !os.IsNotExist(err) {
@@ -77,7 +88,7 @@ func outputPathTaken(stem string) bool {
 }
 
 // Slicer segments a tall composite image into slices and packages them into folders/archives.
-func Slicer(img image.Image, opts SlicerOptions) (string, error) {
+func Slicer(img image.Image, opts SlicerOptions) (result string, err error) {
 	if opts.OutputBase == "" {
 		opts.OutputBase = "./Results"
 	}
@@ -103,10 +114,16 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		savePath = filepath.Join(opts.OutputBase, opts.CurrentDate, folderName)
 	}
 
-	savePath, err := ReserveOutputDir(savePath)
+	savePath, err = ReserveOutputDir(savePath)
 	if err != nil {
 		return "", err
 	}
+	var startedArchives []string
+	defer func() {
+		if err != nil {
+			DiscardFailedOutput(savePath, startedArchives)
+		}
+	}()
 
 	b := img.Bounds()
 	imgWidth := b.Dx()
@@ -332,6 +349,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		startedArchives = append(startedArchives, zipPath)
 		if err := archive.CreateZip(zipPath, files); err != nil {
 			return "", fmt.Errorf("failed to create zip archive: %w", err)
 		}
@@ -344,6 +362,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		startedArchives = append(startedArchives, cbzPath)
 		if err := archive.CreateCbz(cbzPath, files); err != nil {
 			return "", fmt.Errorf("failed to create cbz archive: %w", err)
 		}
@@ -356,6 +375,7 @@ func Slicer(img image.Image, opts SlicerOptions) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		startedArchives = append(startedArchives, pdfPath)
 		if err := archive.CreatePdfFromImages(pdfPath, files); err != nil {
 			return "", fmt.Errorf("failed to create pdf archive: %w", err)
 		}

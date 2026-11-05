@@ -214,3 +214,51 @@ func TestReserveOutputDirConcurrent(t *testing.T) {
 		t.Errorf("expected %d unique paths, got %d", workers, len(seen))
 	}
 }
+
+func tallTestImage() image.Image {
+	img := image.NewRGBA(image.Rect(0, 0, 100, 4000))
+	draw.Draw(img, img.Bounds(), &image.Uniform{C: color.RGBA{R: 120, G: 60, B: 30, A: 255}}, image.Point{}, draw.Src)
+	return img
+}
+
+// A stopped run must not leave a half-written folder behind, and a rerun
+// must get the same output name instead of "Chapter (1)".
+func TestSlicerStoppedRunLeavesNothing(t *testing.T) {
+	out := t.TempDir()
+	calls := 0
+	var mu sync.Mutex
+	opts := SlicerOptions{
+		SaveFormat:    "JPG",
+		SlicesCount:   4,
+		SaveQuality:   90,
+		Mode:          "single",
+		SaveDirectory: "Chapter",
+		OutputBase:    out,
+		MaxWorkers:    1,
+		IsPdf:         true,
+		CheckState: func() error {
+			mu.Lock()
+			defer mu.Unlock()
+			calls++
+			if calls > 1 {
+				return os.ErrDeadlineExceeded
+			}
+			return nil
+		},
+	}
+	if _, err := Slicer(tallTestImage(), opts); err == nil {
+		t.Fatal("expected the stopped run to fail")
+	}
+	if entries, _ := os.ReadDir(out); len(entries) != 0 {
+		t.Fatalf("stopped run left output behind: %v", entries)
+	}
+
+	opts.CheckState = nil
+	res, err := Slicer(tallTestImage(), opts)
+	if err != nil {
+		t.Fatalf("rerun failed: %v", err)
+	}
+	if filepath.Base(res) != "Chapter.pdf" {
+		t.Fatalf("rerun should reuse the name, got %s", filepath.Base(res))
+	}
+}

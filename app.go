@@ -49,6 +49,7 @@ var translations = map[string]map[string]string{
 		"skip_folder":            "Skipping %s (enhancement failed).",
 		"no_images_process":      "No images found to process.",
 		"no_subfolders":          "No subfolders with images found!",
+		"archive_read_fail":      "Could not read %s: %s",
 		"open_folder_err":        "Could not open folder: %s",
 		"path_not_exist":         "Folder path does not exist.",
 		"stopping":               "Stopping...",
@@ -87,6 +88,7 @@ var translations = map[string]map[string]string{
 		"skip_folder":            "رد کردن %s (خطا در AI).",
 		"no_images_process":      "تصویری برای پردازش یافت نشد.",
 		"no_subfolders":          "هیچ زیرپوشه‌ای یافت نشد!",
+		"archive_read_fail":      "خواندن %s ممکن نشد: %s",
 		"open_folder_err":        "خطا در باز کردن پوشه: %s",
 		"path_not_exist":         "مسیر پوشه وجود ندارد.",
 		"stopping":               "در حال توقف...",
@@ -1458,7 +1460,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 		// Batch mode
 		a.changeProgress(0)
 		a.updateStep("scan")
-		subfolders, scanErr := archive.FastScanDirWithCheck(dirAddress, checkState)
+		subfolders, scanFailures, scanErr := archive.ScanBatchDir(dirAddress, checkState)
 		if scanErr != nil {
 			a.showError(scanErr.Error(), true)
 			a.updateStep("ready")
@@ -1475,7 +1477,18 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 			}
 		}
 
+		// Archives that could not be read count as failed chapters, so the
+		// batch reports them instead of silently leaving them out.
+		for _, f := range scanFailures {
+			a.showError(getMsg("archive_read_fail", lang, f.Name, f.Err.Error()), true)
+		}
+
 		if len(validFolders) == 0 {
+			if len(scanFailures) > 0 {
+				a.changeStatusText(getMsg("error_valid_dir", lang))
+				a.updateStep("ready")
+				return queue.Result{Status: queue.StatusFailed, Error: scanFailures[0].Error(), Failed: len(scanFailures), Total: len(scanFailures)}
+			}
 			a.showError(getMsg("no_subfolders", lang), true)
 			a.changeStatusText(getMsg("error_valid_dir", lang))
 			a.updateStep("ready")
@@ -1494,9 +1507,13 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 			}
 		}
 
+		totalItems := totalFolders + len(scanFailures)
 		successCount := 0
-		failCount := 0
+		failCount := len(scanFailures)
 		firstErr := ""
+		if len(scanFailures) > 0 {
+			firstErr = scanFailures[0].Error()
+		}
 
 		for idx, fld := range validFolders {
 			if checkState() != nil {
@@ -1603,7 +1620,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 		if checkState() != nil {
 			a.changeStatusText(getMsg("stopped", lang))
 			a.updateStep("ready")
-			return queue.Result{Status: queue.StatusStopped, OK: successCount, Failed: failCount, Total: totalFolders}
+			return queue.Result{Status: queue.StatusStopped, OK: successCount, Failed: failCount, Total: totalItems}
 		}
 
 		if successCount == 0 {
@@ -1613,14 +1630,14 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 			}
 			a.changeStatusText(getMsg("no_images_process", lang))
 			a.updateStep("ready")
-			return queue.Result{Status: queue.StatusFailed, Error: batchErr, Failed: failCount, Total: totalFolders}
+			return queue.Result{Status: queue.StatusFailed, Error: batchErr, Failed: failCount, Total: totalItems}
 		}
 
 		a.updateStep("save")
 		a.changeProgress(100)
 		a.updateStep("done")
 		if failCount > 0 {
-			a.changeStatusText(fmt.Sprintf("%s (%d/%d)", getMsg("idle_done", lang), successCount, totalFolders))
+			a.changeStatusText(fmt.Sprintf("%s (%d/%d)", getMsg("idle_done", lang), successCount, totalItems))
 		} else {
 			a.changeStatusText(getMsg("idle_done", lang))
 		}
@@ -1638,7 +1655,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 				a.showOpenFolderButton(lastOut)
 			}
 		}
-		result = queue.Result{Status: queue.StatusDone, OutputPath: lastOut, OK: successCount, Failed: failCount, Total: totalFolders}
+		result = queue.Result{Status: queue.StatusDone, OutputPath: lastOut, OK: successCount, Failed: failCount, Total: totalItems}
 		if failCount > 0 {
 			result.Status = queue.StatusPartial
 			result.Error = firstErr
@@ -1649,7 +1666,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 				a.playAudio("success.wav")
 			}
 			if failCount > 0 {
-				a.showError(fmt.Sprintf("%d/%d %s", failCount, totalFolders, getMsg("error_folder", lang)), true)
+				a.showError(fmt.Sprintf("%d/%d %s", failCount, totalItems, getMsg("error_folder", lang)), true)
 			} else {
 				a.showSuccess(getMsg("idle_done", lang))
 			}
