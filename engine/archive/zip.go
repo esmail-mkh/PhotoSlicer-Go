@@ -125,16 +125,35 @@ func CountImagesInArchive(archivePath string) (int, error) {
 
 // ExtractImagesFromZip extracts supported images that are directly in the ZIP archive root.
 // Returns the path to the directory containing extracted images, or an error.
-func ExtractImagesFromZip(zipPath string, extractBaseDir string) (string, error) {
+func ExtractImagesFromZip(zipPath string, extractBaseDir string) (output string, err error) {
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return "", err
 	}
 	defer r.Close()
 
+	// An owned parent keeps archives with the same name (like 1.zip and 1.cbz)
+	// from extracting into one shared folder. The chapter folder inside it
+	// keeps the archive's name, which becomes the output name.
+	if err := os.MkdirAll(extractBaseDir, 0755); err != nil {
+		return "", err
+	}
+	root, err := os.MkdirTemp(extractBaseDir, "photoslicer_zip_")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			SafeRmtreeTemp(root)
+		}
+	}()
+
 	folderName := strings.TrimSuffix(filepath.Base(zipPath), filepath.Ext(zipPath))
-	outputDir := filepath.Join(extractBaseDir, folderName)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if folderName == "" {
+		folderName = "_"
+	}
+	outputDir := filepath.Join(root, folderName)
+	if err := os.Mkdir(outputDir, 0755); err != nil {
 		return "", err
 	}
 

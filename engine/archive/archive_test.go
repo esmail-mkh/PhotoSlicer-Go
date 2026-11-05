@@ -294,3 +294,70 @@ func TestNotifyShellChange(t *testing.T) {
 	NotifyShellChange("non_existent_path_test")
 }
 
+// Two archives with the same name in one batch folder must extract into
+// separate chapter folders instead of mixing their images together.
+func TestFastScanDirSameNameArchivesStaySeparate(t *testing.T) {
+	tempDir := t.TempDir()
+	img := filepath.Join(tempDir, "page.jpg")
+	createSampleJpeg(t, img, 20, 20)
+	imgData, err := os.ReadFile(img)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batchDir := filepath.Join(tempDir, "batch")
+	if err := os.Mkdir(batchDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeArchive := func(name string, entries ...string) {
+		f, err := os.Create(filepath.Join(batchDir, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		w := zip.NewWriter(f)
+		for _, e := range entries {
+			ew, err := w.Create(e)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ew.Write(imgData); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := w.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeArchive("1.zip", "a.jpg", "b.jpg")
+	writeArchive("1.cbz", "a.jpg", "c.jpg", "d.jpg")
+	t.Cleanup(CleanupAllTempDirs)
+
+	dirs, err := FastScanDir(batchDir)
+	if err != nil {
+		t.Fatalf("FastScanDir failed: %v", err)
+	}
+	if len(dirs) != 2 {
+		t.Fatalf("expected 2 chapter folders, got %d: %v", len(dirs), dirs)
+	}
+	if dirs[0] == dirs[1] {
+		t.Fatalf("both archives extracted into the same folder: %s", dirs[0])
+	}
+
+	counts := map[int]bool{}
+	for _, d := range dirs {
+		if filepath.Base(d) != "1" {
+			t.Errorf("chapter folder should keep the archive name, got %q", filepath.Base(d))
+		}
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			t.Fatal(err)
+		}
+		counts[len(entries)] = true
+	}
+	if !counts[2] || !counts[3] {
+		t.Errorf("expected one folder with 2 images and one with 3, got sizes %v", counts)
+	}
+}
