@@ -1,6 +1,7 @@
 package slicing
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
@@ -260,5 +261,42 @@ func TestSlicerStoppedRunLeavesNothing(t *testing.T) {
 	}
 	if filepath.Base(res) != "Chapter.pdf" {
 		t.Fatalf("rerun should reuse the name, got %s", filepath.Base(res))
+	}
+}
+
+func TestSlicerStartNumber(t *testing.T) {
+	for _, start := range []int{0, 1, 5} {
+		tempOut := t.TempDir()
+		opts := SlicerOptions{
+			SaveFormat:          "JPG",
+			SlicesCount:         4,
+			SaveQuality:         90,
+			Mode:                "single",
+			SaveDirectory:       "Chapter",
+			OutputBase:          tempOut,
+			MaxWorkers:          1,
+			FilenamePattern:     "[number]",
+			FilenameDigits:      2,
+			FilenameStartNumber: start,
+		}
+		resPath, err := Slicer(tallTestImage(), opts)
+		if err != nil {
+			t.Fatalf("Slicer failed (start %d): %v", start, err)
+		}
+		entries, err := os.ReadDir(resPath)
+		if err != nil {
+			t.Fatalf("Failed to read output dir (start %d): %v", start, err)
+		}
+		if len(entries) == 0 {
+			t.Fatalf("expected slices (start %d), got none", start)
+		}
+		// os.ReadDir returns entries sorted by filename, so the names must
+		// form the sequence starting at the configured start number.
+		for i, e := range entries {
+			want := fmt.Sprintf("%02d.jpg", start+i)
+			if e.Name() != want {
+				t.Errorf("start %d: slice %d = %q, want %q", start, i, e.Name(), want)
+			}
+		}
 	}
 }

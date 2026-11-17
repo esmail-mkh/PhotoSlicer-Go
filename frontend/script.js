@@ -205,6 +205,7 @@ const translations = {
         filenamePattern: "Pattern",
         filenameDigits: "Digits",
         filenameDigitsUnit: "pad",
+        filenameStartNumber: "Start number",
         filenamePreview: "Preview:",
         filenameGuideTitle: "Placeholders Guide (click to insert):",
         guideNumber: "Sequential number (e.g. 001) - Required",
@@ -466,6 +467,7 @@ const translations = {
         filenamePattern: "الگو",
         filenameDigits: "تعداد ارقام",
         filenameDigitsUnit: "رقم",
+        filenameStartNumber: "عدد شروع",
         filenamePreview: "پیش‌نمایش:",
         filenameGuideTitle: "راهنمای متغیرها (برای افزودن کلیک کنید):",
         guideNumber: "شمارنده ترتیبی (مثال: 001) - الزامی",
@@ -1904,14 +1906,17 @@ function pickWheelColor(e) {
 (function initFilenamePreview() {
     const patternInput = document.getElementById('filename-pattern');
     const digitsInput = document.getElementById('filename-digits');
+    const startInput = document.getElementById('filename-start-number');
     const preview = document.getElementById('filename-preview-text');
-    if (!patternInput || !digitsInput || !preview) return;
+    if (!patternInput || !digitsInput || !startInput || !preview) return;
     const formatSelect = document.getElementById('format-select');
     function refreshPreview() {
         const pattern = (patternInput.value || '').trim() || '[number]';
         const digits = Math.max(1, Math.min(6, parseInt(digitsInput.value) || 3));
         const ext = (formatSelect?.value || 'jpg').toLowerCase();
-        const padded = '1'.padStart(digits, '0');
+        const startRaw = parseInt(startInput.value);
+        const start = Number.isNaN(startRaw) ? 1 : Math.max(0, startRaw);
+        const padded = String(start).padStart(digits, '0');
         
         let name = pattern;
         if (name.includes('[number]')) {
@@ -1947,6 +1952,7 @@ function pickWheelColor(e) {
     });
     patternInput.addEventListener('input', refreshPreview);
     digitsInput.addEventListener('input', refreshPreview);
+    startInput.addEventListener('input', refreshPreview);
     if (formatSelect) formatSelect.addEventListener('change', refreshPreview);
 
     // Clicking a guide chip appends its placeholder to the pattern, separated
@@ -2321,6 +2327,8 @@ function updateSettings() {
     updateEngineIcon();
     if (isInitializing) return;
     const currentTheme = document.body.getAttribute('data-theme') || 'blue';
+    // 0 is a valid start number, so only fall back to 1 when the input is empty/invalid.
+    const startNumberRaw = parseInt(document.getElementById('filename-start-number')?.value);
     const settings = {
         custom_width_checked: document.getElementById('custom-width').checked,
         width: parseInt(document.getElementById('width-input').value) || 800,
@@ -2344,6 +2352,7 @@ function updateSettings() {
         output_suffix: document.getElementById('output-suffix')?.value || ' [Stitched]',
         filename_pattern: document.getElementById('filename-pattern')?.value || '[number]',
         filename_digits: parseInt(document.getElementById('filename-digits')?.value) || 3,
+        filename_start_number: Number.isNaN(startNumberRaw) ? 1 : Math.max(0, startNumberRaw),
         custom_theme_color: document.getElementById('custom-theme-color')?.value || '',
         watermark_enabled: document.getElementById('watermark-enabled')?.checked || false,
         watermark_path: document.getElementById('watermark-path')?.value || '',
@@ -2739,6 +2748,7 @@ const PRESET_FIELD_DEFS = [
     { key: 'output_suffix', id: 'output-suffix', type: 'value', def: ' [Stitched]' },
     { key: 'filename_pattern', id: 'filename-pattern', type: 'value', def: '[number]' },
     { key: 'filename_digits', id: 'filename-digits', type: 'int', def: 3 },
+    { key: 'filename_start_number', id: 'filename-start-number', type: 'int', def: 1, allowZero: true },
     { key: 'watermark_enabled', id: 'watermark-enabled', type: 'check', def: false },
     { key: 'watermark_path', id: 'watermark-path', type: 'value', def: '' },
     { key: 'watermark_count', id: 'watermark-count', type: 'int', def: 1 },
@@ -2766,7 +2776,12 @@ function readCurrentValues() {
         const el = document.getElementById(f.id);
         if (!el) return;
         if (f.type === 'check') v[f.key] = el.checked;
-        else if (f.type === 'int') v[f.key] = parseInt(el.value) || f.def;
+        else if (f.type === 'int') {
+            const n = parseInt(el.value);
+            // 0 is valid for fields with allowZero (e.g. the start number);
+            // every other int field keeps falling back to its default.
+            v[f.key] = (Number.isNaN(n) || (n === 0 && !f.allowZero)) ? f.def : n;
+        }
         else v[f.key] = el.value || f.def;
     });
     return v;

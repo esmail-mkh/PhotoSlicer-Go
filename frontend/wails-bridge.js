@@ -1,6 +1,8 @@
 // Wails v2 bridge providing 1:1 window.pywebview.api compatibility
 (function() {
     function gatherUIParams() {
+        // 0 is a valid start number, so only fall back to 1 when the input is empty/invalid.
+        const startNumberRaw = parseInt(document.getElementById('filename-start-number')?.value, 10);
         return {
             directory: document.getElementById('directory-input')?.value || '',
             custom_width_checked: !!document.getElementById('custom-width')?.checked,
@@ -26,7 +28,8 @@
             thread_count: parseInt(document.getElementById('thread-count')?.value, 10) || 4,
             output_suffix: document.getElementById('output-suffix')?.value || ' [Stitched]',
             filename_pattern: document.getElementById('filename-pattern')?.value || '[number]',
-            filename_digits: parseInt(document.getElementById('filename-digits')?.value, 10) || 3
+            filename_digits: parseInt(document.getElementById('filename-digits')?.value, 10) || 3,
+            filename_start_number: Number.isNaN(startNumberRaw) ? 1 : Math.max(0, startNumberRaw)
         };
     }
 

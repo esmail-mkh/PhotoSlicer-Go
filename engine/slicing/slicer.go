@@ -17,20 +17,22 @@ import (
 )
 
 type SlicerOptions struct {
-	SaveFormat            string
-	SlicesCount           float64
-	SaveQuality           int
-	Mode                  string // "single" or "multi"
-	CurrentDate           string
-	SaveDirectory         string
-	IsZip                 bool
-	IsPdf                 bool
-	IsCbz                 bool
-	ProgressCallback      func(percent float64, curr, total int, item string)
-	OutputBase            string
-	MaxWorkers            int
-	FilenamePattern       string
-	FilenameDigits        int
+	SaveFormat       string
+	SlicesCount      float64
+	SaveQuality      int
+	Mode             string // "single" or "multi"
+	CurrentDate      string
+	SaveDirectory    string
+	IsZip            bool
+	IsPdf            bool
+	IsCbz            bool
+	ProgressCallback func(percent float64, curr, total int, item string)
+	OutputBase       string
+	MaxWorkers       int
+	FilenamePattern  string
+	FilenameDigits   int
+	// First slice number; 0 is valid, so never normalize <= 0 to 1 here.
+	FilenameStartNumber   int
 	WatermarkEnabled      bool
 	WatermarkPath         string
 	WatermarkCount        int
@@ -100,6 +102,10 @@ func Slicer(img image.Image, opts SlicerOptions) (result string, err error) {
 	}
 	if opts.FilenameDigits <= 0 {
 		opts.FilenameDigits = 3
+	}
+	// 0 is a valid start number, so only negatives are clamped.
+	if opts.FilenameStartNumber < 0 {
+		opts.FilenameStartNumber = 0
 	}
 
 	folderName := opts.SaveDirectory
@@ -275,9 +281,10 @@ func Slicer(img image.Image, opts SlicerOptions) (result string, err error) {
 					)
 				}
 
+				// t.index is 1-based; shift it so numbering starts at FilenameStartNumber.
 				filename := FormatFilename(
 					opts.FilenamePattern,
-					t.index,
+					t.index-1+opts.FilenameStartNumber,
 					opts.FilenameDigits,
 					opts.SaveFormat,
 					filepath.Base(savePath),

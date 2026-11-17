@@ -98,6 +98,7 @@ It automates the entire webtoon production workflow: seamless vertical stitching
 * **Advanced Output Filename Templates:**
   * Configure custom naming patterns using tokens: `[number]`, `[folder]`, `[date]`, `[total]`.
   * Customizable digit zero-padding (`1–6` digits, e.g. `001.jpg`).
+  * Configurable starting number for the counter (`0` or higher, e.g. `000.jpg` instead of `001.jpg`).
   * Real-time preview of the output filename.
 * **Thread & Performance Control:** Select active worker concurrency (`1–16` CPU threads).
 * **Presets Management:** Save configurations, set default (starred) presets for startup, and export/import presets via JSON.
