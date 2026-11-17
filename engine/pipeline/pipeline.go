@@ -74,25 +74,27 @@ func (c *Controller) CheckState() error {
 }
 
 type PipelineOptions struct {
-	Mode                  string // "single" or "multi"
-	NewWidth              int
-	IsCustomWidth         bool
-	SaveFormat            string
-	SaveQuality           int
-	SaveDirectory         string
-	HeightLimit           int
-	CurrentDate           string
-	IsZip                 bool
-	IsPdf                 bool
-	IsCbz                 bool
-	IsNoStitch            bool
-	ProgressCallback      func(percent float64, curr, total int, item string)
-	WebpFallbackCallback  func()
-	OutputBase            string
-	MaxWorkers            int
-	AutoTuneWorkers       bool
-	FilenamePattern       string
-	FilenameDigits        int
+	Mode                 string // "single" or "multi"
+	NewWidth             int
+	IsCustomWidth        bool
+	SaveFormat           string
+	SaveQuality          int
+	SaveDirectory        string
+	HeightLimit          int
+	CurrentDate          string
+	IsZip                bool
+	IsPdf                bool
+	IsCbz                bool
+	IsNoStitch           bool
+	ProgressCallback     func(percent float64, curr, total int, item string)
+	WebpFallbackCallback func()
+	OutputBase           string
+	MaxWorkers           int
+	AutoTuneWorkers      bool
+	FilenamePattern      string
+	FilenameDigits       int
+	// First slice number; 0 is valid, so never normalize <= 0 to 1 here.
+	FilenameStartNumber   int
 	WatermarkEnabled      bool
 	WatermarkPath         string
 	WatermarkCount        int
@@ -106,6 +108,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 	savePath, err = slicing.ReserveOutputDir(savePath)
 	if err != nil {
 		return "", err
+	}
+	// 0 is a valid start number, so only negatives are clamped.
+	if opts.FilenameStartNumber < 0 {
+		opts.FilenameStartNumber = 0
 	}
 	var startedArchives []string
 	defer func() {
@@ -190,9 +196,10 @@ func ProcessBatchNoStitch(images []string, savePath string, opts PipelineOptions
 					)
 				}
 
+				// task.index is 0-based; the first file uses FilenameStartNumber.
 				filename := slicing.FormatFilename(
 					opts.FilenamePattern,
-					task.index+1,
+					task.index+opts.FilenameStartNumber,
 					opts.FilenameDigits,
 					opts.SaveFormat,
 					filepath.Base(savePath),
@@ -400,6 +407,7 @@ func MergerImages(inputFolder string, opts PipelineOptions) (string, error) {
 		MaxWorkers:            opts.MaxWorkers,
 		FilenamePattern:       opts.FilenamePattern,
 		FilenameDigits:        opts.FilenameDigits,
+		FilenameStartNumber:   opts.FilenameStartNumber,
 		WatermarkEnabled:      opts.WatermarkEnabled,
 		WatermarkPath:         opts.WatermarkPath,
 		WatermarkCount:        opts.WatermarkCount,

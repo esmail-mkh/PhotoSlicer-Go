@@ -422,3 +422,48 @@ func TestNoStitchFailedRunLeavesNothing(t *testing.T) {
 		t.Fatalf("rerun should reuse the name, got %s", filepath.Base(res))
 	}
 }
+
+func TestProcessBatchNoStitchStartNumber(t *testing.T) {
+	for _, tc := range []struct {
+		start int
+		want  []string
+	}{
+		{0, []string{"000.jpg", "001.jpg", "002.jpg"}},
+		{1, []string{"001.jpg", "002.jpg", "003.jpg"}},
+		{5, []string{"005.jpg", "006.jpg", "007.jpg"}},
+	} {
+		tempSrc := t.TempDir()
+		tempOut := t.TempDir()
+
+		_ = createTestImages(t, tempSrc, 3, 200, 300)
+
+		opts := PipelineOptions{
+			Mode:                "single",
+			IsNoStitch:          true,
+			SaveFormat:          "JPG",
+			SaveQuality:         90,
+			OutputBase:          tempOut,
+			MaxWorkers:          2,
+			FilenamePattern:     "[number]",
+			FilenameDigits:      3,
+			FilenameStartNumber: tc.start,
+		}
+
+		resPath, err := MergerImages(tempSrc, opts)
+		if err != nil {
+			t.Fatalf("MergerImages no-stitch failed (start %d): %v", tc.start, err)
+		}
+		entries, err := os.ReadDir(resPath)
+		if err != nil {
+			t.Fatalf("Failed to read output dir (start %d): %v", tc.start, err)
+		}
+		if len(entries) != len(tc.want) {
+			t.Fatalf("start %d: got %d files, want %d", tc.start, len(entries), len(tc.want))
+		}
+		for i, e := range entries {
+			if e.Name() != tc.want[i] {
+				t.Errorf("start %d: file %d = %q, want %q", tc.start, i, e.Name(), tc.want[i])
+			}
+		}
+	}
+}

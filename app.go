@@ -276,39 +276,40 @@ func (a *App) GetAppVersion() string {
 func (a *App) defaultSettings() map[string]interface{} {
 	initialEngine, gpuInfo := enhancer.GetOptimalEnhanceEngine()
 	return map[string]interface{}{
-		"custom_width_checked": true,
-		"width":                800,
-		"height_limit":         16000,
-		"save_quality":         95,
-		"save_format":          "JPG",
-		"zip_checked":          false,
-		"pdf_checked":          false,
-		"cbz_checked":          false,
-		"enhance_checked":      false,
-		"enhance_engine":       initialEngine,
-		"gpu_detected":         gpuInfo.Name != "",
-		"detected_gpu":         gpuInfo.Name,
-		"detected_vram_mb":     gpuInfo.DedicatedVRAMMB,
-		"no_stitch_checked":    false,
-		"selected_tab":         "process",
-		"theme":                "blue",
-		"language":             "fa",
-		"save_location":        "",
-		"save_next_to_source":  false,
-		"play_sound":           true,
-		"show_notification":    true,
-		"thread_count":         4,
-		"output_suffix":        " [Stitched]",
-		"filename_pattern":     "[number]",
-		"filename_digits":      3,
-		"custom_theme_color":   "",
-		"watermark_enabled":    false,
-		"watermark_path":       "",
-		"watermark_count":      1,
-		"watermark_edge":       "right",
-		"watermark_margin":     0,
-		"presets":              []interface{}{},
-		"default_preset":       nil,
+		"custom_width_checked":  true,
+		"width":                 800,
+		"height_limit":          16000,
+		"save_quality":          95,
+		"save_format":           "JPG",
+		"zip_checked":           false,
+		"pdf_checked":           false,
+		"cbz_checked":           false,
+		"enhance_checked":       false,
+		"enhance_engine":        initialEngine,
+		"gpu_detected":          gpuInfo.Name != "",
+		"detected_gpu":          gpuInfo.Name,
+		"detected_vram_mb":      gpuInfo.DedicatedVRAMMB,
+		"no_stitch_checked":     false,
+		"selected_tab":          "process",
+		"theme":                 "blue",
+		"language":              "fa",
+		"save_location":         "",
+		"save_next_to_source":   false,
+		"play_sound":            true,
+		"show_notification":     true,
+		"thread_count":          4,
+		"output_suffix":         " [Stitched]",
+		"filename_pattern":      "[number]",
+		"filename_digits":       3,
+		"filename_start_number": 1,
+		"custom_theme_color":    "",
+		"watermark_enabled":     false,
+		"watermark_path":        "",
+		"watermark_count":       1,
+		"watermark_edge":        "right",
+		"watermark_margin":      0,
+		"presets":               []interface{}{},
+		"default_preset":        nil,
 	}
 }
 
@@ -669,6 +670,7 @@ func (a *App) applySettingsToDOM(settings map[string]interface{}) {
 			setVal('output-suffix', s.output_suffix || ' [Stitched]');
 			setVal('filename-pattern', s.filename_pattern || '[number]');
 			setVal('filename-digits', s.filename_digits || 3);
+			setVal('filename-start-number', s.filename_start_number ?? 1);
 			setVal('custom-theme-color', s.custom_theme_color || '');
 			setChecked('watermark-enabled', s.watermark_enabled);
 			setVal('watermark-path', s.watermark_path || '');
@@ -1237,6 +1239,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 		filenamePattern = "[number]"
 	}
 	filenameDigits := int(getFloatOrInt(params["filename_digits"], 3))
+	filenameStartNumber := int(getFloatOrInt(params["filename_start_number"], 1))
 
 	// Bounds validation
 	if saveQualityVal < 1 {
@@ -1275,6 +1278,11 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 		filenameDigits = 1
 	} else if filenameDigits > 10 {
 		filenameDigits = 10
+	}
+	if filenameStartNumber < 0 {
+		filenameStartNumber = 0
+	} else if filenameStartNumber > 999999 {
+		filenameStartNumber = 999999
 	}
 
 	// Detect mode: check if directory contains supported images directly or subfolders
@@ -1392,6 +1400,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 			AutoTuneWorkers:       true,
 			FilenamePattern:       filenamePattern,
 			FilenameDigits:        filenameDigits,
+			FilenameStartNumber:   filenameStartNumber,
 			WatermarkEnabled:      wmEnabled,
 			WatermarkPath:         wmPath,
 			WatermarkCount:        wmCount,
@@ -1584,6 +1593,7 @@ func (a *App) runJob(params map[string]interface{}, inQueue bool) queue.Result {
 				AutoTuneWorkers:       true,
 				FilenamePattern:       filenamePattern,
 				FilenameDigits:        filenameDigits,
+				FilenameStartNumber:   filenameStartNumber,
 				WatermarkEnabled:      wmEnabled,
 				WatermarkPath:         wmPath,
 				WatermarkCount:        wmCount,
